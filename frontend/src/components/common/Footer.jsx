@@ -1,11 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck } from 'react-icons/lu';
+import { apiRequest } from '../../api';
+import { useBooking } from '../../context/BookingContext';
 
 export default function Footer() {
-  const cities = [
-    'Moradabad', 'Rampur', 'Amroha', 'Gajraula', 'Sambhal', 'Chandausi', 'Noorpur', 'Dhampur', 'Bijnor'
-  ];
+  const { selectedCity, setSelectedCity, cities: contextCities } = useBooking();
+  const [cities, setCities] = useState(Array.isArray(contextCities) ? contextCities : []);
+
+  // Dynamic fetch to get live cities and render list according to count
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCities() {
+      try {
+        const res = await apiRequest('/locations/cities');
+        if (isMounted && res && res.success !== false && Array.isArray(res.cities)) {
+          setCities(res.cities);
+          return;
+        }
+      } catch (err) {
+        console.warn('Dynamic cities fetch notice:', err);
+      }
+      if (isMounted) {
+        setCities([]);
+      }
+    }
+
+    if (Array.isArray(contextCities) && contextCities.length > 0) {
+      setCities(contextCities);
+    } else {
+      fetchCities();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [contextCities]);
 
   return (
     <footer className="bg-[#10231D] text-[#F4EFE6] pt-14 pb-24 md:pb-14 border-t border-[#3D524A]">
@@ -35,7 +65,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-2 text-xs text-[#E9A23B] font-semibold">
               <LuShieldCheck className="w-4 h-4" />
-              <span>Verified Professional Crews · Commercial Grade Chemicals</span>
+              <span>Verified Professional Crews</span>
             </div>
           </div>
 
@@ -75,21 +105,49 @@ export default function Footer() {
 
           {/* Col 3: Operational Service Areas */}
           <div>
-            <h5 className="font-display font-bold text-base text-[#F4EFE6] mb-4">
-              Active Service Coverage
-            </h5>
+            <div className="flex items-center justify-between mb-3">
+              <h5 className="font-display font-bold text-base text-[#F4EFE6]">
+                Active Service Coverage
+              </h5>
+              {cities.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#E9A23B]/20 text-[#E9A23B] text-[10px] font-mono font-bold border border-[#E9A23B]/30">
+                  {cities.length} Cities
+                </span>
+              )}
+            </div>
             <p className="text-xs text-[#DDEBE4]/70 mb-3">
-              Daily technician deployment across Western Uttar Pradesh:
+              Daily technician deployment across {cities.length > 0 ? `${cities.length} ` : ''}Western UP cities:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {cities.map((city) => (
-                <span
-                  key={city}
-                  className="px-2.5 py-1 rounded bg-[#3D524A]/40 text-xs text-[#DDEBE4] border border-[#3D524A]"
-                >
-                  {city}
-                </span>
-              ))}
+              {cities.map((city) => {
+                const cityName = typeof city === 'string' ? city : (city.name || city.slug);
+                const citySlug = typeof city === 'string' ? city.toLowerCase() : (city.slug || city.name?.toLowerCase());
+                const cityKey = typeof city === 'string' ? city : (city._id || city.slug || city.name);
+                const isSelected = selectedCity && (
+                  (typeof selectedCity === 'string' && selectedCity.toLowerCase() === citySlug) ||
+                  selectedCity.slug === citySlug ||
+                  selectedCity.name === cityName
+                );
+
+                return (
+                  <button
+                    key={cityKey}
+                    type="button"
+                    onClick={() => {
+                      const targetCity = typeof city === 'string' ? { name: city, slug: citySlug } : city;
+                      setSelectedCity(targetCity);
+                    }}
+                    title={`Select ${cityName} as your service city`}
+                    className={`px-2.5 py-1 rounded text-xs transition-all cursor-pointer border ${
+                      isSelected
+                        ? 'bg-[#E9A23B] text-[#10231D] font-bold border-[#E9A23B] shadow-sm ring-1 ring-[#E9A23B]/50'
+                        : 'bg-[#3D524A]/40 text-[#DDEBE4] hover:bg-[#3D524A] hover:text-[#F4EFE6] border-[#3D524A]'
+                    }`}
+                  >
+                    {cityName}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -13,14 +13,17 @@ import { FaWhatsapp } from 'react-icons/fa6';
 import { useToast } from '../context/ToastContext';
 
 import { publicAPI } from '../api';
+import { useBooking } from '../context/BookingContext';
+import CustomSelect from '../components/common/CustomSelect';
 
 export default function ContactPage() {
   const { toast } = useToast();
+  const { cities, selectedCity } = useBooking();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
-    city: 'Moradabad',
+    city: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : ''),
     message: ''
   });
   const [submitting, setSubmitting] = useState(false);
@@ -207,21 +210,15 @@ export default function ContactPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1">City / Region</label>
-                    <select
+                    <CustomSelect
                       value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] outline-none"
-                    >
-                      <option value="Moradabad">Moradabad</option>
-                      <option value="Rampur">Rampur</option>
-                      <option value="Amroha">Amroha</option>
-                      <option value="Sambhal">Sambhal</option>
-                      <option value="Chandausi">Chandausi</option>
-                      <option value="Noorpur">Noorpur</option>
-                      <option value="Dhampur">Dhampur</option>
-                      <option value="Bijnor">Bijnor</option>
-                      <option value="Kanth">Kanth</option>
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, city: val })}
+                      options={cities.map((c) => {
+                        const name = typeof c === 'string' ? c : (c.name || c.slug);
+                        return { value: name, label: name };
+                      })}
+                      placeholder="Select City..."
+                    />
                   </div>
                 </div>
 

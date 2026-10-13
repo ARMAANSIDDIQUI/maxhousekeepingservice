@@ -9,8 +9,13 @@ import {
   LuPhone,
   LuAward
 } from 'react-icons/lu';
+import { useBooking } from '../context/BookingContext';
 
 export default function AboutPage() {
+  const { cities } = useBooking();
+  const displayCities = cities && cities.length > 0
+    ? cities.map(c => typeof c === 'string' ? c : (c.name || c.slug))
+    : ['Moradabad', 'Rampur', 'Amroha', 'Sambhal', 'Chandausi', 'Noorpur', 'Dhampur', 'Bijnor', 'Kanth'];
   return (
     <div className="py-12 md:py-20 bg-[#F4EFE6] text-[#10231D]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -137,7 +142,7 @@ export default function AboutPage() {
                 Our rapid mobile squads operate across Moradabad, Rampur, Amroha, Sambhal, Chandausi, Noorpur, Dhampur, Bijnor, and Kanth with same-day and scheduled dispatch availability.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                {['Moradabad', 'Rampur', 'Amroha', 'Sambhal', 'Chandausi', 'Noorpur', 'Dhampur', 'Bijnor', 'Kanth'].map((city) => (
+                {displayCities.map((city) => (
                   <div key={city} className="flex items-center gap-2 text-xs font-bold text-[#F4EFE6]">
                     <LuCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
                     <span>{city}</span>

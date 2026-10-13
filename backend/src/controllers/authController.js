@@ -377,7 +377,8 @@ export async function googleLogin(req, res, next) {
       try {
         const parts = credential.split('.');
         if (parts.length === 3) {
-          const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
+          // Google JWT payload uses RFC 7519 base64url encoding
+          const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
           const googleUser = JSON.parse(payloadJson);
           email = googleUser.email || email;
           name = googleUser.name || name;

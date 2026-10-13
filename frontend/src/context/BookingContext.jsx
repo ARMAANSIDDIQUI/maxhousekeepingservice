@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiRequest } from '../api/client';
+import { apiRequest } from '../api';
 import { useToast } from './ToastContext';
 
 const BookingContext = createContext(null);
@@ -15,6 +15,26 @@ export function BookingProvider({ children }) {
       return null;
     }
   });
+
+  const [cities, setCities] = useState([]);
+
+  // Load cities dynamically from MongoDB
+  useEffect(() => {
+    async function loadCities() {
+      try {
+        const res = await apiRequest('/locations/cities');
+        if (res && res.success !== false && Array.isArray(res.cities)) {
+          setCities(res.cities);
+          if (!selectedCity && res.cities.length > 0) {
+            setSelectedCity(res.cities[0]);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load cities in BookingContext:', err);
+      }
+    }
+    loadCities();
+  }, []);
 
   useEffect(() => {
     if (selectedCity) {
@@ -217,6 +237,8 @@ export function BookingProvider({ children }) {
         isQuoting,
         selectedCity,
         setSelectedCity,
+        cities,
+        setCities,
         couponCode,
         appliedCoupon,
         addressMode,

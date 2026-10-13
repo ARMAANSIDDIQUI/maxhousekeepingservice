@@ -654,7 +654,7 @@ export function getFallbackResponse(url, options = {}) {
   }
 
   if (cleanPath === '/locations/cities') {
-    return { success: false, cities: [] };
+    return { success: false, cities: [], count: 0 };
   }
 
   if (cleanPath === '/public/brands') {

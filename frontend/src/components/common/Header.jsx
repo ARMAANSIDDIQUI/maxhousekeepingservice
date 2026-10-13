@@ -18,8 +18,8 @@ import Modal from './Modal';
 
 export default function Header() {
   const { user, logout, isAdmin } = useAuth();
-  const { selectedCity, setSelectedCity, items } = useBooking();
-  const [cities, setCities] = useState([]);
+  const { selectedCity, setSelectedCity, cities: contextCities, items } = useBooking();
+  const [cities, setCities] = useState(contextCities || []);
   const [servicesList, setServicesList] = useState([]);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
@@ -33,8 +33,12 @@ export default function Header() {
     return [...servicesList].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [servicesList]);
 
-  // Load cities list dynamically from MongoDB
+  // Load cities list dynamically from MongoDB / context
   useEffect(() => {
+    if (contextCities && contextCities.length > 0) {
+      setCities(contextCities);
+      return;
+    }
     async function fetchCities() {
       try {
         const res = await apiRequest('/locations/cities');
@@ -51,7 +55,7 @@ export default function Header() {
       }
     }
     fetchCities();
-  }, []);
+  }, [contextCities, selectedCity, setSelectedCity]);
 
   // Dynamically load active services from MongoDB for the Services Dropdown
   useEffect(() => {
@@ -104,7 +108,7 @@ export default function Header() {
                 className="flex items-center gap-1 text-[#E9A23B] hover:text-[#D48E28] font-semibold transition-colors cursor-pointer"
               >
                 <LuMapPin className="w-3.5 h-3.5" />
-                <span>{selectedCity?.name || 'Moradabad'}</span>
+                <span>{selectedCity?.name || 'Select City'}</span>
                 <LuChevronDown className="w-3 h-3" />
               </button>
             </div>
@@ -146,16 +150,16 @@ export default function Header() {
               onMouseEnter={() => setIsServicesDropdownOpen(true)}
               onMouseLeave={() => setIsServicesDropdownOpen(false)}
             >
-              <button
-                type="button"
-                onClick={() => setIsServicesDropdownOpen(!isServicesDropdownOpen)}
+              <Link
+                to="/services"
+                onClick={() => setIsServicesDropdownOpen(false)}
                 className={`flex items-center gap-1 hover:text-[#E9A23B] transition-colors py-1 cursor-pointer ${
                   location.pathname.startsWith('/services') ? 'text-[#E9A23B] font-bold' : ''
                 }`}
               >
                 <span>Services</span>
                 <LuChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isServicesDropdownOpen ? 'rotate-180 text-[#E9A23B]' : ''}`} />
-              </button>
+              </Link>
 
               {isServicesDropdownOpen && (
                 <div className="absolute left-0 top-full pt-2 z-50 w-72">
@@ -238,7 +242,7 @@ export default function Header() {
               className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-xs font-semibold text-[#10231D] transition-colors cursor-pointer"
             >
               <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>{selectedCity?.name || 'Moradabad'}</span>
+              <span>{selectedCity?.name || 'Select City'}</span>
               <LuChevronDown className="w-3 h-3 text-[#6B8077]" />
             </button>
 
@@ -415,32 +419,38 @@ export default function Header() {
         maxWidth="max-w-md"
       >
         <div className="grid grid-cols-2 gap-2.5 mt-2">
-          {cities.map((city) => {
-            const isSelected = selectedCity?.slug === city.slug;
-            return (
-              <button
-                key={city.slug || city.name}
-                type="button"
-                onClick={() => {
-                  setSelectedCity(city);
-                  setIsCityModalOpen(false);
-                }}
-                className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                  isSelected
-                    ? 'border-[#E9A23B] bg-[#ECE5D8] font-bold text-[#10231D] ring-2 ring-[#E9A23B]/30'
-                    : 'border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D]'
-                }`}
-              >
-                <div>
-                  <p className="text-sm">{city.name}</p>
-                  <p className="text-[11px] text-[#6B8077]">UP, India</p>
-                </div>
-                {isSelected && (
-                  <span className="w-2 h-2 rounded-full bg-[#E9A23B]" />
-                )}
-              </button>
-            );
-          })}
+          {cities && cities.length > 0 ? (
+            cities.map((city) => {
+              const isSelected = selectedCity?.slug === city.slug;
+              return (
+                <button
+                  key={city.slug || city.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCity(city);
+                    setIsCityModalOpen(false);
+                  }}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                    isSelected
+                      ? 'border-[#E9A23B] bg-[#ECE5D8] font-bold text-[#10231D] ring-2 ring-[#E9A23B]/30'
+                      : 'border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D]'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm">{city.name}</p>
+                    <p className="text-[11px] text-[#6B8077]">UP, India</p>
+                  </div>
+                  {isSelected && (
+                    <span className="w-2 h-2 rounded-full bg-[#E9A23B]" />
+                  )}
+                </button>
+              );
+            })
+          ) : (
+            <div className="col-span-2 text-center text-xs text-[#6B8077] py-6">
+              No service cities currently loaded.
+            </div>
+          )}
         </div>
       </Modal>
     </>

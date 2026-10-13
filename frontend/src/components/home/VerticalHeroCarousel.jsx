@@ -29,8 +29,46 @@ export default function VerticalHeroCarousel({ services = [] }) {
 
   if (!services || services.length === 0) {
     return (
-      <div className="w-full max-w-lg min-h-[460px] rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center text-xs font-mono text-[#6B8077] animate-pulse">
-        LOADING ACTIVE SERVICES...
+      <div className="relative w-full max-w-lg rounded-3xl overflow-hidden border-2 border-[#181511] shadow-2xl bg-[#181511] min-h-[460px] flex flex-col justify-between">
+        <div className="relative h-64 sm:h-72 w-full overflow-hidden bg-[#12100E]">
+          <img
+            src="/media/services/full-home-deep-cleaning.jpg"
+            alt="Max Housekeeping Service - Professional Cleaning"
+            className="w-full h-full object-cover object-center"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#181511] via-[#181511]/30 to-transparent" />
+          <div className="absolute bottom-3 right-4 w-10 h-10 rounded-xl bg-[#F4EFE6] text-[#181511] flex items-center justify-center shadow-lg border border-[#E2D9C8]">
+            <LuClock className="w-5 h-5 text-[#E9A23B]" />
+          </div>
+        </div>
+        <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between text-[#F4EFE6]">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-mono text-[#E9A23B] uppercase tracking-widest mb-1.5">
+              <span>Western UP · Professional Cleaning</span>
+            </div>
+            <h3 className="font-display font-black text-xl sm:text-2xl text-[#F4EFE6] leading-snug">
+              Professional Deep Cleaning
+            </h3>
+            <p className="text-xs text-[#DDEBE4]/80 mt-1.5 leading-relaxed">
+              Industrial single-disc scrubbing, sofa extraction shampooing, and hospital-grade disinfection across Western UP.
+            </p>
+          </div>
+          <div className="pt-4 mt-3 border-t border-[#E2D9C8]/15 flex items-center justify-between gap-4">
+            <div>
+              <span className="text-xl font-display font-black text-[#E9A23B]">Verified Crew</span>
+              <span className="text-[10px] text-[#DDEBE4]/60 uppercase tracking-wider block">Eco-Safe Chemistry</span>
+            </div>
+            <Link
+              to="/services"
+              className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs tracking-wide transition-all shadow-md"
+            >
+              Explore Services
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
