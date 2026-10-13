@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   LuPhone,
@@ -12,15 +12,15 @@ import {
 } from 'react-icons/lu';
 import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
-import { apiRequest, FALLBACK_CITIES, FALLBACK_SERVICES } from '../../api';
+import { apiRequest } from '../../api';
 import { getServiceIcon } from '../../utils/iconHelper';
 import Modal from './Modal';
 
 export default function Header() {
   const { user, logout, isAdmin } = useAuth();
   const { selectedCity, setSelectedCity, items } = useBooking();
-  const [cities, setCities] = useState(FALLBACK_CITIES);
-  const [servicesList, setServicesList] = useState(FALLBACK_SERVICES);
+  const [cities, setCities] = useState([]);
+  const [servicesList, setServicesList] = useState([]);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -28,22 +28,26 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Load cities list
+  // Memoize sorted services
+  const sortedServices = useMemo(() => {
+    return [...servicesList].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  }, [servicesList]);
+
+  // Load cities list dynamically from MongoDB
   useEffect(() => {
     async function fetchCities() {
       try {
         const res = await apiRequest('/locations/cities');
-        if (res.success && res.cities && res.cities.length > 0) {
+        if (res && res.success !== false && res.cities && res.cities.length > 0) {
           setCities(res.cities);
           if (!selectedCity) {
             setSelectedCity(res.cities[0]);
           }
+        } else {
+          setCities([]);
         }
       } catch {
-        setCities(FALLBACK_CITIES);
-        if (!selectedCity) {
-          setSelectedCity(FALLBACK_CITIES[0]);
-        }
+        setCities([]);
       }
     }
     fetchCities();
@@ -54,12 +58,13 @@ export default function Header() {
     async function fetchServices() {
       try {
         const res = await apiRequest('/services');
-        if (res.success && res.services && res.services.length > 0) {
+        if (res && res.success !== false && res.services && res.services.length > 0) {
           setServicesList(res.services);
+        } else {
+          setServicesList([]);
         }
-      } catch (err) {
-        console.warn('Network services fetch notice, using fallback services in header:', err);
-        setServicesList(FALLBACK_SERVICES);
+      } catch {
+        setServicesList([]);
       }
     }
     fetchServices();
@@ -156,8 +161,8 @@ export default function Header() {
                 <div className="absolute left-0 top-full pt-2 z-50 w-72">
                   <div className="bg-[#F4EFE6] border border-[#E2D9C8] rounded-2xl shadow-2xl p-2 animate-fadeIn">
                     <div className="max-h-[380px] overflow-y-auto space-y-1">
-                      {servicesList.length > 0 ? (
-                        servicesList.map((svc) => (
+                      {sortedServices.length > 0 ? (
+                        sortedServices.map((svc) => (
                           <Link
                             key={svc._id || svc.slug}
                             to={`/services/${svc.slug}`}

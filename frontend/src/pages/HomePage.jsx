@@ -11,23 +11,17 @@ import {
   LuAward,
   LuMapPin
 } from 'react-icons/lu';
-import {
-  apiRequest,
-  FALLBACK_CATEGORIES,
-  FALLBACK_SERVICES,
-  FALLBACK_BRANDS,
-  FALLBACK_TESTIMONIALS
-} from '../api';
+import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
 import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
 
 export default function HomePage() {
-  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
-  const [featuredServices, setFeaturedServices] = useState(FALLBACK_SERVICES.filter(s => s.isPopular));
-  const [allServices, setAllServices] = useState(FALLBACK_SERVICES);
-  const [brands, setBrands] = useState(FALLBACK_BRANDS);
-  const [testimonials, setTestimonials] = useState(FALLBACK_TESTIMONIALS);
+  const [categories, setCategories] = useState([]);
+  const [featuredServices, setFeaturedServices] = useState([]);
+  const [allServices, setAllServices] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [testimonials, setTestimonials] = useState([]);
   const { addItem, selectedCity } = useBooking();
 
   useEffect(() => {
@@ -41,23 +35,42 @@ export default function HomePage() {
           apiRequest('/public/testimonials')
         ]);
 
-        if (catsRes.status === 'fulfilled' && catsRes.value?.categories?.length > 0) {
+        if (catsRes.status === 'fulfilled' && catsRes.value?.categories && catsRes.value.categories.length > 0) {
           setCategories(catsRes.value.categories);
+        } else {
+          setCategories([]);
         }
-        if (srvsRes.status === 'fulfilled' && srvsRes.value?.services?.length > 0) {
+
+        if (srvsRes.status === 'fulfilled' && srvsRes.value?.services && srvsRes.value.services.length > 0) {
           setFeaturedServices(srvsRes.value.services);
+        } else {
+          setFeaturedServices([]);
         }
-        if (allSrvsRes.status === 'fulfilled' && allSrvsRes.value?.services?.length > 0) {
+
+        if (allSrvsRes.status === 'fulfilled' && allSrvsRes.value?.services && allSrvsRes.value.services.length > 0) {
           setAllServices(allSrvsRes.value.services);
+        } else {
+          setAllServices([]);
         }
-        if (brandsRes.status === 'fulfilled' && brandsRes.value?.brands?.length > 0) {
+
+        if (brandsRes.status === 'fulfilled' && brandsRes.value?.brands && brandsRes.value.brands.length > 0) {
           setBrands(brandsRes.value.brands);
+        } else {
+          setBrands([]);
         }
-        if (testsRes.status === 'fulfilled' && testsRes.value?.testimonials?.length > 0) {
+
+        if (testsRes.status === 'fulfilled' && testsRes.value?.testimonials && testsRes.value.testimonials.length > 0) {
           setTestimonials(testsRes.value.testimonials);
+        } else {
+          setTestimonials([]);
         }
       } catch (err) {
-        console.warn('Home data load network notice, serving cached fallbacks:', err);
+        console.warn('Network error loading home data:', err);
+        setCategories([]);
+        setFeaturedServices([]);
+        setAllServices([]);
+        setBrands([]);
+        setTestimonials([]);
       }
     }
     loadData();
@@ -185,81 +198,84 @@ export default function HomePage() {
       )}
 
       {/* 3. Six Main Categories Grid with Real Photos */}
-      <section className="py-20 bg-[#F4EFE6]">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="chip mb-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E9A23B]"></span>
-              What we offer
-            </span>
-            <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight mb-3">
-              Cleaning Services for Every Corner
-            </h2>
-            <p className="text-sm text-[#3D524A]">
-              From a quick bathroom refresh to a full-home deep clean — pick a category and we'll handle the rest.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {categories.map((cat) => (
-              <Link
-                key={cat.slug}
-                to={`/services?category=${cat.slug}`}
-                className="group rounded-2xl border border-[#E2D9C8] bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col"
-              >
-                <div className="h-48 overflow-hidden relative">
-                  <img
-                    src={cat.image?.url || `/media/categories/${cat.slug}.jpg`}
-                    alt={cat.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => { e.currentTarget.src = '/media/categories/home-deep-cleaning.jpg'; }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#10231D]/60 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
-                    <span className="text-xs font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-[#10231D]/80">
-                      {cat.serviceCount > 0 ? `${cat.serviceCount} services` : 'Packages Available'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-6 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors mb-2">
-                      {cat.name}
-                    </h3>
-                    <p className="text-xs text-[#3D524A] leading-relaxed mb-4">
-                      {cat.description || cat.tagline}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between text-xs font-bold text-[#10231D] pt-3 border-t border-[#E2D9C8]">
-                    <span>View Packages</span>
-                    <LuArrowRight className="w-4 h-4 text-[#E9A23B] group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Interactive Blueprint Room Map */}
-      <RoomMap />
-
-      {/* 5. Most-Booked Services with Live Dual-Pricing (MRP vs Offered Price) */}
-      <section className="py-20 bg-[#F4EFE6] border-t border-[#E2D9C8]">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
-            <div>
-              <div className="inline-block text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B] mb-2">
-                Popular picks
-              </div>
-              <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight">
-                Most-Booked Services
+      {categories.length > 0 && (
+        <section className="py-20 bg-[#F4EFE6]">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <span className="chip mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E9A23B]"></span>
+                What we offer
+              </span>
+              <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight mb-3">
+                Cleaning Services for Every Corner
               </h2>
-              <p className="text-xs text-[#6B8077] mt-1">
-                Loved by thousands of customers across Western Uttar Pradesh.
+              <p className="text-sm text-[#3D524A]">
+                From a quick bathroom refresh to a full-home deep clean — pick a category and we'll handle the rest.
               </p>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {categories.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  to={`/services?category=${cat.slug}`}
+                  className="group rounded-2xl border border-[#E2D9C8] bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col"
+                >
+                  <div className="h-48 overflow-hidden relative">
+                    <img
+                      src={cat.image?.url || `/media/categories/${cat.slug}.jpg`}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => { e.currentTarget.src = '/media/categories/home-deep-cleaning.jpg'; }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#10231D]/60 via-transparent to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
+                      <span className="text-xs font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-[#10231D]/80">
+                        {cat.serviceCount > 0 ? `${cat.serviceCount} services` : 'Packages Available'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-6 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors mb-2">
+                        {cat.name}
+                      </h3>
+                      <p className="text-xs text-[#3D524A] leading-relaxed mb-4">
+                        {cat.description || cat.tagline}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-bold text-[#10231D] pt-3 border-t border-[#E2D9C8]">
+                      <span>View Packages</span>
+                      <LuArrowRight className="w-4 h-4 text-[#E9A23B] group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 4. Interactive Blueprint Room Map */}
+      <RoomMap services={allServices} />
+
+      {/* 5. Most-Booked Services with Live Dual-Pricing (MRP vs Offered Price) */}
+      {featuredServices.length > 0 && (
+        <section className="py-20 bg-[#F4EFE6] border-t border-[#E2D9C8]">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
+              <div>
+                <div className="inline-block text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B] mb-2">
+                  Popular picks
+                </div>
+                <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight">
+                  Most-Booked Services
+                </h2>
+                <p className="text-xs text-[#6B8077] mt-1">
+                  Loved by thousands of customers across Western Uttar Pradesh.
+                </p>
+              </div>
             <Link
               to="/services"
               className="mt-4 md:mt-0 text-sm font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
@@ -351,6 +367,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* 6. Dynamic Admin-Managed Testimonials Section */}
       {testimonials.length > 0 && (

@@ -19,7 +19,14 @@ import {
   deleteTestimonial,
   getAdminContactMessages,
   updateContactMessageStatus,
-  deleteContactMessage
+  deleteContactMessage,
+  getAdminCities,
+  createCity,
+  updateCity,
+  deleteCity,
+  getAdminUsers,
+  updateUserRole,
+  deleteUser
 } from '../controllers/adminController.js';
 import { uploadImage, deleteImage } from '../controllers/uploadController.js';
 import { upload } from '../middleware/upload.js';
@@ -42,6 +49,17 @@ router.get('/services', getAdminServices);
 router.post('/services', createService);
 router.put('/services/:id', updateService);
 router.delete('/services/:id', deleteService);
+
+// Cities Management (Admin CRUD saved on MongoDB)
+router.get('/cities', getAdminCities);
+router.post('/cities', createCity);
+router.put('/cities/:id', updateCity);
+router.delete('/cities/:id', deleteCity);
+
+// Registered Users Database (MongoDB Atlas)
+router.get('/users', getAdminUsers);
+router.put('/users/:id/role', updateUserRole);
+router.delete('/users/:id', deleteUser);
 
 // Cloudinary Image Uploads (Services, Testimonials, Brands, Media)
 router.post('/upload', upload.single('image'), uploadImage);

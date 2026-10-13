@@ -20,14 +20,12 @@ import {
   LuX,
   LuInbox,
   LuPhone,
-  LuMail
+  LuMail,
+  LuMapPin
 } from 'react-icons/lu';
 import {
   apiRequest,
-  adminAPI,
-  FALLBACK_STATS,
-  FALLBACK_SERVICES,
-  FALLBACK_TESTIMONIALS
+  adminAPI
 } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -35,11 +33,13 @@ import Modal from '../../components/common/Modal';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'testimonials' | 'messages'
-  const [stats, setStats] = useState(FALLBACK_STATS);
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'cities' | 'testimonials' | 'messages'
+  const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
-  const [services, setServices] = useState(FALLBACK_SERVICES);
-  const [testimonials, setTestimonials] = useState(FALLBACK_TESTIMONIALS);
+  const [services, setServices] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [testimonials, setTestimonials] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -56,6 +56,19 @@ export default function AdminDashboard() {
     imageUrl: ''
   });
   const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
+
+  // City Modal & Form State
+  const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [editingCity, setEditingCity] = useState(null);
+  const [cityForm, setCityForm] = useState({
+    name: '',
+    slug: '',
+    state: 'Uttar Pradesh',
+    serviceRadiusKm: 25,
+    pincodes: '',
+    status: 'active',
+    sortOrder: 0
+  });
 
   // Testimonial Modal & Form State
   const [testimonialModalOpen, setTestimonialModalOpen] = useState(false);
@@ -94,10 +107,12 @@ export default function AdminDashboard() {
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [statsRes, bookingsRes, servicesRes, testsRes, msgsRes] = await Promise.allSettled([
+      const [statsRes, bookingsRes, servicesRes, citiesRes, usersRes, testsRes, msgsRes] = await Promise.allSettled([
         apiRequest('/admin/stats'),
         apiRequest('/admin/bookings?limit=50'),
         apiRequest('/admin/services'),
+        adminAPI.getCities(),
+        adminAPI.getUsers(),
         adminAPI.getTestimonials(),
         adminAPI.getContactMessages()
       ]);
@@ -111,6 +126,12 @@ export default function AdminDashboard() {
       if (servicesRes.status === 'fulfilled' && servicesRes.value?.services?.length > 0) {
         setServices(servicesRes.value.services);
       }
+      if (citiesRes.status === 'fulfilled' && Array.isArray(citiesRes.value?.cities)) {
+        setCities(citiesRes.value.cities);
+      }
+      if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value?.users)) {
+        setUsers(usersRes.value.users);
+      }
       if (testsRes.status === 'fulfilled' && testsRes.value?.testimonials?.length > 0) {
         setTestimonials(testsRes.value.testimonials);
       }
@@ -118,7 +139,7 @@ export default function AdminDashboard() {
         setContactMessages(msgsRes.value.messages);
       }
     } catch (err) {
-      console.warn('Failed loading live admin data, using cached fallback data:', err);
+      console.warn('Failed loading live admin data from MongoDB:', err);
     } finally {
       setLoading(false);
     }
@@ -374,6 +395,132 @@ export default function AdminDashboard() {
     }
   };
 
+  // Open City Modal
+  const openCityModal = (city = null) => {
+    if (city) {
+      setEditingCity(city);
+      setCityForm({
+        name: city.name || '',
+        slug: city.slug || '',
+        state: city.state || 'Uttar Pradesh',
+        serviceRadiusKm: city.serviceRadiusKm || 25,
+        pincodes: Array.isArray(city.pincodes) ? city.pincodes.join(', ') : '',
+        status: city.status || 'active',
+        sortOrder: city.sortOrder || 0
+      });
+    } else {
+      setEditingCity(null);
+      setCityForm({
+        name: '',
+        slug: '',
+        state: 'Uttar Pradesh',
+        serviceRadiusKm: 25,
+        pincodes: '',
+        status: 'active',
+        sortOrder: cities.length + 1
+      });
+    }
+    setCityModalOpen(true);
+  };
+
+  // Save City (Create or Update in MongoDB)
+  const handleSaveCity = async (e) => {
+    e.preventDefault();
+    if (!cityForm.name.trim()) {
+      toast.error('City name is required.');
+      return;
+    }
+    const pincodesArray = cityForm.pincodes
+      .split(',')
+      .map(p => p.trim())
+      .filter(Boolean);
+
+    const payload = {
+      name: cityForm.name.trim(),
+      slug: cityForm.slug.trim() || cityForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      state: cityForm.state.trim() || 'Uttar Pradesh',
+      serviceRadiusKm: Number(cityForm.serviceRadiusKm) || 25,
+      pincodes: pincodesArray,
+      status: cityForm.status,
+      sortOrder: Number(cityForm.sortOrder) || 0
+    };
+
+    try {
+      if (editingCity?._id) {
+        const res = await adminAPI.updateCity(editingCity._id, payload);
+        if (res.success) {
+          toast.success(`City "${res.city.name}" updated successfully!`);
+          setCities(prev => prev.map(c => c._id === editingCity._id ? res.city : c));
+          setCityModalOpen(false);
+        }
+      } else {
+        const res = await adminAPI.createCity(payload);
+        if (res.success) {
+          toast.success(`City "${res.city.name}" added successfully!`);
+          setCities(prev => [...prev, res.city]);
+          setCityModalOpen(false);
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to save city.');
+    }
+  };
+
+  // Toggle City Status
+  const handleToggleCityStatus = async (city) => {
+    try {
+      const nextStatus = city.status === 'active' ? 'inactive' : 'active';
+      const res = await adminAPI.updateCity(city._id, { status: nextStatus });
+      if (res.success) {
+        toast.success(`City ${city.name} marked as ${nextStatus}.`);
+        setCities(prev => prev.map(c => c._id === city._id ? { ...c, status: nextStatus } : c));
+      }
+    } catch (err) {
+      toast.error('Failed to update city status.');
+    }
+  };
+
+  // Delete City
+  const handleDeleteCity = async (id, cityName) => {
+    if (!window.confirm(`Are you sure you want to delete "${cityName}"?`)) return;
+    try {
+      const res = await adminAPI.deleteCity(id);
+      if (res.success) {
+        toast.success(`City "${cityName}" deleted successfully.`);
+        setCities(prev => prev.filter(c => c._id !== id));
+      }
+    } catch (err) {
+      toast.error('Failed to delete city.');
+    }
+  };
+
+  // Update User Role
+  const handleUpdateUserRole = async (userId, newRole) => {
+    try {
+      const res = await adminAPI.updateUserRole(userId, newRole);
+      if (res.success) {
+        toast.success(`User role updated to ${newRole}.`);
+        setUsers(prev => prev.map(u => u._id === userId ? { ...u, role: newRole } : u));
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update user role.');
+    }
+  };
+
+  // Delete User Account
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) return;
+    try {
+      const res = await adminAPI.deleteUser(userId);
+      if (res.success) {
+        toast.success(`User "${userName}" removed.`);
+        setUsers(prev => prev.filter(u => u._id !== userId));
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete user.');
+    }
+  };
+
   const unreadMessagesCount = contactMessages.filter(m => m.status === 'unread').length;
 
   return (
@@ -398,7 +545,7 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('bookings')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 activeTab === 'bookings'
                   ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                   : 'text-[#10231D] hover:bg-[#E2D9C8]'
@@ -415,7 +562,7 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('services')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 activeTab === 'services'
                   ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                   : 'text-[#10231D] hover:bg-[#E2D9C8]'
@@ -426,15 +573,49 @@ export default function AdminDashboard() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('cities')}
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'cities'
+                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
+                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
+              }`}
+            >
+              <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span>Cities & Regions</span>
+              {cities.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
+                  {cities.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('users')}
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                activeTab === 'users'
+                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
+                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
+              }`}
+            >
+              <LuUsers className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span>Users Database</span>
+              {users.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
+                  {users.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('testimonials')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 activeTab === 'testimonials'
                   ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                   : 'text-[#10231D] hover:bg-[#E2D9C8]'
               }`}
             >
               <LuStar className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Home Testimonials</span>
+              <span>Testimonials</span>
               {testimonials.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
                   {testimonials.length}
@@ -444,14 +625,14 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('messages')}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
                 activeTab === 'messages'
                   ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                   : 'text-[#10231D] hover:bg-[#E2D9C8]'
               }`}
             >
               <LuMail className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Contact Inquiries</span>
+              <span>Inquiries</span>
               {unreadMessagesCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#C2512D] text-white font-bold animate-pulse">
                   {unreadMessagesCount}
@@ -461,7 +642,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* 4 Overview Stat Cards */}
+        {/* Overview Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
             <span className="text-[11px] font-mono font-bold text-[#6B8077]">TOTAL ORDERS</span>
@@ -470,9 +651,9 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">PENDING CREW</span>
-            <p className="font-display font-black text-3xl text-[#C2512D] mt-1 tnum">
-              {stats?.pendingBookings || 0}
+            <span className="text-[11px] font-mono font-bold text-[#6B8077]">ACTIVE CITIES</span>
+            <p className="font-display font-black text-3xl text-[#E9A23B] mt-1 tnum">
+              {cities.filter(c => c.status === 'active').length || cities.length}
             </p>
           </div>
           <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
@@ -482,9 +663,9 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">ACTIVE TESTIMONIALS</span>
-            <p className="font-display font-black text-3xl text-[#E9A23B] mt-1 tnum">
-              {testimonials.filter(t => t.isActive !== false).length}
+            <span className="text-[11px] font-mono font-bold text-[#6B8077]">REGISTERED USERS (DB)</span>
+            <p className="font-display font-black text-3xl text-[#10231D] mt-1 tnum">
+              {users.length}
             </p>
           </div>
         </div>
@@ -893,6 +1074,259 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => handleDeleteMessage(msg._id)}
                             className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1]"
+                          >
+                            <LuTrash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 5: CITIES & SERVICE REGIONS
+        ======================================================== */}
+        {activeTab === 'cities' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Operational Cities & Regions</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#E9A23B] text-[#10231D]">
+                    {cities.length} Active
+                  </span>
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Manage service delivery cities and coverage pincodes.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => openCityModal()}
+                className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
+              >
+                <LuPlus className="w-4 h-4" />
+                <span>Add New City</span>
+              </button>
+            </div>
+
+            {cities.length === 0 ? (
+              <div className="py-12 text-center text-[#6B8077]">
+                <LuMapPin className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#E9A23B]" />
+                <p className="text-sm font-bold text-[#10231D]">No service cities found</p>
+                <p className="text-xs text-[#6B8077] mt-1">Click "+ Add New City" to register an active service location.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
+                      <th className="py-3 px-3">City Name</th>
+                      <th className="py-3 px-3">State & Slug</th>
+                      <th className="py-3 px-3">Service Radius</th>
+                      <th className="py-3 px-3">Covered Pincodes</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3">Sort Order</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2D9C8]/60">
+                    {cities.map((city) => (
+                      <tr key={city._id} className="hover:bg-[#F4EFE6]/50">
+                        <td className="py-3 px-3">
+                          <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                            <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                            <span>{city.name}</span>
+                          </p>
+                        </td>
+                        <td className="py-3 px-3">
+                          <p className="text-[#10231D] font-medium">{city.state || 'Uttar Pradesh'}</p>
+                          <code className="text-[10px] text-[#6B8077] font-mono">/{city.slug}</code>
+                        </td>
+                        <td className="py-3 px-3 font-mono font-bold text-[#10231D]">
+                          {city.serviceRadiusKm || 25} km
+                        </td>
+                        <td className="py-3 px-3 max-w-[260px]">
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(city.pincodes) && city.pincodes.length > 0 ? (
+                              city.pincodes.slice(0, 5).map((pin, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-1.5 py-0.5 rounded bg-[#F4EFE6] border border-[#E2D9C8] text-[10px] font-mono text-[#10231D]"
+                                >
+                                  {pin}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[11px] text-[#6B8077] italic">All city areas</span>
+                            )}
+                            {city.pincodes?.length > 5 && (
+                              <span className="text-[10px] text-[#6B8077] font-mono self-center">
+                                +{city.pincodes.length - 5} more
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCityStatus(city)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-colors ${
+                              city.status === 'active'
+                                ? 'bg-[#DDEBE4] text-[#10231D] border border-[#BED6CC]'
+                                : city.status === 'coming_soon'
+                                ? 'bg-[#F4E4C8] text-[#8C5D17] border border-[#E6CB9D]'
+                                : 'bg-[#EAE4DC] text-[#6B8077] border border-[#D5CCC0]'
+                            }`}
+                          >
+                            {city.status || 'active'}
+                          </button>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-center text-[#10231D]">
+                          {city.sortOrder || 0}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openCityModal(city)}
+                              className="p-1.5 rounded-lg bg-[#F4EFE6] hover:bg-[#E2D9C8] text-[#10231D] border border-[#E2D9C8]"
+                              title="Edit City Details"
+                            >
+                              <LuSquarePen className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCity(city._id, city.name)}
+                              className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1]"
+                              title="Delete City"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 6: REGISTERED USERS DATABASE
+        ======================================================== */}
+        {activeTab === 'users' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Users & Customer Database</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#10231D] text-[#F4EFE6]">
+                    {users.length} Accounts
+                  </span>
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Registered customer profiles and role-based administration.
+                </p>
+              </div>
+            </div>
+
+            {users.length === 0 ? (
+              <div className="py-12 text-center text-[#6B8077]">
+                <LuUsers className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#10231D]" />
+                <p className="text-sm font-bold text-[#10231D]">No registered users loaded</p>
+                <p className="text-xs text-[#6B8077] mt-1">Users will appear here as soon as they create an account via the Sign Up form.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
+                      <th className="py-3 px-3">User Profile</th>
+                      <th className="py-3 px-3">Contact Details</th>
+                      <th className="py-3 px-3">Role</th>
+                      <th className="py-3 px-3">Saved Addresses</th>
+                      <th className="py-3 px-3">Registered Date</th>
+                      <th className="py-3 px-3 text-right">Account Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2D9C8]/60">
+                    {users.map((u) => (
+                      <tr key={u._id} className="hover:bg-[#F4EFE6]/50">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={u.avatarUrl || 'https://api.dicebear.com/7.x/initials/svg?seed=MH'}
+                              alt={u.name}
+                              className="w-8 h-8 rounded-full border border-[#E2D9C8] bg-white object-cover shrink-0"
+                            />
+                            <div>
+                              <p className="font-bold text-[#10231D]">{u.name}</p>
+                              <span className="text-[10px] text-[#6B8077] font-mono capitalize">
+                                Provider: {u.authProvider || 'local'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <a
+                            href={`tel:${u.phone}`}
+                            className="font-semibold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1"
+                          >
+                            <LuPhone className="w-3 h-3 text-[#E9A23B]" />
+                            <span>{u.phone}</span>
+                          </a>
+                          {u.email && (
+                            <a
+                              href={`mailto:${u.email}`}
+                              className="text-[11px] text-[#6B8077] hover:underline flex items-center gap-1 mt-0.5"
+                            >
+                              <LuMail className="w-3 h-3 text-[#6B8077]" />
+                              <span>{u.email}</span>
+                            </a>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleUpdateUserRole(u._id, e.target.value)}
+                            className={`px-2 py-1 rounded-lg text-xs font-bold border focus:outline-none ${
+                              u.role === 'admin'
+                                ? 'bg-[#E9A23B] text-[#10231D] border-[#D48E28]'
+                                : u.role === 'cleaner'
+                                ? 'bg-[#DDEBE4] text-[#10231D] border-[#BED6CC]'
+                                : 'bg-[#F4EFE6] text-[#10231D] border-[#E2D9C8]'
+                            }`}
+                          >
+                            <option value="customer">Customer</option>
+                            <option value="cleaner">Cleaner Staff</option>
+                            <option value="admin">Administrator</option>
+                          </select>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#10231D]">
+                          {u.addresses?.length || 0} locations
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#6B8077]">
+                          {new Date(u.createdAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u._id, u.name)}
+                            disabled={u._id === user?._id}
+                            className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] disabled:opacity-40 text-[#C2512D] border border-[#F2D7D1]"
+                            title={u._id === user?._id ? 'Cannot delete current logged-in user' : 'Delete user permanently'}
                           >
                             <LuTrash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1334,6 +1768,138 @@ export default function AdminDashboard() {
                 </button>
               </form>
             </div>
+          </Modal>
+        )}
+
+        {/* ========================================================
+            MODAL 4: ADD / EDIT CITY IN MONGODB
+        ======================================================== */}
+        {cityModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setCityModalOpen(false)}
+            title={editingCity ? `Edit City: ${editingCity.name}` : 'Add New Operational City'}
+            subtitle="Manage service delivery city and covered pincodes"
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleSaveCity} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  City Name:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bareilly, Meerut, Sambhal"
+                  value={cityForm.name}
+                  onChange={(e) => setCityForm({ ...cityForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    URL Slug:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. bareilly"
+                    value={cityForm.slug}
+                    onChange={(e) => setCityForm({ ...cityForm, slug: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    State:
+                  </label>
+                  <input
+                    type="text"
+                    value={cityForm.state}
+                    onChange={(e) => setCityForm({ ...cityForm, state: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Service Radius (km):
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={150}
+                    value={cityForm.serviceRadiusKm}
+                    onChange={(e) => setCityForm({ ...cityForm, serviceRadiusKm: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Status:
+                  </label>
+                  <select
+                    value={cityForm.status}
+                    onChange={(e) => setCityForm({ ...cityForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  >
+                    <option value="active">Active (Available)</option>
+                    <option value="coming_soon">Coming Soon</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Covered Pincodes (comma-separated):
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="244001, 244002, 244102"
+                  value={cityForm.pincodes}
+                  onChange={(e) => setCityForm({ ...cityForm, pincodes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none leading-relaxed"
+                />
+                <p className="text-[10px] text-[#6B8077] mt-1">
+                  List specific postal codes serviced by our mobile equipment vans.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Sort Order:
+                </label>
+                <input
+                  type="number"
+                  value={cityForm.sortOrder}
+                  onChange={(e) => setCityForm({ ...cityForm, sortOrder: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-mono"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2.5 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setCityModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                >
+                  {editingCity ? 'Save Changes' : 'Save City'}
+                </button>
+              </div>
+            </form>
           </Modal>
         )}
       </div>

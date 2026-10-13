@@ -7,7 +7,25 @@ const BookingContext = createContext(null);
 export function BookingProvider({ children }) {
   // Booking items in cart: [{ service, selections: { size: '2-bhk' }, qty: 1 }]
   const [items, setItems] = useState([]);
-  const [selectedCity, setSelectedCity] = useState(null); // { id, name, slug }
+  const [selectedCity, setSelectedCity] = useState(() => {
+    try {
+      const saved = localStorage.getItem('max_selected_city');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (selectedCity) {
+      try {
+        localStorage.setItem('max_selected_city', JSON.stringify(selectedCity));
+      } catch (err) {
+        console.warn('Failed to cache selected city:', err);
+      }
+    }
+  }, [selectedCity]);
+
   const [quote, setQuote] = useState(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [couponCode, setCouponCode] = useState('');

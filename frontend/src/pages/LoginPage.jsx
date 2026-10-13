@@ -1,27 +1,90 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LuMail, LuLock, LuPhone, LuShieldCheck, LuArrowRight, LuKey } from 'react-icons/lu';
+import {
+  LuMail,
+  LuLock,
+  LuPhone,
+  LuShieldCheck,
+  LuArrowRight,
+  LuArrowLeft,
+  LuKey,
+  LuUser,
+  LuUserPlus,
+  LuEye,
+  LuEyeOff,
+  LuCheck,
+  LuRotateCcw
+} from 'react-icons/lu';
 import { FaGoogle } from 'react-icons/fa6';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 export default function LoginPage() {
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
   const [authMethod, setAuthMethod] = useState('password'); // 'password' | 'otp'
+
+  // Password Visibility States
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+
+  // Sign In States
   const [identifier, setIdentifier] = useState(''); // email or phone
   const [password, setPassword] = useState('');
-  
-  // OTP State
+
+  // Sign Up Multi-Step Verification States
+  const [signupStep, setSignupStep] = useState(1); // 1: Info Form, 2: Email OTP
+  const [signupOtp, setSignupOtp] = useState('');
+  const [signupOtpSent, setSignupOtpSent] = useState(false);
+  const [signupForm, setSignupForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  // Email OTP Login State (Passwordless Sign In)
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpName, setOtpName] = useState('');
   const [otpPhone, setOtpPhone] = useState('');
+
+  // Forgot Password State
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+
   const [loading, setLoading] = useState(false);
 
-  const { login, requestOtp, verifyOtp, googleLogin } = useAuth();
+  const {
+    login,
+    sendSignupOtp,
+    register,
+    requestOtp,
+    verifyOtp,
+    googleLogin,
+    forgotPassword,
+    resetPassword
+  } = useAuth();
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  React.useEffect(() => {
+    document.title =
+      mode === 'signin'
+        ? 'Login Page | Max Housekeeping Service'
+        : mode === 'signup'
+        ? 'Create Account | Max Housekeeping Service'
+        : 'Reset Password | Max Housekeeping Service';
+  }, [mode]);
 
   const handlePostLoginRedirect = (userRole) => {
     if (userRole === 'admin') {
@@ -44,12 +107,84 @@ export default function LoginPage() {
     const res = await login(identifier.trim(), password);
     setLoading(false);
 
-    if (res.success && res.user) {
+    if (res?.success && res?.user) {
       handlePostLoginRedirect(res.user.role);
     }
   };
 
-  // 2. Request 6-digit Email OTP
+  // 2. Sign Up Step 1: Validate Details and Send Email OTP
+  const handleSignupSendOtp = async (e) => {
+    e.preventDefault();
+    const { name, phone, email, password: pw, confirmPassword: cpw } = signupForm;
+
+    if (!name.trim()) {
+      toast.error('Please enter your full name.');
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      toast.error('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@')) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+
+    if (pw.length < 6) {
+      toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (pw !== cpw) {
+      toast.error('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await sendSignupOtp({
+      name: name.trim(),
+      phone: cleanPhone,
+      email: email.trim().toLowerCase()
+    });
+    setLoading(false);
+
+    if (res?.success) {
+      setSignupStep(2);
+      setSignupOtpSent(true);
+    }
+  };
+
+  // 3. Sign Up Step 2: Verify Email OTP and Create Verified User in DB
+  const handleSignupFinalSubmit = async (e) => {
+    e.preventDefault();
+    const { name, phone, email, password: pw } = signupForm;
+
+    if (!signupOtp.trim() || signupOtp.trim().length !== 6) {
+      toast.error('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/\D/g, '');
+
+    setLoading(true);
+    const res = await register({
+      name: name.trim(),
+      phone: cleanPhone,
+      email: email.trim().toLowerCase(),
+      password: pw,
+      otp: signupOtp.trim()
+    });
+    setLoading(false);
+
+    if (res?.success && res?.user) {
+      handlePostLoginRedirect(res.user.role);
+    }
+  };
+
+  // 4. Request 6-digit Email OTP for Direct Passwordless Login
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     if (!otpEmail.trim() || !otpEmail.includes('@')) {
@@ -61,12 +196,12 @@ export default function LoginPage() {
     const res = await requestOtp(otpEmail.trim());
     setLoading(false);
 
-    if (res.success) {
+    if (res?.success) {
       setOtpSent(true);
     }
   };
 
-  // 3. Verify OTP & Login
+  // 5. Verify OTP & Direct Login
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
@@ -78,25 +213,106 @@ export default function LoginPage() {
     const res = await verifyOtp(otpEmail.trim(), otpCode.trim(), otpName, otpPhone);
     setLoading(false);
 
-    if (res.success && res.user) {
+    if (res?.success && res?.user) {
       handlePostLoginRedirect(res.user.role);
     }
   };
 
-  // 4. Google OAuth Sim
-  const handleGoogleSignIn = async () => {
+  // 6. Forgot Password - Request Reset Code
+  const handleForgotRequestOtp = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim() || !forgotEmail.includes('@')) {
+      toast.error('Please enter your registered email address.');
+      return;
+    }
+
     setLoading(true);
-    // Simulates standard Google OAuth response profile
-    const dummyGoogleProfile = {
-      email: 'client.google@gmail.com',
-      name: 'Google Verified User',
-      avatarUrl: 'https://lh3.googleusercontent.com/a/default-user=s96-c'
-    };
-    const res = await googleLogin(dummyGoogleProfile);
+    const res = await forgotPassword(forgotEmail.trim());
     setLoading(false);
 
-    if (res.success && res.user) {
-      handlePostLoginRedirect(res.user.role);
+    if (res?.success) {
+      setForgotOtpSent(true);
+    }
+  };
+
+  // 7. Reset Password Submit with OTP
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotCode.trim() || forgotCode.trim().length !== 6) {
+      toast.error('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    if (forgotNewPassword.length < 6) {
+      toast.error('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      toast.error('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    const res = await resetPassword(
+      forgotEmail.trim(),
+      forgotCode.trim(),
+      forgotNewPassword
+    );
+    setLoading(false);
+
+    if (res?.success) {
+      setIdentifier(forgotEmail.trim());
+      setForgotOtpSent(false);
+      setForgotCode('');
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setMode('signin');
+      setAuthMethod('password');
+    }
+  };
+
+  // Google OAuth Client ID from Environment
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+  // Initialize Google Identity Services
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.google?.accounts?.id && googleClientId) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response) => {
+            if (response?.credential) {
+              setLoading(true);
+              const res = await googleLogin({ credential: response.credential });
+              setLoading(false);
+              if (res?.success && res?.user) {
+                handlePostLoginRedirect(res.user.role);
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('Google Identity initialization notice:', err);
+      }
+    }
+  }, [googleClientId]);
+
+  // 8. Google OAuth button handler
+  const handleGoogleSignIn = () => {
+    if (!googleClientId) {
+      toast.info('Google Sign-In is enabled. Please enter your VITE_GOOGLE_CLIENT_ID in the frontend .env file.');
+      return;
+    }
+
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          toast.info('Google Sign-In prompt was skipped or blocked by browser. Please check popup settings.');
+        }
+      });
+    } else {
+      toast.info('Google Identity Services is loading. Please try again in a moment.');
     }
   };
 
@@ -104,7 +320,7 @@ export default function LoginPage() {
     <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-[#ECE5D8] p-8 rounded-3xl border-2 border-[#10231D] shadow-2xl">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <img
             src="/logo.png"
             alt="Max House Keeping Service"
@@ -112,124 +328,558 @@ export default function LoginPage() {
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <h1 className="font-display font-black text-2xl sm:text-3xl text-[#10231D]">
-            Single Unified Portal
+            {mode === 'signin'
+              ? 'Login Page'
+              : mode === 'signup'
+              ? 'Create Account'
+              : 'Reset Password'}
           </h1>
           <p className="text-xs text-[#6B8077] mt-1 font-medium">
-            Customer Bookings & Administrative Portal
+            {mode === 'signin'
+              ? 'Sign in to your account'
+              : mode === 'signup'
+              ? (signupStep === 1
+                ? 'Fill details and verify with email OTP'
+                : 'Enter verification code to complete sign up')
+              : 'Enter your email to receive a password reset code'}
           </p>
         </div>
 
-        {/* Auth Method Tabs */}
-        <div className="flex rounded-xl bg-[#F4EFE6] p-1 border border-[#E2D9C8] mb-6">
-          <button
-            type="button"
-            onClick={() => setAuthMethod('password')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
-              authMethod === 'password'
-                ? 'bg-[#10231D] text-[#F4EFE6] shadow-sm'
-                : 'text-[#10231D] hover:bg-[#ECE5D8]'
-            }`}
-          >
-            Password Login
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthMethod('otp')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
-              authMethod === 'otp'
-                ? 'bg-[#10231D] text-[#F4EFE6] shadow-sm'
-                : 'text-[#10231D] hover:bg-[#ECE5D8]'
-            }`}
-          >
-            Email 6-Digit OTP
-          </button>
-        </div>
-
-        {/* 1. PASSWORD LOGIN FORM */}
-        {authMethod === 'password' && (
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#10231D] mb-1">
-                Email or Mobile Number:
-              </label>
-              <div className="relative">
-                <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
-                <input
-                  type="text"
-                  placeholder="admin@maxhousekeepingservice.com"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#10231D] mb-1">
-                Password:
-              </label>
-              <div className="relative">
-                <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
-                <input
-                  type="password"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
-            </div>
-
+        {/* Mode Navigation Bar */}
+        {mode === 'forgot' ? (
+          <div className="mb-6">
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm transition-transform active:scale-95 shadow-md mt-2 flex items-center justify-center gap-2"
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setForgotOtpSent(false);
+              }}
+              className="text-xs font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
             >
-              <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
-              <LuArrowRight className="w-4 h-4" />
+              <LuArrowLeft className="w-4 h-4" />
+              <span>Back to Login</span>
             </button>
-          </form>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 rounded-2xl bg-[#F4EFE6] p-1 border border-[#E2D9C8] mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setSignupStep(1);
+              }}
+              className={`py-2.5 text-xs font-black rounded-xl transition-all ${
+                mode === 'signin'
+                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
+                  : 'text-[#10231D] hover:bg-[#ECE5D8]'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className={`py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'signup'
+                  ? 'bg-[#E9A23B] text-[#10231D] shadow'
+                  : 'text-[#10231D] hover:bg-[#ECE5D8]'
+              }`}
+            >
+              <LuUserPlus className="w-3.5 h-3.5" />
+              <span>Create Account</span>
+            </button>
+          </div>
         )}
 
-        {/* 2. EMAIL 6-DIGIT OTP FORM */}
-        {authMethod === 'otp' && (
-          <div>
-            {!otpSent ? (
-              <form onSubmit={handleRequestOtp} className="space-y-4">
+        {/* ========================================================
+            MODE A: SIGN IN (Password or Email OTP)
+        ======================================================== */}
+        {mode === 'signin' && (
+          <>
+            {/* Sub-tabs: Password vs OTP */}
+            <div className="flex rounded-xl bg-[#F4EFE6]/70 p-1 border border-[#E2D9C8] mb-5">
+              <button
+                type="button"
+                onClick={() => setAuthMethod('password')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                  authMethod === 'password'
+                    ? 'bg-[#10231D] text-[#F4EFE6]'
+                    : 'text-[#10231D] hover:bg-[#ECE5D8]'
+                }`}
+              >
+                Password Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod('otp')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                  authMethod === 'otp'
+                    ? 'bg-[#10231D] text-[#F4EFE6]'
+                    : 'text-[#10231D] hover:bg-[#ECE5D8]'
+                }`}
+              >
+                Email 6-Digit OTP
+              </button>
+            </div>
+
+            {/* 1. PASSWORD SIGN IN */}
+            {authMethod === 'password' && (
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Enter Your Email for Verification:
+                    Email or Mobile Number:
+                  </label>
+                  <div className="relative">
+                    <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type="text"
+                      placeholder="admin@maxhousekeepingservice.com or mobile"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Password:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (identifier.includes('@')) {
+                          setForgotEmail(identifier.trim());
+                        }
+                        setMode('forgot');
+                        setForgotOtpSent(false);
+                      }}
+                      className="text-xs font-bold text-[#E9A23B] hover:text-[#D48E28] transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      placeholder="••••••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-10 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      title={showLoginPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showLoginPassword ? (
+                        <LuEyeOff className="w-4 h-4" />
+                      ) : (
+                        <LuEye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm transition-transform active:scale-95 shadow-md mt-2 flex items-center justify-center gap-2"
+                >
+                  <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
+                  <LuArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            )}
+
+            {/* 2. EMAIL 6-DIGIT OTP SIGN IN */}
+            {authMethod === 'otp' && (
+              <div>
+                {!otpSent ? (
+                  <form onSubmit={handleRequestOtp} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#10231D] mb-1">
+                        Enter Your Email for Verification:
+                      </label>
+                      <div className="relative">
+                        <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                        <input
+                          type="email"
+                          placeholder="you@example.com"
+                          value={otpEmail}
+                          onChange={(e) => setOtpEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <p className="text-[11px] text-[#6B8077] mt-1.5">
+                        We will send a 6-digit one-time verification code to your email inbox.
+                      </p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] disabled:opacity-50 text-[#F4EFE6] font-bold text-sm transition-colors shadow-md mt-2"
+                    >
+                      {loading ? 'Sending Code...' : 'Send Verification Code'}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                    <div className="p-3 rounded-xl bg-[#DDEBE4] text-[#10231D] text-xs font-medium border border-[#BED6CC]">
+                      Verification code sent to <strong>{otpEmail}</strong>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#10231D] mb-1">
+                        Enter 6-Digit Code:
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="123456"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Your Name (optional)"
+                        value={otpName}
+                        onChange={(e) => setOtpName(e.target.value)}
+                        className="p-2.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Mobile (optional)"
+                        value={otpPhone}
+                        onChange={(e) => setOtpPhone(e.target.value)}
+                        className="p-2.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOtpSent(false)}
+                        className="px-3 py-3 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#6B8077] hover:bg-[#F4EFE6]"
+                      >
+                        Change Email
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-sm shadow-md"
+                      >
+                        {loading ? 'Verifying...' : 'Verify & Log In'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ========================================================
+            MODE B: CREATE ACCOUNT (WITH EMAIL OTP VERIFICATION STEPS)
+        ======================================================== */}
+        {mode === 'signup' && (
+          <div>
+            {/* Visual Step Indicator Alongside Form */}
+            <div className="flex items-center justify-between mb-5 px-1">
+              <button
+                type="button"
+                onClick={() => setSignupStep(1)}
+                className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
+                  signupStep === 1 ? 'text-[#10231D]' : 'text-[#6B8077] hover:text-[#10231D]'
+                }`}
+              >
+                <span
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                    signupStep === 1
+                      ? 'bg-[#10231D] text-[#F4EFE6]'
+                      : 'bg-[#DDEBE4] text-[#10231D]'
+                  }`}
+                >
+                  {signupStep > 1 ? <LuCheck className="w-3 h-3" /> : '1'}
+                </span>
+                <span>Account Info</span>
+              </button>
+
+              <div className="flex-1 h-0.5 bg-[#E2D9C8] mx-3" />
+
+              <div
+                className={`flex items-center gap-1.5 text-xs font-bold ${
+                  signupStep === 2 ? 'text-[#10231D]' : 'text-[#6B8077]'
+                }`}
+              >
+                <span
+                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                    signupStep === 2
+                      ? 'bg-[#E9A23B] text-[#10231D]'
+                      : 'bg-[#E2D9C8] text-[#6B8077]'
+                  }`}
+                >
+                  2
+                </span>
+                <span>Email OTP</span>
+              </div>
+            </div>
+
+            {/* STEP 1: FILL DETAILS & SEND OTP */}
+            {signupStep === 1 && (
+              <form onSubmit={handleSignupSendOtp} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Full Name:
+                  </label>
+                  <div className="relative">
+                    <LuUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={signupForm.name}
+                      onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      10-Digit Mobile:
+                    </label>
+                    <div className="relative">
+                      <LuPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        placeholder="9876543210"
+                        value={signupForm.phone}
+                        onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Email Address:
+                    </label>
+                    <div className="relative">
+                      <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                      <input
+                        type="email"
+                        placeholder="you@gmail.com"
+                        value={signupForm.email}
+                        onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Create Password (min 6 characters):
+                  </label>
+                  <div className="relative">
+                    <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type={showSignupPassword ? 'text' : 'password'}
+                      placeholder="••••••••••••"
+                      value={signupForm.password}
+                      onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignupPassword(!showSignupPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      title={showSignupPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showSignupPassword ? (
+                        <LuEyeOff className="w-4 h-4" />
+                      ) : (
+                        <LuEye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Confirm Password:
+                  </label>
+                  <div className="relative">
+                    <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type={showSignupConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••••••"
+                      value={signupForm.confirmPassword}
+                      onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      title={showSignupConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showSignupConfirmPassword ? (
+                        <LuEyeOff className="w-4 h-4" />
+                      ) : (
+                        <LuEye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center gap-2"
+                  >
+                    <span>{loading ? 'Sending Code...' : 'Verify Email & Continue'}</span>
+                    <LuArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 2: ENTER EMAIL OTP & COMPLETE SIGNUP */}
+            {signupStep === 2 && (
+              <form onSubmit={handleSignupFinalSubmit} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-[#DDEBE4] text-[#10231D] text-xs font-medium border border-[#BED6CC] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span>Verification code sent to:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSignupStep(1)}
+                      className="font-bold text-[#10231D] hover:underline flex items-center gap-1"
+                    >
+                      <span>Edit Details</span>
+                    </button>
+                  </div>
+                  <div className="font-mono font-bold text-sm text-[#10231D]">
+                    {signupForm.email}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Enter 6-Digit Verification Code:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={signupOtp}
+                    onChange={(e) => setSignupOtp(e.target.value)}
+                    className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-[#6B8077] mt-1.5 text-center">
+                    Check your email inbox or spam folder for the one-time code.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSignupSendOtp}
+                    disabled={loading}
+                    className="px-3.5 py-3 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#6B8077] hover:bg-[#F4EFE6] flex items-center gap-1"
+                  >
+                    <LuRotateCcw className="w-3.5 h-3.5" />
+                    <span>Resend Code</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center gap-2"
+                  >
+                    <LuShieldCheck className="w-4 h-4 text-[#10231D]" />
+                    <span>{loading ? 'Verifying...' : 'Verify & Create Account'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            MODE C: FORGOT / RESET PASSWORD (WITH EMAIL OTP VERIFICATION)
+        ======================================================== */}
+        {mode === 'forgot' && (
+          <div>
+            {!forgotOtpSent ? (
+              <form onSubmit={handleForgotRequestOtp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Your Registered Email Address:
                   </label>
                   <div className="relative">
                     <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type="email"
                       placeholder="you@example.com"
-                      value={otpEmail}
-                      onChange={(e) => setOtpEmail(e.target.value)}
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                       required
                     />
                   </div>
                   <p className="text-[11px] text-[#6B8077] mt-1.5">
-                    We will send a 6-digit one-time code to your inbox.
+                    We will send a 6-digit one-time verification code to this email to reset your password.
                   </p>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] disabled:opacity-50 text-[#F4EFE6] font-bold text-sm transition-colors shadow-md mt-2"
+                  className="w-full py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm transition-transform active:scale-95 shadow-md flex items-center justify-center gap-2"
                 >
-                  {loading ? 'Sending Code...' : 'Send Verification Code'}
+                  <span>{loading ? 'Sending Code...' : 'Send Reset Code'}</span>
+                  <LuArrowRight className="w-4 h-4" />
                 </button>
+
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('signin');
+                      setForgotOtpSent(false);
+                    }}
+                    className="text-xs font-bold text-[#6B8077] hover:text-[#10231D] transition-colors"
+                  >
+                    Remember your password? Sign In
+                  </button>
+                </div>
               </form>
             ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
                 <div className="p-3 rounded-xl bg-[#DDEBE4] text-[#10231D] text-xs font-medium border border-[#BED6CC]">
-                  Verification code sent to <strong>{otpEmail}</strong>
+                  Verification code sent to <strong>{forgotEmail}</strong>
                 </div>
 
                 <div>
@@ -240,44 +890,85 @@ export default function LoginPage() {
                     type="text"
                     maxLength={6}
                     placeholder="123456"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
+                    value={forgotCode}
+                    onChange={(e) => setForgotCode(e.target.value)}
                     className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    placeholder="Your Name (optional)"
-                    value={otpName}
-                    onChange={(e) => setOtpName(e.target.value)}
-                    className="p-2.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Mobile (optional)"
-                    value={otpPhone}
-                    onChange={(e) => setOtpPhone(e.target.value)}
-                    className="p-2.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs"
-                  />
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    New Password (min 6 characters):
+                  </label>
+                  <div className="relative">
+                    <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type={showForgotNewPassword ? 'text' : 'password'}
+                      placeholder="••••••••••••"
+                      value={forgotNewPassword}
+                      onChange={(e) => setForgotNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      title={showForgotNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showForgotNewPassword ? (
+                        <LuEyeOff className="w-4 h-4" />
+                      ) : (
+                        <LuEye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Confirm New Password:
+                  </label>
+                  <div className="relative">
+                    <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type={showForgotConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••••••"
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      title={showForgotConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showForgotConfirmPassword ? (
+                        <LuEyeOff className="w-4 h-4" />
+                      ) : (
+                        <LuEye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setOtpSent(false)}
+                    onClick={() => setForgotOtpSent(false)}
                     className="px-3 py-3 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#6B8077] hover:bg-[#F4EFE6]"
                   >
-                    Change Email
+                    Resend Code
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-sm shadow-md"
+                    className="flex-1 py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-sm shadow-md"
                   >
-                    {loading ? 'Verifying...' : 'Verify & Log In'}
+                    {loading ? 'Updating Password...' : 'Reset Password'}
                   </button>
                 </div>
               </form>
@@ -285,31 +976,33 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Divider */}
-        <div className="relative my-6 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[#E2D9C8]" />
-          </div>
-          <span className="relative px-3 bg-[#ECE5D8] text-xs text-[#6B8077] font-semibold">
-            OR SIGN IN WITH
-          </span>
-        </div>
+        {/* Divider & Google OAuth (hidden in forgot password mode or step 2) */}
+        {mode !== 'forgot' && signupStep === 1 && (
+          <>
+            <div className="relative my-6 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[#E2D9C8]" />
+              </div>
+              <span className="relative px-3 bg-[#ECE5D8] text-xs text-[#6B8077] font-semibold">
+                OR
+              </span>
+            </div>
 
-        {/* Google OAuth Login Button */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={loading}
-          className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-[#10231D] font-bold text-xs flex items-center justify-center gap-2.5 transition-colors shadow-xs"
-        >
-          <FaGoogle className="w-4 h-4 text-[#C2512D]" />
-          <span>Continue with Google Account</span>
-        </button>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-[#10231D] font-bold text-xs flex items-center justify-center gap-2.5 transition-colors shadow-xs"
+            >
+              <FaGoogle className="w-4 h-4 text-[#C2512D]" />
+              <span>Continue with Google Account</span>
+            </button>
+          </>
+        )}
 
         {/* Security badge */}
         <div className="mt-6 pt-4 border-t border-[#E2D9C8] flex items-center justify-center gap-1.5 text-[11px] text-[#6B8077]">
           <LuShieldCheck className="w-4 h-4 text-[#10231D]" />
-          <span>End-to-end encrypted session · Role-based access</span>
+          <span>Safe & Secure Encrypted Session</span>
         </div>
       </div>
     </div>

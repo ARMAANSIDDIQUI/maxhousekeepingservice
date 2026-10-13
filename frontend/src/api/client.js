@@ -643,113 +643,78 @@ export function calculateFallbackQuote(items = []) {
   };
 }
 
-// Fallback response provider based on endpoint and query parameters
+// Fallback response provider: Returns empty collections when server is not connected
 export function getFallbackResponse(url, options = {}) {
-  const [pathPart, queryPart] = url.split('?');
+  const [pathPart] = url.split('?');
   const cleanPath = pathPart.toLowerCase().replace(/^\/api\/v1/, '').replace(/^\//, '/');
-  const params = new URLSearchParams(queryPart || '');
 
-  // 1. Categories
+  // If server is not connected, return empty datasets (no static fallbacks)
   if (cleanPath === '/categories') {
-    return { success: true, categories: FALLBACK_CATEGORIES };
+    return { success: false, categories: [] };
   }
 
-  // 2. Locations / Cities
   if (cleanPath === '/locations/cities') {
-    return { success: true, cities: FALLBACK_CITIES };
+    return { success: false, cities: [] };
   }
 
-  // 3. Brands
   if (cleanPath === '/public/brands') {
-    return { success: true, brands: FALLBACK_BRANDS };
+    return { success: false, brands: [] };
   }
 
-  // 4. Testimonials
   if (cleanPath === '/public/testimonials') {
-    return { success: true, testimonials: FALLBACK_TESTIMONIALS };
+    return { success: false, testimonials: [] };
   }
 
-  // 5. Admin Stats
   if (cleanPath === '/admin/stats') {
-    return { success: true, stats: FALLBACK_STATS };
+    return { success: false, stats: { totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 } };
   }
 
-  // 6. Services & Filtered Services
   if (cleanPath === '/services' || cleanPath === '/admin/services') {
-    let result = [...FALLBACK_SERVICES];
-    const popularOnly = params.get('popular') === 'true' || options.params?.popular === 'true' || options.params?.popular === true;
-    const catFilter = params.get('category') || options.params?.category;
-
-    if (popularOnly) {
-      result = result.filter(s => s.isPopular);
-    }
-    if (catFilter) {
-      result = result.filter(s => s.categorySlug === catFilter);
-    }
-
-    return { success: true, services: result, count: result.length };
+    return { success: false, services: [], count: 0 };
   }
 
-  // 7. Single Service By Slug
+  if (cleanPath === '/admin/cities') {
+    return { success: false, cities: [] };
+  }
+
+  if (cleanPath === '/admin/testimonials') {
+    return { success: false, testimonials: [] };
+  }
+
+  if (cleanPath === '/admin/contact-messages') {
+    return { success: false, messages: [] };
+  }
+
+  if (cleanPath === '/admin/bookings') {
+    return { success: false, bookings: [] };
+  }
+
+  if (cleanPath === '/admin/users') {
+    return { success: false, users: [] };
+  }
+
   if (cleanPath.startsWith('/services/')) {
-    const slug = cleanPath.replace('/services/', '').trim();
-    const service = FALLBACK_SERVICES.find(s => s.slug === slug || (s.aliases && s.aliases.includes(slug)));
-    if (service) {
-      return { success: true, service };
-    }
-    // Return first service if not found to prevent blank screens in demo mode
-    return { success: true, service: FALLBACK_SERVICES[0] };
-  }
-
-  // 8. Track Booking Fallback
-  if (cleanPath.startsWith('/bookings/track/')) {
-    const code = cleanPath.replace('/bookings/track/', '').toUpperCase();
-    return {
-      success: true,
-      booking: {
-        bookingCode: code || 'MH-82914',
-        status: 'confirmed',
-        createdAt: new Date().toISOString(),
-        items: [
-          { service: FALLBACK_SERVICES[0], qty: 1, price: 3499 }
-        ],
-        address: {
-          line1: 'Civil Lines, Near Kanth Road',
-          city: 'Moradabad',
-          state: 'Uttar Pradesh',
-          pincode: '244001'
-        },
-        slot: {
-          date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-          window: 'Morning (8:00 AM – 11:00 AM)'
-        },
-        pricing: {
-          total: 3499,
-          subtotal: 3499,
-          discount: 500,
-          paymentStatus: 'pending'
-        },
-        timeline: [
-          { status: 'pending', time: new Date(Date.now() - 3600000).toISOString(), note: 'Order placed online' },
-          { status: 'confirmed', time: new Date().toISOString(), note: 'Assigned to Squad Alpha (Moradabad)' }
-        ]
-      }
-    };
-  }
-
-  // 9. Booking Quote Fallback
-  if (cleanPath === '/bookings/quote') {
-    const bodyItems = options.body?.items || options.data?.items || [];
-    return calculateFallbackQuote(bodyItems);
+    return { success: false, service: null };
   }
 
   return null;
 }
 
-// Unified apiRequest helper powered by Axios with automatic graceful fallbacks
+import { getCache, setCache, clearCacheByPrefix } from '../utils/cache.js';
+
+// Unified apiRequest helper powered by Axios with automatic graceful fallbacks and memory+localStorage caching
 export async function apiRequest(endpoint, options = {}) {
   const method = (options.method || 'GET').toLowerCase();
   const rawUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const cacheKey = options.params ? `${rawUrl}_${JSON.stringify(options.params)}` : rawUrl;
+
+  // Check cache for idempotent GET requests (if options.noCache !== true)
+  if (method === 'get' && !options.noCache) {
+    const cached = getCache(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
 
   try {
     const response = await api({
@@ -762,6 +727,22 @@ export async function apiRequest(endpoint, options = {}) {
 
     // Check if response is empty or unpopulated when expected
     if (response && response.success !== false) {
+      // Save to cache memo & localStorage on successful GET
+      if (method === 'get' && !options.noCache) {
+        setCache(cacheKey, response);
+      } else if (method !== 'get') {
+        // Invalidate cache on mutations
+        if (rawUrl.includes('/services')) clearCacheByPrefix('/services');
+        if (rawUrl.includes('/cities')) {
+          clearCacheByPrefix('/locations/cities');
+          clearCacheByPrefix('/admin/cities');
+        }
+        if (rawUrl.includes('/testimonials')) {
+          clearCacheByPrefix('/public/testimonials');
+          clearCacheByPrefix('/admin/testimonials');
+        }
+        if (rawUrl.includes('/users')) clearCacheByPrefix('/admin/users');
+      }
       return response;
     }
     // If backend returned success: false on GET, try fallback
@@ -775,7 +756,7 @@ export async function apiRequest(endpoint, options = {}) {
     if (method === 'get' || rawUrl === '/bookings/quote') {
       const fallback = getFallbackResponse(rawUrl, options);
       if (fallback) {
-        console.warn(`[Axios API Fallback] Serving cached data for ${rawUrl}:`, error.message);
+        console.warn(`[Axios API Fallback] Serving response for ${rawUrl}:`, error.message);
         return fallback;
       }
     }
@@ -822,13 +803,18 @@ export const bookingsAPI = {
 
 export const authAPI = {
   getMe: () => apiRequest('/auth/me', { method: 'GET' }),
+  sendSignupOtp: (data) => apiRequest('/auth/signup-otp', { method: 'POST', body: data }),
+  register: (data) => apiRequest('/auth/register', { method: 'POST', body: data }),
   login: (identifier, password) => apiRequest('/auth/login', { method: 'POST', body: { identifier, password } }),
   requestOtp: (email) => apiRequest('/auth/request-otp', { method: 'POST', body: { email } }),
   verifyOtp: (payload) => apiRequest('/auth/verify-otp', { method: 'POST', body: payload }),
   googleLogin: (payload) => apiRequest('/auth/google', { method: 'POST', body: payload }),
   logout: () => apiRequest('/auth/logout', { method: 'POST' }),
   addAddress: (addressData) => apiRequest('/auth/addresses', { method: 'POST', body: addressData }),
-  deleteAddress: (addressId) => apiRequest(`/auth/addresses/${addressId}`, { method: 'DELETE' })
+  deleteAddress: (addressId) => apiRequest(`/auth/addresses/${addressId}`, { method: 'DELETE' }),
+  forgotPassword: (email) => apiRequest('/auth/forgot-password', { method: 'POST', body: { email } }),
+  resetPassword: (payload) => apiRequest('/auth/reset-password', { method: 'POST', body: payload }),
+  changePassword: (payload) => apiRequest('/auth/change-password', { method: 'PUT', body: payload })
 };
 
 export const publicAPI = {
@@ -865,7 +851,16 @@ export const adminAPI = {
   // Contact messages
   getContactMessages: () => apiRequest('/admin/contact-messages', { method: 'GET' }),
   updateContactMessage: (id, data) => apiRequest(`/admin/contact-messages/${id}`, { method: 'PUT', body: data }),
-  deleteContactMessage: (id) => apiRequest(`/admin/contact-messages/${id}`, { method: 'DELETE' })
+  deleteContactMessage: (id) => apiRequest(`/admin/contact-messages/${id}`, { method: 'DELETE' }),
+  // Cities management
+  getCities: () => apiRequest('/admin/cities', { method: 'GET' }),
+  createCity: (data) => apiRequest('/admin/cities', { method: 'POST', body: data }),
+  updateCity: (id, data) => apiRequest(`/admin/cities/${id}`, { method: 'PUT', body: data }),
+  deleteCity: (id) => apiRequest(`/admin/cities/${id}`, { method: 'DELETE' }),
+  // Users Database management (MongoDB Atlas)
+  getUsers: () => apiRequest('/admin/users', { method: 'GET' }),
+  updateUserRole: (id, role) => apiRequest(`/admin/users/${id}/role`, { method: 'PUT', body: { role } }),
+  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' })
 };
 
 // Export api Axios instance as default for direct use if desired

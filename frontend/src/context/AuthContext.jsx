@@ -27,6 +27,42 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, []);
 
+  // Send 6-digit OTP for Signup Email Verification
+  const sendSignupOtp = async (signupData) => {
+    try {
+      const data = await apiRequest('/auth/signup-otp', {
+        method: 'POST',
+        body: signupData
+      });
+      if (data.success) {
+        toast.success(data.message || 'Verification code sent to your email.');
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message };
+    } catch (err) {
+      toast.error(err.message || 'Failed to send verification code.');
+      return { success: false, error: err.message };
+    }
+  };
+
+  // New User Registration / Sign Up
+  const register = async (userData) => {
+    try {
+      const data = await apiRequest('/auth/register', {
+        method: 'POST',
+        body: userData
+      });
+      if (data.success && data.user) {
+        setUser(data.user);
+        toast.success(`Account created! Welcome, ${data.user.name}!`);
+        return { success: true, user: data.user };
+      }
+    } catch (err) {
+      toast.error(err.message || 'Registration failed. Please check inputs.');
+      return { success: false, error: err.message };
+    }
+  };
+
   // Unified Login (Email/Phone + Password)
   const login = async (identifier, password) => {
     try {
@@ -145,19 +181,78 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Change Password
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const data = await apiRequest('/auth/change-password', {
+        method: 'PUT',
+        body: { currentPassword, newPassword }
+      });
+      if (data.success) {
+        toast.success(data.message || 'Password updated successfully.');
+        return { success: true };
+      }
+      return { success: false, message: data.message };
+    } catch (err) {
+      toast.error(err.message || 'Failed to update password.');
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Forgot Password (send OTP)
+  const forgotPassword = async (email) => {
+    try {
+      const data = await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: { email }
+      });
+      if (data.success) {
+        toast.success(data.message || 'Reset code sent to your email.');
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message };
+    } catch (err) {
+      toast.error(err.message || 'Failed to send reset code.');
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Reset Password (with OTP)
+  const resetPassword = async (email, code, newPassword) => {
+    try {
+      const data = await apiRequest('/auth/reset-password', {
+        method: 'POST',
+        body: { email, code, newPassword }
+      });
+      if (data.success) {
+        toast.success(data.message || 'Password reset successfully!');
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message };
+    } catch (err) {
+      toast.error(err.message || 'Failed to reset password.');
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAdmin: user?.role === 'admin',
+        sendSignupOtp,
+        register,
         login,
         requestOtp,
         verifyOtp,
         googleLogin,
         logout,
         addAddress,
-        deleteAddress
+        deleteAddress,
+        changePassword,
+        forgotPassword,
+        resetPassword
       }}
     >
       {children}

@@ -9,16 +9,14 @@ import {
   LuArrowLeft,
   LuSparkles
 } from 'react-icons/lu';
-import { apiRequest, FALLBACK_SERVICES } from '../api';
+import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
 
 export default function ServiceDetailPage() {
   const { slug } = useParams();
-  const [service, setService] = useState(() => {
-    return FALLBACK_SERVICES.find(s => s.slug === slug || (s.aliases && s.aliases.includes(slug))) || null;
-  });
-  const [loading, setLoading] = useState(false);
+  const [service, setService] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState('');
   const [sliderPosition, setSliderPosition] = useState(50); // Before/After slider
 
@@ -28,34 +26,25 @@ export default function ServiceDetailPage() {
 
   useEffect(() => {
     async function loadService() {
+      setLoading(true);
       try {
         const res = await apiRequest(`/services/${slug}`);
-        if (res.success && res.service) {
+        if (res && res.success && res.service) {
           setService(res.service);
           if (res.service.matrix && res.service.matrix.length > 0) {
             const firstRow = res.service.matrix[0];
             const firstKey = Object.values(firstRow.selection || {})[0];
             setSelectedVariant(firstKey || '');
           }
-          return;
+        } else {
+          setService(null);
         }
       } catch (err) {
-        console.warn('Network service fetch failed, checking fallback catalog for slug:', slug);
+        console.warn('Network service fetch failed:', slug);
+        setService(null);
+      } finally {
+        setLoading(false);
       }
-
-      // Check fallback catalog
-      const fallbackItem = FALLBACK_SERVICES.find(s => s.slug === slug || (s.aliases && s.aliases.includes(slug)));
-      if (fallbackItem) {
-        setService(fallbackItem);
-        if (fallbackItem.matrix && fallbackItem.matrix.length > 0) {
-          const firstRow = fallbackItem.matrix[0];
-          const firstKey = Object.values(firstRow.selection || {})[0];
-          setSelectedVariant(firstKey || '');
-        }
-      } else {
-        toast.error('Service not found.');
-      }
-      setLoading(false);
     }
     loadService();
   }, [slug]);

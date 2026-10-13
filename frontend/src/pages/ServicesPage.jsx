@@ -1,24 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar } from 'react-icons/lu';
-import {
-  apiRequest,
-  FALLBACK_CATEGORIES,
-  FALLBACK_SERVICES
-} from '../api';
+import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 
 export default function ServicesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCategory = searchParams.get('category') || '';
   
-  const [services, setServices] = useState(() => {
-    if (selectedCategory) {
-      return FALLBACK_SERVICES.filter(s => s.categorySlug === selectedCategory);
-    }
-    return FALLBACK_SERVICES;
-  });
-  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('recommended');
   const [loading, setLoading] = useState(false);
@@ -33,24 +24,20 @@ export default function ServicesPage() {
           apiRequest(`/services${selectedCategory ? `?category=${selectedCategory}` : ''}`)
         ]);
 
-        if (catsRes.status === 'fulfilled' && catsRes.value?.categories?.length > 0) {
+        if (catsRes.status === 'fulfilled' && catsRes.value?.categories && catsRes.value.categories.length > 0) {
           setCategories(catsRes.value.categories);
+        } else {
+          setCategories([]);
         }
-        if (srvsRes.status === 'fulfilled' && srvsRes.value?.services?.length > 0) {
+        if (srvsRes.status === 'fulfilled' && srvsRes.value?.services && srvsRes.value.services.length > 0) {
           setServices(srvsRes.value.services);
         } else {
-          // Local fallback filter
-          const filtered = selectedCategory
-            ? FALLBACK_SERVICES.filter(s => s.categorySlug === selectedCategory)
-            : FALLBACK_SERVICES;
-          setServices(filtered);
+          setServices([]);
         }
       } catch (err) {
-        console.warn('Failed to load live services, using fallbacks:', err);
-        const filtered = selectedCategory
-          ? FALLBACK_SERVICES.filter(s => s.categorySlug === selectedCategory)
-          : FALLBACK_SERVICES;
-        setServices(filtered);
+        console.warn('Failed to load services from MongoDB:', err);
+        setCategories([]);
+        setServices([]);
       } finally {
         setLoading(false);
       }
@@ -58,21 +45,23 @@ export default function ServicesPage() {
     loadData();
   }, [selectedCategory]);
 
-  const filteredServices = services
-    .filter(s => {
-      if (!search.trim()) return true;
-      const q = search.toLowerCase();
-      return (
-        s.title.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.categoryName?.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => {
-      if (sortBy === 'price-low') return a.price - b.price;
-      if (sortBy === 'price-high') return b.price - a.price;
-      return (a.sortOrder || 0) - (b.sortOrder || 0);
-    });
+  const filteredServices = React.useMemo(() => {
+    return services
+      .filter(s => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        return (
+          s.title?.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q) ||
+          s.categoryName?.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price-low') return (a.price || 0) - (b.price || 0);
+        if (sortBy === 'price-high') return (b.price || 0) - (a.price || 0);
+        return (a.sortOrder || 0) - (b.sortOrder || 0);
+      });
+  }, [services, search, sortBy]);
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">

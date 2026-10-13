@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Lenis from 'lenis';
 
 import { ToastProvider } from './context/ToastContext';
@@ -87,6 +87,8 @@ export default function App() {
                       <Route path="/dashboard" element={<CustomerDashboard />} />
                       <Route path="/my-bookings" element={<CustomerDashboard />} />
                       <Route path="/admin/*" element={<AdminDashboard />} />
+                      {/* Broken / Non-existent links redirect to Home */}
+                      <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </main>
 

@@ -1,45 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuSparkles, LuArrowRight } from 'react-icons/lu';
+import { apiRequest } from '../../api';
 
-export default function RoomMap() {
+export default function RoomMap({ services = [] }) {
   const [activeRoom, setActiveRoom] = useState('living');
+  const [liveServices, setLiveServices] = useState(services);
+
+  useEffect(() => {
+    if (services && services.length > 0) {
+      setLiveServices(services);
+    } else {
+      apiRequest('/services')
+        .then(res => {
+          if (res && res.success !== false && res.services?.length > 0) {
+            setLiveServices(res.services);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [services]);
+
+  const findService = (slugMatch, catMatch) => {
+    return liveServices.find(s => s.slug === slugMatch || s.categorySlug === catMatch) || null;
+  };
+
+  const livingSvc = findService('sofa-carpet-cleaning', 'sofa-carpet-cleaning');
+  const kitchenSvc = findService('kitchen-deep-cleaning', 'kitchen-cleaning');
+  const bathroomSvc = findService('bathroom-deep-cleaning', 'bathroom-cleaning');
+  const bedroomSvc = findService('full-home-deep-cleaning', 'home-deep-cleaning');
 
   const rooms = {
     living: {
       name: 'Living Room',
-      service: 'Sofa & Carpet Cleaning',
-      slug: 'sofa-carpet-cleaning',
-      priceText: 'From ₹299 / seat',
-      description: 'Shampooing, dust mite vacuuming, and organic fabric stain removal.'
+      service: livingSvc?.title || 'Sofa & Carpet Cleaning',
+      slug: livingSvc?.slug || 'sofa-carpet-cleaning',
+      priceText: livingSvc ? `From ₹${livingSvc.price.toLocaleString('en-IN')}` : 'From ₹299 / seat',
+      description: livingSvc?.shortDescription || livingSvc?.description || 'Shampooing, dust mite vacuuming, and organic fabric stain removal.'
     },
     kitchen: {
       name: 'Kitchen & Chimney',
-      service: 'Kitchen Deep Cleaning',
-      slug: 'kitchen-cleaning',
-      priceText: 'From ₹1,499',
-      description: 'Chimney degreasing, backsplash tile scrub, and appliance exterior detailing.'
+      service: kitchenSvc?.title || 'Kitchen Deep Cleaning',
+      slug: kitchenSvc?.slug || 'kitchen-deep-cleaning',
+      priceText: kitchenSvc ? `From ₹${kitchenSvc.price.toLocaleString('en-IN')}` : 'From ₹1,499',
+      description: kitchenSvc?.shortDescription || kitchenSvc?.description || 'Chimney degreasing, backsplash tile scrub, and appliance exterior detailing.'
     },
     bathroom: {
       name: 'Bathroom & Washroom',
-      service: 'Bathroom Deep Cleaning',
-      slug: 'bathroom-cleaning',
-      priceText: 'From ₹799',
-      description: 'Acid-free tile scaling removal, chrome tap polishing, and WC sanitisation.'
+      service: bathroomSvc?.title || 'Bathroom Deep Cleaning',
+      slug: bathroomSvc?.slug || 'bathroom-deep-cleaning',
+      priceText: bathroomSvc ? `From ₹${bathroomSvc.price.toLocaleString('en-IN')}` : 'From ₹799',
+      description: bathroomSvc?.shortDescription || bathroomSvc?.description || 'Acid-free tile scaling removal, chrome tap polishing, and WC sanitisation.'
     },
     bedroom: {
       name: 'Master Bedroom',
-      service: 'Full Home Deep Cleaning',
-      slug: 'home-deep-cleaning',
-      priceText: 'From ₹3,499 (1 BHK)',
-      description: 'Floor scrubbing machine, mattress sanitisation, and glass track vacuuming.'
-    },
-    terrace: {
-      name: 'Water Tank & Terrace',
-      service: 'Water Tank Cleaning',
-      slug: 'home-deep-cleaning',
-      priceText: 'From ₹799 (700L)',
-      description: '6-stage mechanised de-sludging, rotary jet wash, and UV disinfection.'
+      service: bedroomSvc?.title || 'Full Home Deep Cleaning',
+      slug: bedroomSvc?.slug || 'full-home-deep-cleaning',
+      priceText: bedroomSvc ? `From ₹${bedroomSvc.price.toLocaleString('en-IN')}` : 'From ₹3,499 (1 BHK)',
+      description: bedroomSvc?.shortDescription || bedroomSvc?.description || 'Floor scrubbing machine, mattress sanitisation, and glass track vacuuming.'
     }
   };
 

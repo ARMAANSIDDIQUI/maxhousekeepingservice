@@ -454,10 +454,79 @@ export async function sendContactNotificationToAdmin({ contact }) {
   }
 }
 
+/**
+ * Send Welcome Email to Newly Registered User
+ */
+export async function sendWelcomeEmail(user) {
+  if (!user || !user.email) return { success: false, message: 'No user email' };
+
+  const content = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span class="badge" style="background-color: #E9A23B; color: #10231D; font-weight: 800;">
+        ACCOUNT CREATED
+      </span>
+      <h2 style="margin: 14px 0 6px; font-size: 20px; color: #10231D;">
+        Welcome to Max Housekeeping Service, ${user.name}!
+      </h2>
+      <p style="color: #6B8077; font-size: 14px; margin: 0;">
+        Your verified customer profile is now saved on our secure platform.
+      </p>
+    </div>
+
+    <div class="highlight-box">
+      <h3 style="margin: 0 0 8px; font-size: 15px; color: #10231D;">
+        Your Account Credentials:
+      </h3>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Name:</strong> ${user.name}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Mobile:</strong> ${user.phone}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Email:</strong> ${user.email}</p>
+    </div>
+
+    <p style="font-size: 14px; line-height: 1.6; color: #3D524A;">
+      You can now book verified deep cleaning slots, manage saved addresses, track dispatched crews in real-time, and get exclusive customer discounts across Western Uttar Pradesh.
+    </p>
+
+    <div style="text-align: center; margin-top: 28px;">
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="btn">
+        Explore Services & Book Now
+      </a>
+    </div>
+  `;
+
+  const html = emailShell({
+    title: `Welcome to Max Housekeeping Service`,
+    preheader: `Welcome ${user.name}! Your account is now active on Max Housekeeping Service.`,
+    content
+  });
+
+  const mailer = getEmailTransporter();
+  const subject = `Welcome to Max Housekeeping Service, ${user.name}!`;
+
+  if (!mailer) {
+    console.log(`[Email Simulator] Welcome email to ${user.email} (${user.name})`);
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const info = await mailer.sendMail({
+      from: `"${BRAND_NAME}" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject,
+      html
+    });
+    console.log(`[Email] Welcome email sent to ${user.email}: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed welcome email:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   sendBookingConfirmationEmail,
   sendAdminNewBookingNotification,
   sendBookingStatusUpdateEmail,
   sendContactConfirmationToUser,
-  sendContactNotificationToAdmin
+  sendContactNotificationToAdmin,
+  sendWelcomeEmail
 };

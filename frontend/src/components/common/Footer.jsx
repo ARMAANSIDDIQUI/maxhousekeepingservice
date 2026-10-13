@@ -135,8 +135,7 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-6">
             <Link to="/track" className="hover:text-[#F4EFE6]">Track Order</Link>
-            <Link to="/login" className="hover:text-[#F4EFE6]">Portal Access</Link>
-            <span>Developed by Senior Full-Stack Engineering</span>
+            <Link to="/login" className="hover:text-[#F4EFE6]">Login Page</Link>
           </div>
         </div>
       </div>

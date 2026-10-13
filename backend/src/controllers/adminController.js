@@ -477,6 +477,168 @@ export async function deleteContactMessage(req, res, next) {
   }
 }
 
+/**
+ * Get All Cities (Admin)
+ * GET /api/v1/admin/cities
+ */
+export async function getAdminCities(req, res, next) {
+  try {
+    const cities = await City.find().sort({ sortOrder: 1, name: 1 });
+    res.status(200).json({ success: true, count: cities.length, cities });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Create City (Admin)
+ * POST /api/v1/admin/cities
+ */
+export async function createCity(req, res, next) {
+  try {
+    const { name, slug, state, serviceRadiusKm, pincodes, status, sortOrder, contactOverrides } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'City name is required' });
+    }
+    const finalSlug = (slug || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+    const city = await City.create({
+      name: name.trim(),
+      slug: finalSlug,
+      state: state || 'Uttar Pradesh',
+      location: { type: 'Point', coordinates: [78.7768, 28.8386] },
+      serviceRadiusKm: Number(serviceRadiusKm) || 25,
+      pincodes: Array.isArray(pincodes) ? pincodes : (typeof pincodes === 'string' ? pincodes.split(',').map(p => p.trim()).filter(Boolean) : []),
+      status: status || 'active',
+      sortOrder: Number(sortOrder) || 0,
+      contactOverrides: contactOverrides || {}
+    });
+    res.status(201).json({ success: true, message: 'City created successfully', city });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update City (Admin)
+ * PUT /api/v1/admin/cities/:id
+ */
+export async function updateCity(req, res, next) {
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body };
+    if (typeof updateData.pincodes === 'string') {
+      updateData.pincodes = updateData.pincodes.split(',').map(p => p.trim()).filter(Boolean);
+    }
+    const city = await City.findByIdAndUpdate(id, updateData, { new: true });
+    if (!city) {
+      return res.status(404).json({ success: false, message: 'City not found' });
+    }
+    res.status(200).json({ success: true, message: 'City updated successfully', city });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Delete City (Admin)
+ * DELETE /api/v1/admin/cities/:id
+ */
+export async function deleteCity(req, res, next) {
+  try {
+    const { id } = req.params;
+    const city = await City.findByIdAndDelete(id);
+    if (!city) {
+      return res.status(404).json({ success: false, message: 'City not found' });
+    }
+    res.status(200).json({ success: true, message: 'City deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get All Registered Users from MongoDB (Admin)
+ * GET /api/v1/admin/users
+ */
+export async function getAdminUsers(req, res, next) {
+  try {
+    const users = await User.find()
+      .select('-passwordHash')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      users
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update User Role in MongoDB (Admin)
+ * PUT /api/v1/admin/users/:id/role
+ */
+export async function updateUserRole(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['customer', 'admin', 'cleaner'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role specified.' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { role },
+      { new: true }
+    ).select('-passwordHash');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `User role updated to ${role}.`,
+      user
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Delete User Account from MongoDB (Admin)
+ * DELETE /api/v1/admin/users/:id
+ */
+export async function deleteUser(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    // Prevent self-deletion of currently logged in admin
+    if (req.user && req.user._id.toString() === id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own administrative account.'
+      });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User removed from MongoDB database.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getStats,
   getAdminBookings,
@@ -497,5 +659,12 @@ export default {
   deleteTestimonial,
   getAdminContactMessages,
   updateContactMessageStatus,
-  deleteContactMessage
+  deleteContactMessage,
+  getAdminCities,
+  createCity,
+  updateCity,
+  deleteCity,
+  getAdminUsers,
+  updateUserRole,
+  deleteUser
 };
