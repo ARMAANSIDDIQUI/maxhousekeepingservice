@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiRequest, FALLBACK_SERVICES } from '../api';
 import Modal from '../components/common/Modal';
+import CustomSelect from '../components/common/CustomSelect';
 
 export default function BookingPage() {
   const {
@@ -26,6 +27,8 @@ export default function BookingPage() {
     quote,
     isQuoting,
     selectedCity,
+    setSelectedCity,
+    cities,
     updateItemVariant,
     updateItemQty,
     removeItem,
@@ -58,7 +61,7 @@ export default function BookingPage() {
   const [addressForm, setAddressForm] = useState({
     line1: '',
     landmark: '',
-    cityText: selectedCity?.name || 'Moradabad',
+    cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : ''),
     pincode: '',
     tempText: '' // Used when checkbox is checked
   });
@@ -123,7 +126,7 @@ export default function BookingPage() {
       setAddressForm({
         line1: '',
         landmark: '',
-        cityText: selectedCity?.name || 'Moradabad',
+        cityText: selectedCity?.name || '',
         pincode: '',
         tempText: ''
       });
@@ -164,8 +167,8 @@ export default function BookingPage() {
       }
       addressPayload = {
         line1: addressForm.tempText.trim(),
-        cityText: selectedCity?.name || 'Moradabad',
-        pincode: '244001',
+        cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
+        pincode: addressForm.pincode || '244001',
         isTemporary: true
       };
     } else {
@@ -176,7 +179,7 @@ export default function BookingPage() {
       addressPayload = {
         line1: addressForm.line1.trim(),
         landmark: addressForm.landmark?.trim() || '',
-        cityText: addressForm.cityText?.trim() || selectedCity?.name || 'Moradabad',
+        cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
         pincode: addressForm.pincode.trim(),
         isTemporary: false
       };
@@ -195,7 +198,7 @@ export default function BookingPage() {
           phone: customer.phone.trim(),
           email: customer.email?.trim() || ''
         },
-        citySlug: selectedCity?.slug || 'moradabad',
+        citySlug: selectedCity?.slug || (typeof selectedCity === 'string' ? selectedCity.toLowerCase() : (cities[0]?.slug || 'moradabad')),
         address: addressPayload,
         slot,
         notes: customer.notes || '',
@@ -242,7 +245,7 @@ export default function BookingPage() {
             Book Your Cleaning Service
           </h1>
           <p className="text-sm text-[#3D524A] mt-1">
-            Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Moradabad'}</strong> (Western UP)
+            Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Select City'}</strong> (Western UP)
           </p>
         </div>
 
@@ -385,18 +388,18 @@ export default function BookingPage() {
                   <label className="block text-xs font-bold text-[#10231D] mb-1.5">
                     Choose from Saved Addresses:
                   </label>
-                  <select
+                  <CustomSelect
                     value={selectedSavedAddressId}
-                    onChange={(e) => handleSavedAddressChange(e.target.value)}
-                    className="w-full theme-select bg-[#F4EFE6]"
-                  >
-                    {user.addresses.map((a) => (
-                      <option key={a._id} value={a._id}>
-                        {a.label || 'Home'}: {a.line1}, {a.city} ({a.pincode})
-                      </option>
-                    ))}
-                    <option value="new">+ Add a different address</option>
-                  </select>
+                    onChange={(val) => handleSavedAddressChange(val)}
+                    options={[
+                      ...user.addresses.map((a) => ({
+                        value: a._id,
+                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})`
+                      })),
+                      { value: 'new', label: '+ Add a different address' }
+                    ]}
+                    placeholder="Choose from Saved Addresses..."
+                  />
                 </div>
               )}
 
@@ -448,7 +451,27 @@ export default function BookingPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#10231D] mb-1">
+                        Service City:
+                      </label>
+                      <CustomSelect
+                        value={addressForm.cityText}
+                        onChange={(val) => {
+                          setAddressForm({ ...addressForm, cityText: val });
+                          const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name) === val);
+                          if (matchedCity && typeof matchedCity === 'object') {
+                            setSelectedCity(matchedCity);
+                          }
+                        }}
+                        options={cities.map(c => {
+                          const name = typeof c === 'string' ? c : (c.name || c.slug);
+                          return { value: name, label: name };
+                        })}
+                        placeholder="Select City..."
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-[#10231D] mb-1">
                         Landmark (Optional):
@@ -458,7 +481,7 @@ export default function BookingPage() {
                         placeholder="e.g. Near Water Tank"
                         value={addressForm.landmark}
                         onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
-                        className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                        className="w-full p-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                       />
                     </div>
                     <div>
@@ -471,7 +494,7 @@ export default function BookingPage() {
                         maxLength={6}
                         value={addressForm.pincode}
                         onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                        className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                        className="w-full p-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                         required
                       />
                     </div>
@@ -509,16 +532,17 @@ export default function BookingPage() {
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
                     Preferred Time Window:
                   </label>
-                  <select
+                  <CustomSelect
                     value={slot.window}
-                    onChange={(e) => setSlot({ ...slot, window: e.target.value })}
-                    className="w-full theme-select bg-[#F4EFE6]"
-                  >
-                    <option value="Morning (8:00 AM – 11:00 AM)">Morning (8:00 AM – 11:00 AM)</option>
-                    <option value="Midday (11:00 AM – 2:00 PM)">Midday (11:00 AM – 2:00 PM)</option>
-                    <option value="Afternoon (2:00 PM – 5:00 PM)">Afternoon (2:00 PM – 5:00 PM)</option>
-                    <option value="Evening (5:00 PM – 8:00 PM)">Evening (5:00 PM – 8:00 PM)</option>
-                  </select>
+                    onChange={(val) => setSlot({ ...slot, window: val })}
+                    options={[
+                      { value: 'Morning (8:00 AM – 11:00 AM)', label: 'Morning (8:00 AM – 11:00 AM)' },
+                      { value: 'Midday (11:00 AM – 2:00 PM)', label: 'Midday (11:00 AM – 2:00 PM)' },
+                      { value: 'Afternoon (2:00 PM – 5:00 PM)', label: 'Afternoon (2:00 PM – 5:00 PM)' },
+                      { value: 'Evening (5:00 PM – 8:00 PM)', label: 'Evening (5:00 PM – 8:00 PM)' }
+                    ]}
+                    placeholder="Select Time Window..."
+                  />
                 </div>
               </div>
 

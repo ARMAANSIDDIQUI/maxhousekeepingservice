@@ -23,14 +23,26 @@ export function BookingProvider({ children }) {
     async function loadCities() {
       try {
         const res = await apiRequest('/locations/cities');
-        if (res && res.success !== false && Array.isArray(res.cities)) {
+        if (res && res.success !== false && Array.isArray(res.cities) && res.cities.length > 0) {
           setCities(res.cities);
-          if (!selectedCity && res.cities.length > 0) {
-            setSelectedCity(res.cities[0]);
+          // Validate selectedCity against active cities list
+          if (selectedCity) {
+            const matched = res.cities.find(c => c.slug === selectedCity.slug || c.name === selectedCity.name);
+            if (!matched) {
+              setSelectedCity(null);
+              try { localStorage.removeItem('max_selected_city'); } catch {}
+            }
           }
+        } else {
+          setCities([]);
+          setSelectedCity(null);
+          try { localStorage.removeItem('max_selected_city'); } catch {}
         }
       } catch (err) {
         console.warn('Failed to load cities in BookingContext:', err);
+        setCities([]);
+        setSelectedCity(null);
+        try { localStorage.removeItem('max_selected_city'); } catch {}
       }
     }
     loadCities();

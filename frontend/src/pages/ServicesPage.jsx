@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
+import CustomSelect from '../components/common/CustomSelect';
 
 export default function ServicesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -95,17 +96,20 @@ export default function ServicesPage() {
             </div>
 
             {/* Sort Selector */}
-            <div className="w-full sm:w-auto flex items-center gap-2 justify-end">
-              <span className="text-xs font-semibold text-[#3D524A]">Sort by:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="theme-select text-xs py-2 px-3 bg-[#F4EFE6]"
-              >
-                <option value="recommended">Recommended</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-              </select>
+            <div className="w-full sm:w-auto flex items-center gap-2 justify-end min-w-[200px]">
+              <span className="text-xs font-semibold text-[#3D524A] shrink-0">Sort by:</span>
+              <div className="w-44">
+                <CustomSelect
+                  value={sortBy}
+                  onChange={(val) => setSortBy(val)}
+                  options={[
+                    { value: 'recommended', label: 'Recommended' },
+                    { value: 'price-low', label: 'Price: Low to High' },
+                    { value: 'price-high', label: 'Price: High to Low' }
+                  ]}
+                  placeholder="Sort by..."
+                />
+              </div>
             </div>
           </div>
 

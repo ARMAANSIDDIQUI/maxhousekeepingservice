@@ -30,6 +30,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Modal from '../../components/common/Modal';
+import CustomSelect from '../../components/common/CustomSelect';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
 
 export default function AdminDashboard() {
@@ -714,18 +715,19 @@ export default function AdminDashboard() {
                       <td className="py-3 px-3 font-black text-[#10231D] tnum">
                         ₹{b.totals.total.toLocaleString('en-IN')}
                       </td>
-                      <td className="py-3 px-3">
-                        <select
+                      <td className="py-3 px-3 min-w-[140px]">
+                        <CustomSelect
                           value={b.status}
-                          onChange={(e) => handleUpdateBookingStatus(b._id, e.target.value)}
-                          className="bg-[#F4EFE6] border border-[#E2D9C8] rounded-lg px-2.5 py-1 text-xs font-bold text-[#10231D] focus:outline-none"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                          onChange={(val) => handleUpdateBookingStatus(b._id, val)}
+                          options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'confirmed', label: 'Confirmed' },
+                            { value: 'in_progress', label: 'In Progress' },
+                            { value: 'completed', label: 'Completed' },
+                            { value: 'cancelled', label: 'Cancelled' }
+                          ]}
+                          placeholder="Status..."
+                        />
                       </td>
                       <td className="py-3 px-3">
                         <button
@@ -1058,16 +1060,17 @@ export default function AdminDashboard() {
                             {msg.message}
                           </p>
                         </td>
-                        <td className="py-3 px-3">
-                          <select
+                        <td className="py-3 px-3 min-w-[130px]">
+                          <CustomSelect
                             value={msg.status}
-                            onChange={(e) => handleUpdateMessageStatus(msg._id, e.target.value)}
-                            className="bg-[#F4EFE6] border border-[#E2D9C8] rounded-lg px-2.5 py-1 text-xs font-bold text-[#10231D] focus:outline-none"
-                          >
-                            <option value="unread">Unread</option>
-                            <option value="read">Read</option>
-                            <option value="replied">Replied</option>
-                          </select>
+                            onChange={(val) => handleUpdateMessageStatus(msg._id, val)}
+                            options={[
+                              { value: 'unread', label: 'Unread' },
+                              { value: 'read', label: 'Read' },
+                              { value: 'replied', label: 'Replied' }
+                            ]}
+                            placeholder="Status..."
+                          />
                         </td>
                         <td className="py-3 px-3 text-right">
                           <button
@@ -1293,22 +1296,17 @@ export default function AdminDashboard() {
                             </a>
                           )}
                         </td>
-                        <td className="py-3 px-3">
-                          <select
+                        <td className="py-3 px-3 min-w-[140px]">
+                          <CustomSelect
                             value={u.role}
-                            onChange={(e) => handleUpdateUserRole(u._id, e.target.value)}
-                            className={`px-2 py-1 rounded-lg text-xs font-bold border focus:outline-none ${
-                              u.role === 'admin'
-                                ? 'bg-[#E9A23B] text-[#10231D] border-[#D48E28]'
-                                : u.role === 'cleaner'
-                                ? 'bg-[#DDEBE4] text-[#10231D] border-[#BED6CC]'
-                                : 'bg-[#F4EFE6] text-[#10231D] border-[#E2D9C8]'
-                            }`}
-                          >
-                            <option value="customer">Customer</option>
-                            <option value="cleaner">Cleaner Staff</option>
-                            <option value="admin">Administrator</option>
-                          </select>
+                            onChange={(val) => handleUpdateUserRole(u._id, val)}
+                            options={[
+                              { value: 'customer', label: 'Customer' },
+                              { value: 'cleaner', label: 'Cleaner Staff' },
+                              { value: 'admin', label: 'Administrator' }
+                            ]}
+                            placeholder="Role..."
+                          />
                         </td>
                         <td className="py-3 px-3 font-mono text-[#10231D]">
                           {u.addresses?.length || 0} locations
@@ -1844,15 +1842,16 @@ export default function AdminDashboard() {
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
                     Status:
                   </label>
-                  <select
+                  <CustomSelect
                     value={cityForm.status}
-                    onChange={(e) => setCityForm({ ...cityForm, status: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  >
-                    <option value="active">Active (Available)</option>
-                    <option value="coming_soon">Coming Soon</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+                    onChange={(val) => setCityForm({ ...cityForm, status: val })}
+                    options={[
+                      { value: 'active', label: 'Active (Available)' },
+                      { value: 'coming_soon', label: 'Coming Soon' },
+                      { value: 'inactive', label: 'Inactive' }
+                    ]}
+                    placeholder="Status..."
+                  />
                 </div>
               </div>
 

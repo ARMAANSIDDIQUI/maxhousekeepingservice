@@ -108,7 +108,7 @@ export default function Header() {
                 className="flex items-center gap-1 text-[#E9A23B] hover:text-[#D48E28] font-semibold transition-colors cursor-pointer"
               >
                 <LuMapPin className="w-3.5 h-3.5" />
-                <span>{selectedCity?.name || 'Select City'}</span>
+                <span>{(cities && cities.length > 0 && selectedCity?.name) ? selectedCity.name : 'Select City'}</span>
                 <LuChevronDown className="w-3 h-3" />
               </button>
             </div>
@@ -242,7 +242,7 @@ export default function Header() {
               className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-xs font-semibold text-[#10231D] transition-colors cursor-pointer"
             >
               <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>{selectedCity?.name || 'Select City'}</span>
+              <span>{(cities && cities.length > 0 && selectedCity?.name) ? selectedCity.name : 'Select City'}</span>
               <LuChevronDown className="w-3 h-3 text-[#6B8077]" />
             </button>
 

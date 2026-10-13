@@ -240,7 +240,7 @@ export default function ContactPage() {
                   className="w-full py-4 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-display font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60"
                 >
                   <LuSend className="w-4 h-4 text-[#E9A23B]" />
-                  <span>{submitting ? 'Transmitting Inquiries...' : 'Send Message to Operations'}</span>
+                  <span>{submitting ? 'Transmitting Inquiries...' : 'Send Message'}</span>
                 </button>
               </form>
             </div>
