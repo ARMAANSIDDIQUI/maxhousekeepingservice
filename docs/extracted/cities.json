@@ -1,0 +1,110 @@
+[
+  {
+    "id": 3,
+    "name": "Moradabad",
+    "slug": "moradabad",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.8386,
+      "lng": 78.7733
+    },
+    "active": true,
+    "sortOrder": 1
+  },
+  {
+    "id": 4,
+    "name": "Rampur",
+    "slug": "rampur",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.8093,
+      "lng": 79.0267
+    },
+    "active": true,
+    "sortOrder": 2
+  },
+  {
+    "id": 5,
+    "name": "Amroha",
+    "slug": "amroha",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.9044,
+      "lng": 78.4674
+    },
+    "active": true,
+    "sortOrder": 3
+  },
+  {
+    "id": 6,
+    "name": "Gajraula",
+    "slug": "gajraula",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.8475,
+      "lng": 78.2372
+    },
+    "active": true,
+    "sortOrder": 4
+  },
+  {
+    "id": 7,
+    "name": "Sambhal",
+    "slug": "sambhal",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.5835,
+      "lng": 78.5714
+    },
+    "active": true,
+    "sortOrder": 5
+  },
+  {
+    "id": 8,
+    "name": "Chandausi",
+    "slug": "chandausi",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 28.4554,
+      "lng": 78.7766
+    },
+    "active": true,
+    "sortOrder": 6
+  },
+  {
+    "id": 9,
+    "name": "Noorpur",
+    "slug": "noorpur",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 29.1557,
+      "lng": 78.4069
+    },
+    "active": true,
+    "sortOrder": 7
+  },
+  {
+    "id": 10,
+    "name": "Dhampur",
+    "slug": "dhampur",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 29.3087,
+      "lng": 78.5085
+    },
+    "active": true,
+    "sortOrder": 8
+  },
+  {
+    "id": 12,
+    "name": "Bijnor",
+    "slug": "bijnor",
+    "state": "Uttar Pradesh",
+    "coordinates": {
+      "lat": 29.3724,
+      "lng": 78.1358
+    },
+    "active": true,
+    "sortOrder": 9
+  }
+]

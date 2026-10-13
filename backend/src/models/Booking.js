@@ -1,0 +1,79 @@
+import mongoose from 'mongoose';
+
+const bookingItemSchema = new mongoose.Schema({
+  service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service', required: true },
+  titleSnapshot: { type: String, required: true },
+  variantSnapshot: { type: String }, // e.g. "1 BHK"
+  selections: { type: Map, of: String },
+  priceSnapshot: { type: Number, required: true }, // Offered price charged
+  mrpSnapshot: { type: Number, required: true },   // Shown price baseline
+  qty: { type: Number, default: 1 }
+}, { _id: false });
+
+const bookingSchema = new mongoose.Schema({
+  bookingCode: { type: String, required: true, unique: true, index: true }, // MH-2026-XXXX
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }, // Optional for guest checkout
+  customer: {
+    name: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true, index: true },
+    email: { type: String, trim: true }
+  },
+  items: [bookingItemSchema],
+  city: { type: mongoose.Schema.Types.ObjectId, ref: 'City', required: true },
+  cityName: { type: String, required: true },
+  address: {
+    line1: { type: String, required: true, trim: true },
+    landmark: { type: String, trim: true },
+    cityText: { type: String, required: true, trim: true },
+    stateText: { type: String, default: 'Uttar Pradesh' },
+    pincode: { type: String, required: true, trim: true },
+    isTemporary: { type: Boolean, default: false } // Checkbox feature requested by user
+  },
+  slot: {
+    date: { type: String, required: true }, // YYYY-MM-DD
+    window: { type: String, required: true } // "Morning (8:00 AM – 11:00 AM)"
+  },
+  notes: { type: String, trim: true },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'confirmed', 'assigned', 'in_progress', 'completed', 'paid', 'unresponsive', 'spam', 'cancelled'],
+    default: 'pending',
+    index: true
+  },
+  messages: [{
+    sender: { type: String, enum: ['customer', 'admin'], required: true },
+    senderName: { type: String, required: true },
+    text: { type: String, required: true, trim: true },
+    timestamp: { type: Date, default: Date.now }
+  }],
+  totals: {
+    subtotal: { type: Number, required: true },
+    mrpTotal: { type: Number, required: true },
+    discount: { type: Number, default: 0 },
+    couponDiscount: { type: Number, default: 0 },
+    total: { type: Number, required: true },
+    customerSaved: { type: Number, required: true }
+  },
+  appliedCoupon: {
+    code: { type: String },
+    discountAmount: { type: Number, default: 0 }
+  },
+  priceVersion: { type: String, default: 'v1' },
+  paymentMode: { type: String, enum: ['cash_on_service', 'razorpay'], default: 'cash_on_service' },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'refunded'], default: 'pending' },
+  assignedCrew: {
+    name: String,
+    phone: String
+  },
+  statusHistory: [{
+    status: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    note: { type: String },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }]
+}, {
+  timestamps: true
+});
+
+export const Booking = mongoose.model('Booking', bookingSchema);
+export default Booking;

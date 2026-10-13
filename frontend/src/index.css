@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #F4EFE6;
+  --color-paper-subtle: #ECE5D8;
+  --color-paper-deep: #E2D9C8;
+
+  --color-ink: #10231D;
+  --color-ink-muted: #3D524A;
+  --color-ink-faint: #6B8077;
+
+  --color-brass: #E9A23B;
+  --color-brass-hover: #D48E28;
+  --color-brass-light: #FBF1E2;
+
+  --color-lather: #DDEBE4;
+  --color-lather-deep: #BED6CC;
+
+  --color-rust: #C2512D;
+  --color-rust-faint: #F9ECE8;
+
+  --font-display: 'Bricolage Grotesque', serif, system-ui;
+  --font-sans: 'Instrument Sans', sans-serif, system-ui;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Base Editorial Styling */
+html {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  scroll-behavior: smooth;
+}
+
+/* ========================================================
+   GLOBAL THEME-BASED SCROLLBARS
+   Warm paper track, deep ink thumb with brass hover
+   ======================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-muted) var(--color-paper-subtle);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-paper-subtle);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-muted);
+  border-radius: 4px;
+  border: 2px solid var(--color-paper-subtle);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brass);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ========================================================
+   GLOBAL THEME-BASED DROPDOWNS & SELECTS
+   Paper surface, ink typography, custom chevron, brass glow
+   ======================================================== */
+select, .theme-select {
+  appearance: none;
+  background-color: var(--color-paper-subtle);
+  color: var(--color-ink);
+  border: 1px solid var(--color-paper-deep);
+  border-radius: 0.5rem;
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310231D' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+select:focus, .theme-select:focus {
+  outline: none;
+  border-color: var(--color-brass);
+  box-shadow: 0 0 0 3px rgba(233, 162, 59, 0.25);
+  background-color: var(--color-paper);
+}
+
+/* Dropdown popover containers */
+.theme-dropdown-menu {
+  background-color: var(--color-paper);
+  border: 1px solid var(--color-paper-deep);
+  box-shadow: 0 14px 32px -6px rgba(16, 35, 29, 0.18);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  animation: popupFadeIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.theme-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.625rem 1rem;
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+
+.theme-dropdown-item:hover, .theme-dropdown-item:focus {
+  background-color: var(--color-lather);
+  color: var(--color-ink);
+}
+
+/* ========================================================
+   GLOBAL MODALS & POPUPS (NO BROWSER ALERTS)
+   Backdrop blur with paper card & tactile shadow
+   ======================================================== */
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.theme-modal-backdrop {
+  background-color: rgba(16, 35, 29, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.theme-modal-card {
+  background-color: var(--color-paper);
+  border: 1px solid var(--color-paper-deep);
+  border-radius: 1rem;
+  box-shadow: 0 24px 48px -12px rgba(16, 35, 29, 0.3);
+  animation: popupFadeIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Force tabular numbers on all price readouts */
+.tnum, [data-tnum] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Custom Zig-Zag Perforated Edge for Job Ticket */
+.perforated-top {
+  background-image: radial-gradient(circle at 10px -5px, transparent 10px, var(--color-paper-subtle) 11px);
+  background-size: 20px 20px;
+}
+
+.perforated-bottom {
+  background-image: radial-gradient(circle at 10px 25px, transparent 10px, var(--color-paper-subtle) 11px);
+  background-size: 20px 20px;
+}
+
+/* Hide scrollbar utility when needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========================================================
+   INFINITE PARTNER BRANDS MARQUEE
+   Smooth continuous scroll, pauses on user hover
+   ======================================================== */
+@keyframes marqueeScroll {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll 35s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+

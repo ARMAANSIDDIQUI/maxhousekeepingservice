@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Aarav Mehta",
+    "role": "Homeowner",
+    "city": "Amroha, U.P",
+    "quote": "Booked a 2BHK deep cleaning and the team was punctual, professional and thorough. My house has never looked this good!",
+    "rating": 5,
+    "isActive": true
+  },
+  {
+    "name": "Rahul Verma",
+    "role": "Homeowner",
+    "city": "Sambhal, U.P",
+    "quote": "Quick booking, transparent pricing and a polite crew. The bathroom looks brand new after their deep clean.",
+    "rating": 5,
+    "isActive": true
+  },
+  {
+    "name": "Priya Nair",
+    "role": "Interior Designer",
+    "city": "Moradabad, U.P",
+    "quote": "I use them for all my client move-ins. Reliable, well-equipped and consistently great results.",
+    "rating": 5,
+    "isActive": true
+  },
+  {
+    "name": "Imran Khan",
+    "role": "Restaurant Owner",
+    "city": "Amroha, U.P",
+    "quote": "Their commercial kitchen cleaning kept us audit-ready. Good machines and trained staff.",
+    "rating": 4,
+    "isActive": true
+  },
+  {
+    "name": "Kavya Reddy",
+    "role": "Homeowner",
+    "city": "Chandausi, U.P",
+    "quote": "AC jet service was smooth and affordable. The technician explained everything. Will book again.",
+    "rating": 5,
+    "isActive": true
+  }
+]

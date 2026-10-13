@@ -1,0 +1,63 @@
+{
+  "brandName": "Max House Keeping Service",
+  "tagline": "A spotless home, without lifting a finger.",
+  "heroCopy": "Book trained, background-verified cleaning professionals for your home or office. Deep cleaning, sofa, bathroom, kitchen, AC & pest control — all in one place.",
+  "phone": "+91 98977 66002",
+  "phoneRaw": "9897766002",
+  "alternatePhone": "+91 82105 23309",
+  "alternatePhoneRaw": "8210523309",
+  "whatsappNumber": "+91 98977 66002",
+  "whatsappRaw": "919897766002",
+  "email": "vikasmax321@gmail.com",
+  "address": "Kanth road Asian Behind, Vivekanand Hospital, Moradabad, Uttar Pradesh 244001",
+  "workingHours": "Mon–Sun · 10:00 AM – 6:00 PM",
+  "heroStats": [
+    {
+      "label": "Homes cleaned",
+      "value": 10000,
+      "suffix": "+"
+    },
+    {
+      "label": "Trained pros",
+      "value": 500,
+      "suffix": "+"
+    },
+    {
+      "label": "Cities served",
+      "value": 9,
+      "suffix": ""
+    },
+    {
+      "label": "Would recommend",
+      "value": 98,
+      "suffix": "%"
+    }
+  ],
+  "trustBadges": [
+    "Background-verified pros",
+    "Eco-safe products",
+    "Transparent pricing",
+    "100% satisfaction guarantee",
+    "All equipment included",
+    "Pay after service"
+  ],
+  "stepByStep": [
+    {
+      "step": 1,
+      "title": "Choose a service",
+      "description": "Pick from our menu of home & commercial cleaning services and select your city."
+    },
+    {
+      "step": 2,
+      "title": "Pick a time slot",
+      "description": "Tell us your address and choose a date & time that works for you."
+    },
+    {
+      "step": 3,
+      "title": "Relax & enjoy",
+      "description": "Our verified pros arrive on time with everything needed. Sit back and relax."
+    }
+  ],
+  "thirdPartyCredits": "Kwacko Solutions Private Limited (flagged for owner decision)",
+  "ratingClaim": "4.9 / 5.0 from 10k+ reviews (editable setting, flagged for owner verification)"
+}

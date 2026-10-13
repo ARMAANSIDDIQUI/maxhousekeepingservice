@@ -1,0 +1,79 @@
+[
+  {
+    "localPath": "docs/generated-media/site/hero-clean-home.jpg",
+    "targetSlug": "hero",
+    "entityType": "site",
+    "alt": "Immaculate sunlit Indian living room with marble flooring and brass accents",
+    "bytes": 848265
+  },
+  {
+    "localPath": "docs/generated-media/categories/home-deep-cleaning.jpg",
+    "targetSlug": "home-deep-cleaning",
+    "entityType": "category",
+    "alt": "Master bedroom with crisp fresh linen and spotless hardwood flooring",
+    "bytes": 774089
+  },
+  {
+    "localPath": "docs/generated-media/categories/bathroom-cleaning.jpg",
+    "targetSlug": "bathroom-cleaning",
+    "entityType": "category",
+    "alt": "Luxury sparkling bathroom with subway tile and brushed brass faucet",
+    "bytes": 671711
+  },
+  {
+    "localPath": "docs/generated-media/categories/kitchen-cleaning.jpg",
+    "targetSlug": "kitchen-cleaning",
+    "entityType": "category",
+    "alt": "Grease-free modern kitchen with quartz countertops and stainless steel appliances",
+    "bytes": 646984
+  },
+  {
+    "localPath": "docs/generated-media/categories/sofa-carpet-cleaning.jpg",
+    "targetSlug": "sofa-carpet-cleaning",
+    "entityType": "category",
+    "alt": "Clean textured linen sectional sofa and handwoven wool rug",
+    "bytes": 787820
+  },
+  {
+    "localPath": "docs/generated-media/categories/pest-control.jpg",
+    "targetSlug": "pest-control",
+    "entityType": "category",
+    "alt": "Sunlit hygienic protected home garden threshold",
+    "bytes": 1057613
+  },
+  {
+    "localPath": "docs/generated-media/categories/commercial-cleaning.jpg",
+    "targetSlug": "commercial-cleaning",
+    "entityType": "category",
+    "alt": "Gleaming corporate office lobby with spotless architectural glass",
+    "bytes": 826983
+  },
+  {
+    "localPath": "docs/generated-media/services/full-home-deep-cleaning.jpg",
+    "targetSlug": "full-home-deep-cleaning",
+    "entityType": "service",
+    "alt": "Professional Max Housekeeping technician in black and red uniform vacuuming marble living room floor",
+    "bytes": 743338
+  },
+  {
+    "localPath": "docs/generated-media/services/kitchen-deep-cleaning.jpg",
+    "targetSlug": "kitchen-deep-cleaning",
+    "entityType": "service",
+    "alt": "Max Housekeeping professional cleaner in uniform deep cleaning a kitchen chimney hood and countertop",
+    "bytes": 736371
+  },
+  {
+    "localPath": "docs/generated-media/services/bathroom-tile-cleaning.jpg",
+    "targetSlug": "bathroom-tile-cleaning",
+    "entityType": "service",
+    "alt": "Max Housekeeping professional cleaner polishing bathroom sink and ceramic tiles",
+    "bytes": 644069
+  },
+  {
+    "localPath": "docs/generated-media/services/sofa-dry-cleaning.jpg",
+    "targetSlug": "sofa-dry-cleaning",
+    "entityType": "service",
+    "alt": "Max Housekeeping technician shampooing and vacuuming fabric sofa in modern living room",
+    "bytes": 812543
+  }
+]
