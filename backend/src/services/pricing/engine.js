@@ -37,8 +37,19 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
   }
 
   // 2. Option Group Deltas & Multipliers
+  // If an option group was already matched and accounted for by the matrix row,
+  // its base tier price is already in row.price / row.mrp. We only apply deltas for
+  // groups that are NOT part of the matched matrix selection (e.g. add-ons or steppers).
+  const matchedMatrixKeys = matchedMatrixRow
+    ? Object.keys(matchedMatrixRow.selection instanceof Map ? Object.fromEntries(matchedMatrixRow.selection) : (matchedMatrixRow.selection || {}))
+    : [];
+
   if (service.optionGroups && Array.isArray(service.optionGroups)) {
     for (const group of service.optionGroups) {
+      if (matchedMatrixKeys.includes(group.key)) {
+        continue; // Skip already factored matrix tier group
+      }
+
       const selectedValue = selections[group.key];
       if (!selectedValue) continue;
 
@@ -152,7 +163,7 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
   let couponError = null;
 
   if (coupon && coupon.isActive !== false) {
-    const minAmount = coupon.minBookingAmount || 0;
+    const minAmount = coupon.minBookingAmount || coupon.minOrderValue || 0;
     if (subtotal < minAmount) {
       couponError = `Coupon requires a minimum booking amount of ₹${minAmount}`;
     } else {

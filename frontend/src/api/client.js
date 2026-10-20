@@ -6,7 +6,7 @@
 
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
 
 // Create single Axios instance
 export const api = axios.create({
@@ -195,8 +195,8 @@ export const FALLBACK_SERVICES = [
     categoryName: 'Home Cleaning',
     categorySlug: 'home-deep-cleaning',
     icon: 'House',
-    price: 3499,
-    mrp: 3999,
+    price: 2800,
+    mrp: 2999,
     duration: '4-5 hrs',
     isPopular: true,
     sortOrder: 1,
@@ -223,19 +223,19 @@ export const FALLBACK_SERVICES = [
         required: true,
         options: [
           { key: '1-bhk', label: '1 BHK', isDefault: true, priceDelta: 0, mrpDelta: 0 },
-          { key: '2-bhk', label: '2 BHK', priceDelta: 1000, mrpDelta: 1500 },
-          { key: '3-bhk', label: '3 BHK', priceDelta: 2000, mrpDelta: 3000 },
-          { key: '4-bhk', label: '4 BHK', priceDelta: 3500, mrpDelta: 5000 },
-          { key: 'villa', label: 'Villa / Kothi (5+ BHK)', priceDelta: 6500, mrpDelta: 9000 }
+          { key: '2-bhk', label: '2 BHK', priceDelta: 3200, mrpDelta: 4500 },
+          { key: '3-bhk', label: '3 BHK', priceDelta: 6700, mrpDelta: 7501 },
+          { key: '4-bhk', label: '4 BHK', priceDelta: 9700, mrpDelta: 12001 },
+          { key: 'villa', label: 'Villa / Kothi (5+ BHK)', priceDelta: 15200, mrpDelta: 19001 }
         ]
       }
     ],
     matrix: [
-      { selection: { size: '1-bhk' }, price: 3499, mrp: 3999, duration: '3-4 hrs' },
-      { selection: { size: '2-bhk' }, price: 4499, mrp: 5499, duration: '4-5 hrs' },
-      { selection: { size: '3-bhk' }, price: 5499, mrp: 6999, duration: '5-6 hrs' },
-      { selection: { size: '4-bhk' }, price: 6999, mrp: 8999, duration: '6-7 hrs' },
-      { selection: { size: 'villa' }, price: 9999, mrp: 12999, duration: '7-8 hrs' }
+      { selection: { size: '1-bhk' }, price: 2800, mrp: 2999, duration: '4-5 hrs' },
+      { selection: { size: '2-bhk' }, price: 6000, mrp: 7499, duration: '5-7 hrs' },
+      { selection: { size: '3-bhk' }, price: 9500, mrp: 10500, duration: '7-9 hrs' },
+      { selection: { size: '4-bhk' }, price: 12500, mrp: 15000, duration: '2 Days' },
+      { selection: { size: 'villa' }, price: 18000, mrp: 22000, duration: '2-3 Days' }
     ]
   },
   {
@@ -708,8 +708,11 @@ export async function apiRequest(endpoint, options = {}) {
   const rawUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const cacheKey = options.params ? `${rawUrl}_${JSON.stringify(options.params)}` : rawUrl;
 
-  // Check cache for idempotent GET requests (if options.noCache !== true)
-  if (method === 'get' && !options.noCache) {
+  const isPrivateEndpoint = rawUrl.startsWith('/auth') || rawUrl.startsWith('/admin') || rawUrl.includes('/bookings/my') || rawUrl.includes('/messages');
+  const canCache = method === 'get' && !options.noCache && !isPrivateEndpoint;
+
+  // Check cache for public idempotent GET requests
+  if (canCache) {
     const cached = getCache(cacheKey);
     if (cached !== null) {
       return cached;
@@ -727,8 +730,8 @@ export async function apiRequest(endpoint, options = {}) {
 
     // Check if response is empty or unpopulated when expected
     if (response && response.success !== false) {
-      // Save to cache memo & localStorage on successful GET
-      if (method === 'get' && !options.noCache) {
+      // Save to cache memo & localStorage on successful public GET
+      if (canCache) {
         setCache(cacheKey, response);
       } else if (method !== 'get') {
         // Invalidate cache on mutations
@@ -793,12 +796,22 @@ export const testimonialsAPI = {
 
 export const bookingsAPI = {
   create: (bookingData) => apiRequest('/bookings', { method: 'POST', body: bookingData }),
+  createBooking: (data) => apiRequest('/bookings', { method: 'POST', body: data }),
   getMyBookings: () => apiRequest('/bookings/my', { method: 'GET' }),
   track: (code) => apiRequest(`/bookings/track/${encodeURIComponent(code)}`, { method: 'GET' }),
-  getQuote: (payload) => apiRequest('/bookings/quote', { method: 'POST', body: payload }),
+  trackBooking: (code) => apiRequest(`/bookings/track/${encodeURIComponent(code)}`, { method: 'GET' }),
+  getQuote: (payloadOrItems, citySlug) => {
+    if (citySlug !== undefined) {
+      return apiRequest('/bookings/quote', { method: 'POST', body: { items: payloadOrItems, citySlug } });
+    }
+    return apiRequest('/bookings/quote', { method: 'POST', body: payloadOrItems });
+  },
   update: (bookingId, data) => apiRequest(`/bookings/${bookingId}/edit`, { method: 'PUT', body: data }),
+  editBooking: (id, data) => apiRequest(`/bookings/${id}/edit`, { method: 'PUT', body: data }),
+  cancelBooking: (id, reason) => apiRequest(`/bookings/${id}/cancel`, { method: 'PUT', body: { reason } }),
+  deleteBooking: (id) => apiRequest(`/bookings/${id}`, { method: 'DELETE' }),
   getMessages: (bookingId) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'GET' }),
-  sendMessage: (bookingId, text) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'POST', body: { text } })
+  sendMessage: (bookingId, text, senderName) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'POST', body: { text, senderName } })
 };
 
 export const authAPI = {
@@ -811,6 +824,8 @@ export const authAPI = {
   googleLogin: (payload) => apiRequest('/auth/google', { method: 'POST', body: payload }),
   logout: () => apiRequest('/auth/logout', { method: 'POST' }),
   addAddress: (addressData) => apiRequest('/auth/addresses', { method: 'POST', body: addressData }),
+  updateAddress: (addressId, addressData) => apiRequest(`/auth/addresses/${addressId}`, { method: 'PUT', body: addressData }),
+  setDefaultAddress: (addressId) => apiRequest(`/auth/addresses/${addressId}/default`, { method: 'PUT' }),
   deleteAddress: (addressId) => apiRequest(`/auth/addresses/${addressId}`, { method: 'DELETE' }),
   forgotPassword: (email) => apiRequest('/auth/forgot-password', { method: 'POST', body: { email } }),
   resetPassword: (payload) => apiRequest('/auth/reset-password', { method: 'POST', body: payload }),
@@ -829,7 +844,10 @@ export const adminAPI = {
   getBookings: (params = {}) => apiRequest('/admin/bookings', { method: 'GET', params }),
   getServices: () => apiRequest('/admin/services', { method: 'GET' }),
   updateBooking: (id, data) => apiRequest(`/admin/bookings/${id}`, { method: 'PUT', body: data }),
+  deleteBooking: (id) => apiRequest(`/admin/bookings/${id}`, { method: 'DELETE' }),
   updateService: (id, data) => apiRequest(`/admin/services/${id}`, { method: 'PUT', body: data }),
+  createService: (data) => apiRequest('/admin/services', { method: 'POST', body: data }),
+  deleteService: (id) => apiRequest(`/admin/services/${id}`, { method: 'DELETE' }),
   // Cloudinary image upload
   uploadImage: async (file, folder = 'max-housekeeping/uploads') => {
     const formData = new FormData();
@@ -860,7 +878,15 @@ export const adminAPI = {
   // Users Database management (MongoDB Atlas)
   getUsers: () => apiRequest('/admin/users', { method: 'GET' }),
   updateUserRole: (id, role) => apiRequest(`/admin/users/${id}/role`, { method: 'PUT', body: { role } }),
-  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' })
+  deleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: 'DELETE' }),
+  // Coupons management
+  getCoupons: () => apiRequest('/admin/coupons', { method: 'GET' }),
+  createCoupon: (data) => apiRequest('/admin/coupons', { method: 'POST', body: data }),
+  updateCoupon: (id, data) => apiRequest(`/admin/coupons/${id}`, { method: 'PUT', body: data }),
+  deleteCoupon: (id) => apiRequest(`/admin/coupons/${id}`, { method: 'DELETE' }),
+  // Site & Business Settings
+  getSettings: () => apiRequest('/admin/settings', { method: 'GET' }),
+  updateSettings: (data) => apiRequest('/admin/settings', { method: 'PUT', body: data })
 };
 
 // Export api Axios instance as default for direct use if desired

@@ -16,22 +16,70 @@ import {
   LuEye,
   LuEyeOff,
   LuShieldCheck,
-  LuUser
+  LuUser,
+  LuTrash2,
+  LuSearch,
+  LuX,
+  LuRotateCcw,
+  LuCamera,
+  LuUpload,
+  LuImage,
+  LuSparkles,
+  LuCreditCard,
+  LuBanknote
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
-import { apiRequest } from '../api/client';
+import confetti from 'canvas-confetti';
+import { apiRequest, bookingsAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useBooking } from '../context/BookingContext';
 import Modal from '../components/common/Modal';
+import ConfirmModal from '../components/common/ConfirmModal';
+import UserAvatar from '../components/common/UserAvatar';
 
 export default function CustomerDashboard() {
-  const { user, changePassword } = useAuth();
+  const { user, updateProfile, changePassword, addAddress, updateAddress, deleteAddress, setDefaultAddress, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
+  const { settings } = useBooking();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'security'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'addresses' | 'security'
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [confirmModalConfig, setConfirmModalConfig] = useState(null);
+
+  // Online Payment State for Unpaid Bookings
+  const [payingBookingId, setPayingBookingId] = useState(null);
+  const [dashboardTestPaymentOrder, setDashboardTestPaymentOrder] = useState(null);
+
+  // Address Management State
+  const [isAddAddressModalOpen, setIsAddAddressModalOpen] = useState(false);
+  const [addressSubmitting, setAddressSubmitting] = useState(false);
+  const [newAddressForm, setNewAddressForm] = useState({
+    label: 'Home',
+    line1: '',
+    landmark: '',
+    city: 'Moradabad',
+    state: 'Uttar Pradesh',
+    pincode: '',
+    isDefault: false
+  });
+
+  // Edit Address State
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [editingAddressSubmitting, setEditingAddressSubmitting] = useState(false);
+  const [editAddressForm, setEditAddressForm] = useState({
+    label: 'Home',
+    line1: '',
+    landmark: '',
+    city: 'Moradabad',
+    state: 'Uttar Pradesh',
+    pincode: '',
+    isDefault: false
+  });
 
   // Edit Modal State
   const [editingBooking, setEditingBooking] = useState(null);
@@ -60,12 +108,120 @@ export default function CustomerDashboard() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Require auth
+  // Profile Management State
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [photoInputMode, setPhotoInputMode] = useState('upload'); // 'upload' | 'url' | 'presets'
+  const [customPhotoUrl, setCustomPhotoUrl] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    phone: '',
+    avatarUrl: ''
+  });
+
+  const handleOpenEditProfile = () => {
+    setProfileForm({
+      name: user?.name || '',
+      phone: user?.phone || '',
+      avatarUrl: user?.avatarUrl || ''
+    });
+    setCustomPhotoUrl(user?.avatarUrl || '');
+    setIsEditProfileModalOpen(true);
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file (PNG, JPG, WebP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        setProfileForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+        toast.success('Photo ready! Click "Save Changes" to apply.');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setProfileForm((prev) => ({ ...prev, avatarUrl: '' }));
+    setCustomPhotoUrl('');
+    toast.info('Photo removed. Default geometrical avatar will be displayed.');
+  };
+
+  const handleApplyCustomUrl = () => {
+    if (!customPhotoUrl.trim()) {
+      toast.error('Please enter a valid image URL.');
+      return;
+    }
+    setProfileForm((prev) => ({ ...prev, avatarUrl: customPhotoUrl.trim() }));
+    toast.success('Image link attached!');
+  };
+
+  const handleSaveProfile = async (e) => {
+    e?.preventDefault();
+    if (!profileForm.name.trim()) {
+      toast.error('Please enter your full name.');
+      return;
+    }
+
+    const cleanPhone = (profileForm.phone || '').trim().replace(/\D/g, '');
+    if (cleanPhone && cleanPhone.length !== 10) {
+      toast.error('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setProfileSubmitting(true);
+    try {
+      const res = await updateProfile({
+        name: profileForm.name.trim(),
+        phone: cleanPhone,
+        avatarUrl: profileForm.avatarUrl
+      });
+      if (res?.success) {
+        setIsEditProfileModalOpen(false);
+      }
+    } finally {
+      setProfileSubmitting(false);
+    }
+  };
+
+  // Require auth only after session check resolves
   useEffect(() => {
-    if (!user) {
+    if (!isAuthLoading && !user) {
       navigate('/login');
     }
-  }, [user]);
+  }, [user, isAuthLoading]);
 
   // Load Bookings
   const loadMyBookings = async () => {
@@ -81,6 +237,155 @@ export default function CustomerDashboard() {
       setLoading(false);
     }
   };
+
+  // Cancel Booking
+  const handleCancelBooking = (bookingId, bookingCode) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Cancel Booking #${bookingCode}`,
+      message: 'Please provide a reason for cancelling this reservation (optional):',
+      confirmText: 'Cancel Booking',
+      confirmVariant: 'warning',
+      inputPlaceholder: 'Reason for cancellation (e.g., schedule conflict)...',
+      defaultValue: '',
+      inputRequired: false,
+      onConfirm: async (reason) => {
+        try {
+          const res = await bookingsAPI.cancelBooking(bookingId, reason || 'Cancelled by customer');
+          if (res.success) {
+            toast.success(`Booking #${bookingCode} has been cancelled.`);
+            setBookings(prev => prev.map(b => b._id === bookingId ? { ...b, status: 'cancelled' } : b));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to cancel booking.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  // Delete Booking permanently from customer history
+  const handleDeleteBooking = (bookingId, bookingCode) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Remove Booking #${bookingCode}`,
+      message: `Are you sure you want to remove booking #${bookingCode} from your account history? This will remove it from your dashboard view.`,
+      confirmText: 'Remove Booking',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await bookingsAPI.deleteBooking(bookingId);
+          if (res.success) {
+            toast.success(`Booking #${bookingCode} deleted from history.`);
+            setBookings(prev => prev.filter(b => b._id !== bookingId));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete booking.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  // Address Action Handlers
+  const handleOpenAddAddress = () => {
+    setNewAddressForm({
+      label: 'Home',
+      line1: '',
+      landmark: '',
+      city: 'Moradabad',
+      state: 'Uttar Pradesh',
+      pincode: '',
+      isDefault: (!user?.addresses || user.addresses.length === 0)
+    });
+    setIsAddAddressModalOpen(true);
+  };
+
+  const handleCreateAddress = async (e) => {
+    e.preventDefault();
+    if (!newAddressForm.line1.trim() || !newAddressForm.city.trim() || !newAddressForm.pincode.trim()) {
+      toast.error('Street address, city, and pincode are required.');
+      return;
+    }
+    setAddressSubmitting(true);
+    try {
+      const res = await addAddress(newAddressForm);
+      if (res && res.success) {
+        setIsAddAddressModalOpen(false);
+      }
+    } finally {
+      setAddressSubmitting(false);
+    }
+  };
+
+  const handleSetDefaultAddress = async (addressId) => {
+    await setDefaultAddress(addressId);
+  };
+
+  const handleDeleteAddressConfirm = (address) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete Address (${address.label || 'Saved Address'})`,
+      message: `Are you sure you want to delete this address? "${address.line1}, ${address.city}" will be removed from your profile.`,
+      confirmText: 'Delete Address',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        await deleteAddress(address._id);
+        setConfirmModalConfig(null);
+      }
+    });
+  };
+
+  const handleOpenEditAddress = (addr) => {
+    setEditingAddress(addr);
+    setEditAddressForm({
+      label: addr.label || 'Home',
+      line1: addr.line1 || '',
+      landmark: addr.landmark || '',
+      city: addr.city || 'Moradabad',
+      state: addr.state || 'Uttar Pradesh',
+      pincode: addr.pincode || '',
+      isDefault: Boolean(addr.isDefault)
+    });
+  };
+
+  const handleUpdateAddressSubmit = async (e) => {
+    e.preventDefault();
+    if (!editAddressForm.line1.trim() || !editAddressForm.city.trim() || !editAddressForm.pincode.trim()) {
+      toast.error('Street address, city, and pincode are required.');
+      return;
+    }
+    setEditingAddressSubmitting(true);
+    try {
+      const res = await updateAddress(editingAddress._id, editAddressForm);
+      if (res && res.success) {
+        setEditingAddress(null);
+      }
+    } finally {
+      setEditingAddressSubmitting(false);
+    }
+  };
+
+  const filteredCustomerBookings = bookings.filter((b) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q || (
+      b.bookingCode?.toLowerCase().includes(q) ||
+      b.items?.some(it => (it.titleSnapshot || it.title || '').toLowerCase().includes(q)) ||
+      b.cityName?.toLowerCase().includes(q) ||
+      b.address?.line1?.toLowerCase().includes(q)
+    );
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = ['pending', 'approved', 'paid', 'in_progress', 'unresponsive'].includes(b.status);
+    } else if (statusFilter === 'completed') {
+      matchesStatus = b.status === 'completed';
+    } else if (statusFilter === 'cancelled') {
+      matchesStatus = b.status === 'cancelled';
+    }
+    return matchesSearch && matchesStatus;
+  });
 
   useEffect(() => {
     if (user) loadMyBookings();
@@ -168,6 +473,120 @@ export default function CustomerDashboard() {
     }
   };
 
+  // Handle Online Payment for an Unpaid Booking
+  const handlePayBookingOnline = async (booking) => {
+    const amount = Number(booking.totals?.total || booking.total || 0);
+    if (!amount || amount <= 0) {
+      toast.error('Invalid booking payment amount.');
+      return;
+    }
+
+    setPayingBookingId(booking._id);
+    try {
+      const orderRes = await apiRequest('/payments/create-order', {
+        method: 'POST',
+        body: {
+          amount,
+          bookingCode: booking.bookingCode,
+          customerName: user?.name || booking.customer?.name || '',
+          customerPhone: user?.phone || booking.customer?.phone || '',
+          customerEmail: user?.email || booking.customer?.email || ''
+        }
+      });
+
+      if (!orderRes.success) {
+        throw new Error(orderRes.message || 'Could not initiate online payment order.');
+      }
+
+      // If in sandbox test mode or Razorpay script not loaded, open interactive test approval modal
+      if (orderRes.isMock || !window.Razorpay) {
+        setDashboardTestPaymentOrder({ orderRes, booking });
+        setPayingBookingId(null);
+        return;
+      }
+
+      // Live Razorpay Gateway Checkout
+      const rzpOptions = {
+        key: orderRes.keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: 'Max Housekeeping Service',
+        description: `Payment for Booking #${booking.bookingCode}`,
+        image: '/logo.png',
+        order_id: orderRes.orderId,
+        prefill: {
+          name: user?.name || booking.customer?.name || '',
+          contact: user?.phone || booking.customer?.phone || '',
+          email: user?.email || booking.customer?.email || ''
+        },
+        theme: {
+          color: '#10231D'
+        },
+        handler: async function (response) {
+          await verifyBookingPayment(booking.bookingCode, {
+            razorpay_order_id: response.razorpay_order_id || orderRes.orderId,
+            razorpay_payment_id: response.razorpay_payment_id || `txn_${Date.now()}`,
+            razorpay_signature: response.razorpay_signature || 'rzp_verified',
+            method: 'online'
+          });
+        },
+        modal: {
+          ondismiss: function () {
+            setPayingBookingId(null);
+            toast.info('Payment was cancelled.');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(rzpOptions);
+      rzp.on('payment.failed', function (resp) {
+        setPayingBookingId(null);
+        toast.error(`Payment failed: ${resp.error?.description || 'Transaction declined'}`);
+      });
+      rzp.open();
+    } catch (err) {
+      setPayingBookingId(null);
+      toast.error(err.message || 'Payment initiation error.');
+    }
+  };
+
+  const verifyBookingPayment = async (bookingCode, paymentPayload) => {
+    try {
+      const verifyRes = await apiRequest('/payments/verify', {
+        method: 'POST',
+        body: {
+          bookingCode,
+          ...paymentPayload
+        }
+      });
+
+      if (verifyRes.success) {
+        toast.success(`Payment verified! Booking #${bookingCode} is now marked as Paid.`);
+        try {
+          confetti({ particleCount: 100, spread: 60, origin: { y: 0.6 } });
+        } catch {}
+
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.bookingCode === bookingCode
+              ? {
+                  ...b,
+                  paymentStatus: 'paid',
+                  paymentMode: 'online_before',
+                  status: b.status === 'pending' ? 'confirmed' : b.status
+                }
+              : b
+          )
+        );
+      }
+    } catch (err) {
+      toast.error(err.message || 'Payment verification failed.');
+    } finally {
+      setPayingBookingId(null);
+      setDashboardTestPaymentOrder(null);
+    }
+  };
+
   // Submit Change Password
   const handleChangePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -245,46 +664,76 @@ export default function CustomerDashboard() {
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
       <div className="container mx-auto px-4 max-w-5xl">
+        {/* Missing Phone Alert Banner (Prompts Google OAuth users to add their phone number) */}
+        {!user?.phone && (
+          <div className="mb-6 p-4 rounded-2xl bg-[#E9A23B]/15 border-2 border-[#E9A23B] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="p-2.5 rounded-xl bg-[#E9A23B] text-[#10231D] shrink-0 mt-0.5 sm:mt-0 shadow-xs">
+                <LuPhone className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
+                  <span>Action Needed: Add Mobile Number</span>
+                  <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#E9A23B] text-[#10231D] rounded-full uppercase">
+                    Important
+                  </span>
+                </h4>
+                <p className="text-xs text-[#3D524A] mt-0.5 leading-relaxed">
+                  You logged in with Google. Please add your 10-digit mobile number so our cleaning crew can contact you for confirmations, schedule arrivals, and society gate passes.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleOpenEditProfile}
+              className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-black shrink-0 transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-2"
+            >
+              <LuPlus className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span>Add Mobile Number</span>
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-[#E2D9C8] mb-6 gap-4">
-          <div>
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
-              CUSTOMER DASHBOARD
-            </span>
-            <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D]">
-              {activeTab === 'bookings' ? 'My Cleaning Bookings' : 'Account & Security'}
-            </h1>
-            <p className="text-xs text-[#6B8077] mt-1">
-              Welcome back, {user?.name}. Manage your appointments, profile, and account security.
-            </p>
+          <div className="flex items-center gap-4">
+            <UserAvatar user={user} size="xl" className="shadow-md" />
+            <div>
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
+                CUSTOMER DASHBOARD
+              </span>
+              <h1 className="font-display font-black text-2xl sm:text-3xl text-[#10231D]">
+                {activeTab === 'bookings'
+                  ? 'My Cleaning Bookings'
+                  : activeTab === 'addresses'
+                  ? 'Saved Service Addresses'
+                  : activeTab === 'profile'
+                  ? 'My Profile & Details'
+                  : 'Account & Security'}
+              </h1>
+              <p className="text-xs text-[#6B8077] mt-0.5">
+                Welcome back, {user?.name || 'Customer'}. {user?.phone ? `• +91 ${user.phone}` : '• No mobile number added'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setIsChangePasswordModalOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl border border-[#10231D] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5"
-            >
-              <LuKey className="w-4 h-4 text-[#E9A23B]" />
-              <span>Change Password</span>
-            </button>
-
             <Link
               to="/book"
-              className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
             >
-              <LuPlus className="w-4 h-4" />
+              <LuPlus className="w-4 h-4 text-[#E9A23B]" />
               <span>New Booking</span>
             </Link>
           </div>
         </div>
 
         {/* Dashboard Sub-Tabs */}
-        <div className="flex items-center gap-2 mb-8 border-b border-[#E2D9C8] pb-3">
+        <div className="flex items-center gap-2 mb-8 border-b border-[#E2D9C8] pb-3 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'bookings'
                 ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                 : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
@@ -296,8 +745,45 @@ export default function CustomerDashboard() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('addresses')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'addresses'
+                ? 'bg-[#10231D] text-[#F4EFE6] shadow'
+                : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+            }`}
+          >
+            <LuMapPin className="w-4 h-4 text-[#E9A23B]" />
+            <span>Saved Addresses ({user?.addresses?.length || 0})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('profile');
+              setProfileForm({
+                name: user?.name || '',
+                phone: user?.phone || '',
+                avatarUrl: user?.avatarUrl || ''
+              });
+              setCustomPhotoUrl(user?.avatarUrl || '');
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'profile'
+                ? 'bg-[#10231D] text-[#F4EFE6] shadow'
+                : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+            }`}
+          >
+            <LuUser className="w-4 h-4 text-[#E9A23B]" />
+            <span>Profile Details</span>
+            {!user?.phone && (
+              <span className="w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'security'
                 ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                 : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
@@ -332,49 +818,140 @@ export default function CustomerDashboard() {
               </div>
             ) : (
               <div className="space-y-6">
-                {bookings.map((b) => (
-                  <div
-                    key={b._id}
-                    className="bg-[#ECE5D8] p-6 rounded-3xl border border-[#E2D9C8] shadow-sm space-y-4"
-                  >
-                    {/* Header row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E2D9C8] gap-2">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono font-black text-lg text-[#10231D]">
-                          {b.bookingCode}
-                        </span>
-                        {renderStatusBadge(b.status)}
-                      </div>
+                {/* Search & Filter Bar for Customer Bookings */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search bookings by code or service..."
+                      className="w-full pl-9 pr-7 py-2 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-xs text-[#10231D] placeholder-[#6B8077] focus:outline-none focus:border-[#E9A23B]"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                      >
+                        <LuX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                      <div className="flex items-center gap-2">
-                        {/* Communicate with Admin Button */}
-                        <button
-                          type="button"
-                          onClick={() => setMessagingBooking(b)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F4EFE6] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] transition-colors"
-                        >
-                          <LuMessageSquare className="w-3.5 h-3.5 text-[#E9A23B]" />
-                          <span>Chat with Admin</span>
-                          {b.messages && b.messages.length > 0 && (
-                            <span className="w-4 h-4 rounded-full bg-[#10231D] text-[#F4EFE6] text-[9px] flex items-center justify-center font-bold">
-                              {b.messages.length}
-                            </span>
-                          )}
-                        </button>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { val: 'all', label: 'All' },
+                      { val: 'active', label: 'Active' },
+                      { val: 'completed', label: 'Completed' },
+                      { val: 'cancelled', label: 'Cancelled' }
+                    ].map((f) => (
+                      <button
+                        key={f.val}
+                        type="button"
+                        onClick={() => setStatusFilter(f.val)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          statusFilter === f.val
+                            ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                            : 'bg-[#F4EFE6] text-[#3D524A] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
 
-                        {/* Edit Details (Allowed for pending/approved) */}
-                        {!['completed', 'cancelled', 'in_progress'].includes(b.status) && (
+                    {(searchQuery || statusFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setStatusFilter('all');
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#C2512D] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
+                      >
+                        <LuRotateCcw className="w-3.5 h-3.5" />
+                        <span>Reset</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {filteredCustomerBookings.length === 0 ? (
+                  <div className="py-12 text-center bg-[#ECE5D8] rounded-2xl border border-[#E2D9C8] p-6">
+                    <p className="font-display font-bold text-base text-[#10231D]">No bookings match your filter</p>
+                    <p className="text-xs text-[#6B8077] mt-1">Try clearing your search or choosing another status tab.</p>
+                  </div>
+                ) : (
+                  filteredCustomerBookings.map((b) => (
+                    <div
+                      key={b._id}
+                      className="bg-[#ECE5D8] p-6 rounded-3xl border border-[#E2D9C8] shadow-sm space-y-4"
+                    >
+                      {/* Header row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E2D9C8] gap-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-black text-lg text-[#10231D]">
+                            {b.bookingCode}
+                          </span>
+                          {renderStatusBadge(b.status)}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Communicate with Admin Button */}
                           <button
                             type="button"
-                            onClick={() => openEditModal(b)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-colors"
+                            onClick={() => setMessagingBooking(b)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F4EFE6] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] transition-colors cursor-pointer"
                           >
-                            <LuSquarePen className="w-3.5 h-3.5 text-[#E9A23B]" />
-                            <span>Edit Booking</span>
+                            <LuMessageSquare className="w-3.5 h-3.5 text-[#E9A23B]" />
+                            <span>Chat</span>
+                            {b.messages && b.messages.length > 0 && (
+                              <span className="w-4 h-4 rounded-full bg-[#10231D] text-[#F4EFE6] text-[9px] flex items-center justify-center font-bold">
+                                {b.messages.length}
+                              </span>
+                            )}
                           </button>
-                        )}
+
+                          {/* Edit Details (Allowed for pending/approved) */}
+                          {!['completed', 'cancelled', 'in_progress'].includes(b.status) && (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(b)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              <LuSquarePen className="w-3.5 h-3.5 text-[#E9A23B]" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+
+                          {/* Cancel Booking (Allowed when active) */}
+                          {!['completed', 'cancelled'].includes(b.status) && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelBooking(b._id, b.bookingCode)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#C2512D]/50 text-[#C2512D] hover:bg-[#C2512D] hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                              title="Cancel this reservation"
+                            >
+                              <LuX className="w-3.5 h-3.5" />
+                              <span>Cancel</span>
+                            </button>
+                          )}
+
+                          {/* Delete Booking (Allowed when completed or cancelled) */}
+                          {['completed', 'cancelled'].includes(b.status) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBooking(b._id, b.bookingCode)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#C2512D]/50 text-[#C2512D] hover:bg-[#C2512D] hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                              title="Delete booking from history"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
                     {/* Service Items & Slot */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -420,9 +997,9 @@ export default function CustomerDashboard() {
                       </div>
                     </div>
 
-                    {/* Footer Row: Total Price + Live Tracking Action */}
+                    {/* Footer Row: Total Price + Payment Status & Actions */}
                     <div className="pt-3 border-t border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-3">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         <div>
                           <span className="text-[#6B8077] block text-[11px]">Total Payable:</span>
                           <span className="font-mono font-black text-base text-[#10231D]">
@@ -431,17 +1008,48 @@ export default function CustomerDashboard() {
                         </div>
                         <span className="text-[#6B8077]">•</span>
                         <div>
-                          <span className="text-[#6B8077] block text-[11px]">Payment Mode:</span>
+                          <span className="text-[#6B8077] block text-[11px]">Payment:</span>
+                          {b.paymentStatus === 'paid' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                              <LuCheck className="w-3 h-3 text-emerald-700" />
+                              Paid Online
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1">
+                              Unpaid
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[#6B8077]">•</span>
+                        <div>
+                          <span className="text-[#6B8077] block text-[11px]">Mode:</span>
                           <span className="font-semibold text-[#10231D] capitalize">
                             {b.paymentMode === 'cash_on_service' ? 'Cash on Service' : b.paymentMode}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Pay Online Now Button for Unpaid Bookings */}
+                        {b.paymentStatus !== 'paid' && b.status !== 'cancelled' && (
+                          <button
+                            type="button"
+                            disabled={payingBookingId === b._id}
+                            onClick={() => handlePayBookingOnline(b)}
+                            className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <LuCreditCard className="w-3.5 h-3.5" />
+                            <span>
+                              {payingBookingId === b._id
+                                ? 'Connecting...'
+                                : `Pay Online · ₹${Number(b.totals?.total || b.total || 0).toLocaleString('en-IN')}`}
+                            </span>
+                          </button>
+                        )}
+
                         {/* WhatsApp support */}
                         <a
-                          href={`https://wa.me/919897766002?text=Hello%20Max%20Housekeeping,%20inquiry%20regarding%20booking%20${b.bookingCode}`}
+                          href={`https://wa.me/${(settings?.whatsappNumber || '9897766002').replace(/[^0-9]/g, '')}?text=Hello%20Max%20Housekeeping,%20inquiry%20regarding%20booking%20${b.bookingCode}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-2 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs"
@@ -460,6 +1068,136 @@ export default function CustomerDashboard() {
                       </div>
                     </div>
                   </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+        {/* ========================================================
+            TAB 2: SAVED SERVICE ADDRESSES
+        ======================================================== */}
+        {activeTab === 'addresses' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8]">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#10231D]">
+                  Saved Service Addresses
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-1">
+                  Manage your home, apartment, and office locations for fast 1-click booking checkout.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenAddAddress}
+                className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+              >
+                <LuPlus className="w-4 h-4 text-[#E9A23B]" />
+                <span>Add New Address</span>
+              </button>
+            </div>
+
+            {(!user?.addresses || user.addresses.length === 0) ? (
+              <div className="py-16 text-center bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8] p-8">
+                <div className="w-14 h-14 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <LuMapPin className="w-7 h-7" />
+                </div>
+                <h4 className="font-display font-bold text-lg text-[#10231D] mb-1">
+                  No Saved Addresses Yet
+                </h4>
+                <p className="text-xs text-[#6B8077] max-w-md mx-auto mb-5">
+                  Save your home, villa, or office location to quickly auto-fill checkout next time you book a deep cleaning or housekeeping service.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddAddress}
+                  className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold shadow-sm transition-transform active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                >
+                  <LuPlus className="w-4 h-4" />
+                  <span>Add First Address</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {user.addresses.map((addr) => (
+                  <div
+                    key={addr._id}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                      addr.isDefault
+                        ? 'bg-[#F4EFE6] border-[#E9A23B] shadow-md ring-2 ring-[#E9A23B]/30'
+                        : 'bg-[#ECE5D8] border-[#E2D9C8] hover:border-[#10231D]/40'
+                    }`}
+                  >
+                    <div>
+                      {/* Badge Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="px-2.5 py-1 rounded-lg bg-[#10231D] text-[#F4EFE6] text-[11px] font-bold tracking-wide">
+                          {addr.label || 'Home'}
+                        </span>
+                        {addr.isDefault && (
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E9A23B]/20 text-[#10231D] border border-[#E9A23B] text-[10px] font-extrabold uppercase tracking-wider">
+                            <LuCheck className="w-3 h-3 text-[#10231D]" />
+                            <span>Default</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Address Text */}
+                      <p className="font-bold text-sm text-[#10231D] leading-snug">
+                        {addr.line1}
+                      </p>
+                      {addr.landmark && (
+                        <p className="text-xs text-[#6B8077] mt-1">
+                          Landmark: {addr.landmark}
+                        </p>
+                      )}
+                      <p className="text-xs font-semibold text-[#10231D] mt-2">
+                        {addr.city}, {addr.state || 'Uttar Pradesh'}
+                      </p>
+                      <p className="text-xs font-mono text-[#6B8077] mt-0.5">
+                        Pincode: <span className="font-bold text-[#10231D]">{addr.pincode}</span>
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-4 mt-4 border-t border-[#E2D9C8] flex items-center justify-between gap-2">
+                      {!addr.isDefault ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSetDefaultAddress(addr._id)}
+                          className="text-[11px] font-bold text-[#10231D] hover:text-[#E9A23B] transition-colors cursor-pointer"
+                        >
+                          Set as Default
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-[#6B8077] italic font-medium">Primary location</span>
+                      )}
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditAddress(addr)}
+                          className="p-1.5 rounded-lg text-[#10231D] hover:bg-[#E2D9C8] transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                          title="Edit Address"
+                        >
+                          <LuSquarePen className="w-3.5 h-3.5 text-[#E9A23B]" />
+                          <span>Edit</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAddressConfirm(addr)}
+                          className="p-1.5 rounded-lg text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                          title="Delete Address"
+                        >
+                          <LuTrash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -467,17 +1205,195 @@ export default function CustomerDashboard() {
         )}
 
         {/* ========================================================
-            TAB 2: ACCOUNT & SECURITY (Change Password Form)
+            TAB 3: MY PROFILE & PERSONAL DETAILS
+        ======================================================== */}
+        {activeTab === 'profile' && (
+          <div className="bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8] p-6 sm:p-8 shadow-sm max-w-3xl mx-auto">
+            <div className="flex items-center justify-between pb-5 border-b border-[#E2D9C8] mb-6">
+              <div>
+                <h2 className="font-display font-bold text-xl text-[#10231D]">
+                  Personal Profile & Details
+                </h2>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Update your contact details, profile photo, and communication preferences.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-[#10231D] text-[#E9A23B] font-mono text-xs font-bold uppercase">
+                {user?.authProvider === 'google' ? 'Google Account' : 'Direct Account'}
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-6">
+              {/* Photo Section */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                <label className="block text-xs font-bold text-[#10231D] mb-3 uppercase tracking-wider font-mono">
+                  Profile Photo & Avatar
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  {/* Photo Preview with Initials Fallback */}
+                  <div className="relative group shrink-0">
+                    <UserAvatar
+                      name={profileForm.name}
+                      avatarUrl={profileForm.avatarUrl}
+                      size="2xl"
+                      className="shadow-md border-2 border-[#10231D]"
+                    />
+                    {profileForm.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-xs shadow-md hover:bg-red-700 transition-colors cursor-pointer"
+                        title="Remove photo & use initials"
+                      >
+                        <LuX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Photo Controls */}
+                  <div className="flex-1 space-y-3 w-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Hidden File Input */}
+                      <input
+                        type="file"
+                        id="profilePhotoUploadTab"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="profilePhotoUploadTab"
+                        className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                        <span>Upload New Photo</span>
+                      </label>
+
+                      {profileForm.avatarUrl ? (
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="px-3.5 py-2 rounded-xl border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <LuTrash2 className="w-3.5 h-3.5" />
+                          <span>Remove Photo</span>
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-[#6B8077] italic">
+                          Showing geometrical icon / initials as default avatar
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Name and Mobile Input Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Full Name:
+                  </label>
+                  <div className="relative">
+                    <LuUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                    <input
+                      type="text"
+                      value={profileForm.name}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="Your full name"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#6B8077] mt-1">
+                    Initials for avatar: <span className="font-bold text-[#10231D] font-mono">{profileForm.name ? profileForm.name.trim().slice(0, 2).toUpperCase() : 'MH'}</span>
+                  </p>
+                </div>
+
+                {/* Mobile Number */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Mobile / WhatsApp Number:
+                    </label>
+                    {!profileForm.phone ? (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.2 rounded-full">
+                        Required for Service
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.2 rounded-full flex items-center gap-1">
+                        <LuCheck className="w-3 h-3 text-emerald-700" />
+                        <span>Saved</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative flex">
+                    <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-[#E2D9C8] bg-[#ECE5D8] text-xs font-bold text-[#10231D]">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={profileForm.phone}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        setProfileForm({ ...profileForm, phone: digits });
+                      }}
+                      placeholder="10-digit mobile number"
+                      className="w-full p-2.5 rounded-r-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] font-mono focus:border-[#E9A23B] focus:outline-none"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#6B8077] mt-1">
+                    Crew will call this number for gate entry and appointment arrival.
+                  </p>
+                </div>
+              </div>
+
+              {/* Email (Readonly) */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Registered Email Address:
+                </label>
+                <input
+                  type="email"
+                  value={user?.email || ''}
+                  readOnly
+                  disabled
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8]/70 border border-[#D2C8B8] text-sm text-[#3D524A] cursor-not-allowed select-none"
+                />
+                <p className="text-[11px] text-[#6B8077] mt-1">
+                  {user?.authProvider === 'google' ? 'Google OAuth linked account. Email cannot be modified.' : 'Primary email for invoice receipts & booking confirmations.'}
+                </p>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-4 border-t border-[#E2D9C8] flex items-center justify-end gap-3">
+                <button
+                  type="submit"
+                  disabled={profileSubmitting}
+                  className="px-6 py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-xs transition-transform active:scale-95 shadow-sm flex items-center gap-2 cursor-pointer"
+                >
+                  <LuCheck className="w-4 h-4" />
+                  <span>{profileSubmitting ? 'Saving Changes...' : 'Save Profile Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 4: ACCOUNT & SECURITY (Change Password Form)
         ======================================================== */}
         {activeTab === 'security' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* User Profile Card */}
             <div className="bg-[#ECE5D8] p-6 rounded-3xl border border-[#E2D9C8] shadow-sm space-y-4">
               <div className="text-center">
-                <img
-                  src={user?.avatarUrl || 'https://api.dicebear.com/7.x/initials/svg?seed=MH&backgroundColor=10231D&textColor=F4EFE6'}
-                  alt={user?.name}
-                  className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-[#10231D] mb-3"
+                <UserAvatar
+                  user={user}
+                  size="2xl"
+                  className="mx-auto border-2 border-[#10231D] mb-3 shadow-md"
                 />
                 <h3 className="font-display font-black text-lg text-[#10231D]">
                   {user?.name}
@@ -609,6 +1525,150 @@ export default function CustomerDashboard() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* ========================================================
+            MODAL 0: EDIT PROFILE MODAL (Accessible from button/banner)
+        ======================================================== */}
+        {isEditProfileModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setIsEditProfileModalOpen(false)}
+            title="Edit Profile Details"
+            subtitle="Update your full name, profile photo, and mobile number"
+            maxWidth="max-w-lg"
+          >
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              {/* Avatar Preview & Controls */}
+              <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center gap-4">
+                <div className="relative group shrink-0">
+                  <UserAvatar
+                    name={profileForm.name}
+                    avatarUrl={profileForm.avatarUrl}
+                    size="2xl"
+                    className="shadow-md border-2 border-[#10231D]"
+                  />
+                  {profileForm.avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-xs shadow-md hover:bg-red-700 transition-colors cursor-pointer"
+                      title="Remove photo & use initials"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="file"
+                      id="profilePhotoUploadModal"
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="profilePhotoUploadModal"
+                      className="px-3.5 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>Upload Photo</span>
+                    </label>
+
+                    {profileForm.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="px-3 py-1.5 rounded-xl border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <LuTrash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#6B8077]">
+                    {profileForm.avatarUrl ? 'Photo loaded. Click Remove to revert to geometric default avatar.' : 'No photo uploaded. Your geometric avatar / initials will be displayed.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Full Name:
+                </label>
+                <div className="relative">
+                  <LuUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                    placeholder="Enter full name"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-[#6B8077] mt-1">
+                  Avatar initials preview: <span className="font-bold text-[#10231D] font-mono">{profileForm.name ? profileForm.name.trim().slice(0, 2).toUpperCase() : 'MH'}</span>
+                </p>
+              </div>
+
+              {/* Mobile Number */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#10231D]">
+                    Mobile / WhatsApp Number:
+                  </label>
+                  {!profileForm.phone && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.2 rounded-full">
+                      Required
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex">
+                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-[#E2D9C8] bg-[#ECE5D8] text-xs font-bold text-[#10231D]">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={profileForm.phone}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '');
+                      setProfileForm({ ...profileForm, phone: digits });
+                    }}
+                    placeholder="10-digit mobile number"
+                    className="w-full p-2.5 rounded-r-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] font-mono focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-[#6B8077] mt-1">
+                  Required for appointment notifications and crew gate entry.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#6B8077] hover:bg-[#ECE5D8] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={profileSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                >
+                  <LuCheck className="w-4 h-4" />
+                  <span>{profileSubmitting ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
 
         {/* ========================================================
@@ -765,7 +1825,7 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
                     Scheduled Date:
@@ -851,6 +1911,11 @@ export default function CustomerDashboard() {
             maxWidth="max-w-lg"
           >
             <div className="flex flex-col h-96">
+              {/* 7-day chat retention banner */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DDEBE4] text-[#10231D] text-[11px] font-medium border border-[#A3B8B0]/40 mb-3">
+                <LuClock className="w-3.5 h-3.5 text-[#10231D] shrink-0" />
+                <span>Chat history is saved for 7 days. Older messages are automatically cleared.</span>
+              </div>
               {/* Message Feed */}
               <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#F4EFE6] rounded-xl border border-[#E2D9C8] mb-3">
                 {!messagingBooking.messages || messagingBooking.messages.length === 0 ? (
@@ -904,6 +1969,389 @@ export default function CustomerDashboard() {
               </form>
             </div>
           </Modal>
+        )}
+
+        {/* ========================================================
+            MODAL: ADD NEW SAVED ADDRESS
+        ======================================================== */}
+        {isAddAddressModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setIsAddAddressModalOpen(false)}
+            title="Add New Service Address"
+            subtitle="Save an address to your profile for faster checkout"
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleCreateAddress} className="space-y-4">
+              {/* Address Label Presets */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1.5">
+                  Address Label:
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {['Home', 'Office', 'Apartment', 'Villa'].map((lbl) => (
+                    <button
+                      key={lbl}
+                      type="button"
+                      onClick={() => setNewAddressForm({ ...newAddressForm, label: lbl })}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        newAddressForm.label === lbl
+                          ? 'bg-[#10231D] text-[#E9A23B] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Or custom label (e.g. Parents Home, Farmhouse)"
+                  value={newAddressForm.label}
+                  onChange={(e) => setNewAddressForm({ ...newAddressForm, label: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Line 1 */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  House / Flat / Street / Society:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Flat 402, Royal Palms, Kanth Road"
+                  value={newAddressForm.line1}
+                  onChange={(e) => setNewAddressForm({ ...newAddressForm, line1: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Landmark */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Landmark (Optional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Behind Vivekanand Hospital"
+                  value={newAddressForm.landmark}
+                  onChange={(e) => setNewAddressForm({ ...newAddressForm, landmark: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                />
+              </div>
+
+              {/* City & Pincode */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    City:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Moradabad"
+                    value={newAddressForm.city}
+                    onChange={(e) => setNewAddressForm({ ...newAddressForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Pincode:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="244001"
+                    value={newAddressForm.pincode}
+                    onChange={(e) => setNewAddressForm({ ...newAddressForm, pincode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* State */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  State:
+                </label>
+                <input
+                  type="text"
+                  value={newAddressForm.state}
+                  onChange={(e) => setNewAddressForm({ ...newAddressForm, state: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Set as Default Checkbox */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="addrDefaultToggle"
+                  checked={Boolean(newAddressForm.isDefault)}
+                  onChange={(e) => setNewAddressForm({ ...newAddressForm, isDefault: e.target.checked })}
+                  className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="addrDefaultToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
+                  Set as my primary default address
+                </label>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAddressModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#6B8077] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addressSubmitting}
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {addressSubmitting ? 'Saving...' : 'Save Address'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* ========================================================
+            MODAL: EDIT SAVED ADDRESS
+        ======================================================== */}
+        {editingAddress && (
+          <Modal
+            isOpen={true}
+            onClose={() => setEditingAddress(null)}
+            title="Edit Saved Address"
+            subtitle={`Update address details for "${editingAddress.label || 'Saved Location'}"`}
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleUpdateAddressSubmit} className="space-y-4">
+              {/* Address Label Presets */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1.5">
+                  Address Label:
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {['Home', 'Office', 'Apartment', 'Villa'].map((lbl) => (
+                    <button
+                      key={lbl}
+                      type="button"
+                      onClick={() => setEditAddressForm({ ...editAddressForm, label: lbl })}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        editAddressForm.label === lbl
+                          ? 'bg-[#10231D] text-[#E9A23B] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Custom label (e.g. Home, Office, Villa)"
+                  value={editAddressForm.label}
+                  onChange={(e) => setEditAddressForm({ ...editAddressForm, label: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Line 1 */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  House / Flat / Street / Society:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Flat 402, Royal Palms, Kanth Road"
+                  value={editAddressForm.line1}
+                  onChange={(e) => setEditAddressForm({ ...editAddressForm, line1: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Landmark */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Landmark (Optional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Behind Vivekanand Hospital"
+                  value={editAddressForm.landmark}
+                  onChange={(e) => setEditAddressForm({ ...editAddressForm, landmark: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                />
+              </div>
+
+              {/* City & Pincode */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    City:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Moradabad"
+                    value={editAddressForm.city}
+                    onChange={(e) => setEditAddressForm({ ...editAddressForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Pincode:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="244001"
+                    value={editAddressForm.pincode}
+                    onChange={(e) => setEditAddressForm({ ...editAddressForm, pincode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* State */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  State:
+                </label>
+                <input
+                  type="text"
+                  value={editAddressForm.state}
+                  onChange={(e) => setEditAddressForm({ ...editAddressForm, state: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Set as Default Checkbox */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="editAddrDefaultToggle"
+                  checked={Boolean(editAddressForm.isDefault)}
+                  onChange={(e) => setEditAddressForm({ ...editAddressForm, isDefault: e.target.checked })}
+                  className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="editAddrDefaultToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
+                  Set as my primary default address
+                </label>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setEditingAddress(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#6B8077] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editingAddressSubmitting}
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {editingAddressSubmitting ? 'Updating...' : 'Update Address'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* Modal: Test / Sandbox Mode Payment Simulator for Customer Dashboard */}
+        <Modal
+          isOpen={Boolean(dashboardTestPaymentOrder)}
+          onClose={() => {
+            setDashboardTestPaymentOrder(null);
+            setPayingBookingId(null);
+          }}
+          title="Simulate Online Payment (Sandbox Mode)"
+          subtitle="Test gateway enabled without live banking debits"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Booking Code:</span>
+                <span className="font-mono font-bold text-[#10231D]">
+                  {dashboardTestPaymentOrder?.booking?.bookingCode}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Order Reference:</span>
+                <span className="font-mono font-bold text-[#10231D]">
+                  {dashboardTestPaymentOrder?.orderRes?.orderId}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Payable Amount:</span>
+                <span className="font-mono font-bold text-base text-[#10231D]">
+                  ₹{Number(dashboardTestPaymentOrder?.booking?.totals?.total || dashboardTestPaymentOrder?.booking?.total || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#3D524A] leading-relaxed">
+              This sandbox order simulates instant payment completion via UPI/Card. Click <strong>"Approve Test Payment"</strong> to mark this reservation as Paid.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const bookingCode = dashboardTestPaymentOrder?.booking?.bookingCode;
+                  const orderId = dashboardTestPaymentOrder?.orderRes?.orderId || `order_${Date.now()}`;
+                  await verifyBookingPayment(bookingCode, {
+                    razorpay_order_id: orderId,
+                    razorpay_payment_id: `txn_mock_${Date.now()}`,
+                    razorpay_signature: 'mock_verified',
+                    method: 'upi'
+                  });
+                }}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
+              >
+                Approve Test Payment (₹{Number(dashboardTestPaymentOrder?.booking?.totals?.total || dashboardTestPaymentOrder?.booking?.total || 0).toLocaleString('en-IN')})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDashboardTestPaymentOrder(null);
+                  setPayingBookingId(null);
+                }}
+                className="px-4 py-3 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Action Confirmation & Prompt Modal */}
+        {confirmModalConfig && (
+          <ConfirmModal
+            isOpen={Boolean(confirmModalConfig)}
+            onClose={() => setConfirmModalConfig(null)}
+            {...confirmModalConfig}
+          />
         )}
       </div>
     </div>

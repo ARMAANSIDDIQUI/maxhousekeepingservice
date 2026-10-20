@@ -143,7 +143,7 @@ const settings = {
   whatsappNumber: "+91 98977 66002",
   whatsappRaw: "919897766002",
   email: "vikasmax321@gmail.com",
-  address: "Kanth road Asian Behind, Vivekanand Hospital, Moradabad, Uttar Pradesh 244001",
+  address: "Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001",
   workingHours: "Mon–Sun · 10:00 AM – 6:00 PM",
   heroStats: [
     { label: "Homes cleaned", value: 10000, suffix: "+" },

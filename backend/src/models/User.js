@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const addressSchema = new mongoose.Schema({
-  label: { type: String, enum: ['Home', 'Office', 'Other'], default: 'Home' },
+  label: { type: String, default: 'Home', trim: true },
   line1: { type: String, required: true, trim: true },
   landmark: { type: String, trim: true },
   city: { type: String, required: true, trim: true },
@@ -17,12 +17,12 @@ const addressSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  phone: { type: String, required: true, unique: true, index: true, trim: true },
+  phone: { type: String, trim: true, default: '' },
   email: { type: String, trim: true, lowercase: true, sparse: true, index: true },
   passwordHash: { type: String },
   role: { type: String, enum: ['customer', 'cleaner', 'admin'], default: 'customer', index: true },
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
-  avatarUrl: { type: String }, // Google profile photo OR generated head+shoulder person avatar
+  avatarUrl: { type: String, default: '' },
   emailVerified: { type: Boolean, default: false },
   otpSecret: {
     code: { type: String },
@@ -55,6 +55,12 @@ userSchema.statics.generateDefaultAvatar = function (seed = 'user') {
   const initials = encodeURIComponent((seed || 'MH').slice(0, 2).toUpperCase());
   return `https://api.dicebear.com/7.x/initials/svg?seed=${initials}&backgroundColor=10231D&textColor=F4EFE6&radius=50`;
 };
+
+// Ensure unique phone only for non-empty string values
+userSchema.index(
+  { phone: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: 'string', $gt: '' } } }
+);
 
 export const User = mongoose.model('User', userSchema);
 export default User;

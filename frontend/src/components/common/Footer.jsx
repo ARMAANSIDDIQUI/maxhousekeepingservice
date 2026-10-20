@@ -5,10 +5,19 @@ import { apiRequest } from '../../api';
 import { useBooking } from '../../context/BookingContext';
 
 export default function Footer() {
-  const { selectedCity, setSelectedCity, cities: contextCities } = useBooking();
+  const { selectedCity, setSelectedCity, cities: contextCities, settings: contextSettings } = useBooking();
   const [cities, setCities] = useState(Array.isArray(contextCities) ? contextCities : []);
 
-  // Dynamic fetch to get live cities and render list according to count
+  const settings = contextSettings || {
+    brandName: 'Max House Keeping Service',
+    phone: '+91 98977 66002',
+    alternatePhone: '+91 82105 23309',
+    email: 'vikasmax321@gmail.com',
+    workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'
+  };
+
+  // Dynamic fetch to get live cities if not in context
   useEffect(() => {
     let isMounted = true;
     async function fetchCities() {
@@ -160,27 +169,29 @@ export default function Footer() {
               <li className="flex items-start gap-2.5">
                 <LuPhone className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
                 <div>
-                  <a href="tel:9897766002" className="block font-bold text-[#F4EFE6] hover:text-[#E9A23B]">
-                    +91 98977 66002
+                  <a href={`tel:${(settings.phone || '').replace(/[^0-9+]/g, '')}`} className="block font-bold text-[#F4EFE6] hover:text-[#E9A23B]">
+                    {settings.phone}
                   </a>
-                  <a href="tel:8210523309" className="text-xs text-[#DDEBE4]/70 hover:text-[#E9A23B]">
-                    +91 82105 23309
-                  </a>
+                  {settings.alternatePhone && (
+                    <a href={`tel:${(settings.alternatePhone || '').replace(/[^0-9+]/g, '')}`} className="text-xs text-[#DDEBE4]/70 hover:text-[#E9A23B]">
+                      {settings.alternatePhone}
+                    </a>
+                  )}
                 </div>
               </li>
               <li className="flex items-center gap-2.5">
                 <LuMail className="w-4 h-4 text-[#E9A23B] shrink-0" />
-                <a href="mailto:contact@maxhousekeepingservice.com" className="hover:text-[#E9A23B] text-xs">
-                  contact@maxhousekeepingservice.com
+                <a href={`mailto:${settings.email || ''}`} className="hover:text-[#E9A23B] text-xs">
+                  {settings.email}
                 </a>
               </li>
               <li className="flex items-center gap-2.5 text-xs">
                 <LuClock className="w-4 h-4 text-[#E9A23B] shrink-0" />
-                <span>Mon – Sun: 8:00 AM – 8:00 PM</span>
+                <span>{settings.workingHours}</span>
               </li>
-              <li className="flex items-center gap-2.5 text-xs">
-                <LuMapPin className="w-4 h-4 text-[#E9A23B] shrink-0" />
-                <span>Moradabad, Uttar Pradesh, India</span>
+              <li className="flex items-start gap-2.5 text-xs">
+                <LuMapPin className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
+                <span>{settings.address}</span>
               </li>
             </ul>
           </div>
@@ -189,7 +200,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#DDEBE4]/60 gap-4">
           <p>
-            &copy; {new Date().getFullYear()} Max House Keeping Service. All rights reserved.
+            &copy; {new Date().getFullYear()} {settings.brandName || 'Max House Keeping Service'}. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <Link to="/track" className="hover:text-[#F4EFE6]">Track Order</Link>

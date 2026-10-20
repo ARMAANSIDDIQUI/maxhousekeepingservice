@@ -64,6 +64,7 @@ export const sendOTPVerificationEmail = async ({ toEmail, otpCode, userName }) =
     return { success: true, messageId: info.messageId };
   } catch (err) {
     console.error(`[Email Error] Failed sending OTP to ${toEmail}:`, err.message);
+    throw new Error(`Failed to deliver verification email. Please verify SMTP credentials or try again.`);
   }
 };
 

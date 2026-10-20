@@ -3,6 +3,7 @@ import {
   getStats,
   getAdminBookings,
   updateBooking,
+  deleteBooking,
   getAdminServices,
   updateService,
   createService,
@@ -43,6 +44,7 @@ router.get('/stats', getStats);
 // Bookings
 router.get('/bookings', getAdminBookings);
 router.put('/bookings/:id', updateBooking);
+router.delete('/bookings/:id', deleteBooking);
 
 // Services (Shown Price vs Offered Price Management)
 router.get('/services', getAdminServices);

@@ -3,6 +3,9 @@ import mongoose from 'mongoose';
 let isConnected = false;
 
 export const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
   const uri = process.env.MONGODB_URI || process.env.MONGODB_ATLAS_URI || 'mongodb://localhost:27017/maxhousekeeping';
 
   try {

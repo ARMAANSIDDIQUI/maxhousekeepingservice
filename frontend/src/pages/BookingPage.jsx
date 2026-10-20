@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   LuPlus,
   LuTrash2,
@@ -11,7 +11,9 @@ import {
   LuShieldCheck,
   LuChevronDown,
   LuPhone,
-  LuUser
+  LuUser,
+  LuCreditCard,
+  LuBanknote
 } from 'react-icons/lu';
 import confetti from 'canvas-confetti';
 import { useBooking } from '../context/BookingContext';
@@ -20,6 +22,37 @@ import { useToast } from '../context/ToastContext';
 import { apiRequest, FALLBACK_SERVICES } from '../api';
 import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
+
+// Helper to calculate exact variant unit price and MRP
+function getServiceVariantPrice(service, optKey, groupKey) {
+  if (!service) return { price: 0, mrp: 0 };
+  // 1. Matrix row match
+  if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
+    for (const row of service.matrix) {
+      if (row.isActive === false) continue;
+      const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
+      const rowVal = String(sel[groupKey] || '').toLowerCase().trim();
+      if (rowVal === String(optKey).toLowerCase().trim()) {
+        return { price: row.price, mrp: row.mrp || row.price, duration: row.duration };
+      }
+    }
+  }
+  // 2. Option group delta / multiplier match
+  const basePrice = service.price || 0;
+  const baseMrp = service.mrp || service.price || 0;
+  const group = service.optionGroups?.find(g => g.key === groupKey);
+  const opt = group?.options?.find(o => o.key === optKey);
+  if (opt) {
+    let p = basePrice + (opt.priceDelta || 0);
+    let m = baseMrp + (opt.mrpDelta || opt.priceDelta || 0);
+    if (opt.multiplier && opt.multiplier > 0) {
+      p = Math.round(p * opt.multiplier);
+      m = Math.round(m * opt.multiplier);
+    }
+    return { price: p, mrp: m };
+  }
+  return { price: basePrice, mrp: baseMrp };
+}
 
 export default function BookingPage() {
   const {
@@ -58,6 +91,7 @@ export default function BookingPage() {
   // Address Feature (Saved Address Dropdown vs Temporary Address Checkbox)
   const [isTemporaryAddress, setIsTemporaryAddress] = useState(false);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
+  const [saveAddressToProfile, setSaveAddressToProfile] = useState(true);
   const [addressForm, setAddressForm] = useState({
     line1: '',
     landmark: '',
@@ -65,6 +99,29 @@ export default function BookingPage() {
     pincode: '',
     tempText: '' // Used when checkbox is checked
   });
+
+  // Payment Gateway Settings & Dynamic Selection (Default: Cash on Service)
+  const [acceptOnlinePayments, setAcceptOnlinePayments] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState(null);
+  const [paymentChoice, setPaymentChoice] = useState('cash_on_service'); // 'cash_on_service' | 'online_before'
+  const [testPaymentModalOpen, setTestPaymentModalOpen] = useState(false);
+  const [pendingPaymentOrder, setPendingPaymentOrder] = useState(null);
+
+  // Fetch Public Settings on Mount
+  useEffect(() => {
+    async function loadPublicSettings() {
+      try {
+        const res = await apiRequest('/public/settings');
+        if (res.success && res.settings) {
+          setAcceptOnlinePayments(Boolean(res.settings.acceptOnlinePayments));
+          setPaymentSettings(res.settings);
+        }
+      } catch (err) {
+        console.warn('Failed loading public business settings:', err);
+      }
+    }
+    loadPublicSettings();
+  }, []);
 
   // Pre-fill user data if logged in
   useEffect(() => {
@@ -119,6 +176,9 @@ export default function BookingPage() {
     loadCatalog();
   }, [slug]);
 
+  // Helper to determine if address inputs are locked to saved address
+  const isSavedAddressSelected = !isTemporaryAddress && Boolean(user) && Boolean(selectedSavedAddressId) && selectedSavedAddressId !== 'new';
+
   // Handle saved address selection change
   const handleSavedAddressChange = (addressId) => {
     setSelectedSavedAddressId(addressId);
@@ -126,7 +186,7 @@ export default function BookingPage() {
       setAddressForm({
         line1: '',
         landmark: '',
-        cityText: selectedCity?.name || '',
+        cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
         pincode: '',
         tempText: ''
       });
@@ -140,50 +200,63 @@ export default function BookingPage() {
           pincode: addr.pincode,
           tempText: ''
         });
+        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === addr.city?.toLowerCase());
+        if (matchedCity && typeof matchedCity === 'object') {
+          setSelectedCity(matchedCity);
+        }
       }
     }
   };
 
-  // Submit Booking Order
-  const handleBookingSubmit = async (e) => {
-    e.preventDefault();
-
-    if (items.length === 0) {
-      toast.error('Please add at least one service to your booking.');
-      return;
-    }
-
-    if (!customer.name.trim() || !customer.phone.trim()) {
-      toast.error('Please provide your name and mobile number.');
-      return;
-    }
-
-    // Prepare address payload based on temporary checkbox
-    let addressPayload;
-    if (isTemporaryAddress) {
-      if (!addressForm.tempText.trim()) {
-        toast.error('Please type your temporary service address.');
-        return;
-      }
-      addressPayload = {
-        line1: addressForm.tempText.trim(),
-        cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
-        pincode: addressForm.pincode || '244001',
-        isTemporary: true
-      };
+  // Toggle temporary address checkbox
+  const handleToggleTemporaryAddress = (e) => {
+    const checked = e.target.checked;
+    setIsTemporaryAddress(checked);
+    if (checked) {
+      // Clear saved address selection so typing is enabled
+      setSelectedSavedAddressId('');
+      // Wipe/remove default details so user enters fresh temporary address
+      setAddressForm({
+        line1: '',
+        landmark: '',
+        cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
+        pincode: '',
+        tempText: ''
+      });
     } else {
-      if (!addressForm.line1.trim() || !addressForm.pincode.trim()) {
-        toast.error('Please enter street address and pincode.');
-        return;
+      // When unchecked, restore default saved address if available
+      if (user?.addresses && user.addresses.length > 0) {
+        const defaultAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
+        setSelectedSavedAddressId(defaultAddr._id);
+        setAddressForm({
+          line1: defaultAddr.line1,
+          landmark: defaultAddr.landmark || '',
+          cityText: defaultAddr.city,
+          pincode: defaultAddr.pincode,
+          tempText: ''
+        });
+        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === defaultAddr.city?.toLowerCase());
+        if (matchedCity && typeof matchedCity === 'object') {
+          setSelectedCity(matchedCity);
+        }
       }
-      addressPayload = {
-        line1: addressForm.line1.trim(),
-        landmark: addressForm.landmark?.trim() || '',
-        cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
-        pincode: addressForm.pincode.trim(),
-        isTemporary: false
-      };
     }
+  };
+
+  // Execute Final Booking Record Creation in MongoDB
+  const executeBookingCreation = async (paymentDetails = null) => {
+    if (!addressForm.line1.trim() || !addressForm.pincode.trim()) {
+      toast.error('Please enter complete street address and pincode.');
+      return;
+    }
+
+    const addressPayload = {
+      line1: addressForm.line1.trim(),
+      landmark: addressForm.landmark?.trim() || '',
+      cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
+      pincode: addressForm.pincode.trim(),
+      isTemporary: Boolean(isTemporaryAddress)
+    };
 
     setIsSubmitting(true);
     try {
@@ -203,7 +276,10 @@ export default function BookingPage() {
         slot,
         notes: customer.notes || '',
         couponCode: couponCode || undefined,
-        paymentMode: 'cash_on_service'
+        paymentMode: paymentDetails ? 'online_before' : (paymentChoice || 'cash_on_service'),
+        paymentStatus: paymentDetails ? 'paid' : 'pending',
+        paymentDetails: paymentDetails || undefined,
+        saveAddressToProfile: user ? Boolean(saveAddressToProfile) : false
       };
 
       const res = await apiRequest('/bookings', {
@@ -225,6 +301,104 @@ export default function BookingPage() {
       toast.error(err.message || 'Failed to submit booking. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Submit Booking Order (Handles Cash on Service vs Online Gateway)
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
+
+    if (items.length === 0) {
+      toast.error('Please add at least one service to your booking.');
+      return;
+    }
+
+    if (!customer.name.trim() || !customer.phone.trim()) {
+      toast.error('Please provide your name and mobile number.');
+      return;
+    }
+
+    if (!addressForm.line1.trim() || !addressForm.pincode.trim()) {
+      toast.error('Please enter complete street address and pincode.');
+      return;
+    }
+
+    // Cash on Service Choice (Default) OR Online payments disabled by Admin
+    if (!acceptOnlinePayments || paymentChoice === 'cash_on_service') {
+      await executeBookingCreation(null);
+      return;
+    }
+
+    // Pay Online Now Chosen via Razorpay
+    setIsSubmitting(true);
+    try {
+      const orderRes = await apiRequest('/payments/create-order', {
+        method: 'POST',
+        body: {
+          amount: quote?.totals?.total || 1,
+          customerName: customer.name.trim(),
+          customerPhone: customer.phone.trim(),
+          customerEmail: customer.email?.trim() || ''
+        }
+      });
+
+      if (!orderRes.success) {
+        throw new Error(orderRes.message || 'Could not initiate online payment order.');
+      }
+
+      // If in sandbox test mode or Razorpay script not loaded, open interactive test approval modal
+      if (orderRes.isMock || !window.Razorpay) {
+        setPendingPaymentOrder(orderRes);
+        setTestPaymentModalOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Live Razorpay Gateway Checkout
+      const rzpOptions = {
+        key: orderRes.keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: 'Max Housekeeping Service',
+        description: `Booking reservation payment for ${items.length} service(s)`,
+        image: '/logo.png',
+        order_id: orderRes.orderId,
+        prefill: {
+          name: customer.name.trim(),
+          contact: customer.phone.trim(),
+          email: customer.email?.trim() || ''
+        },
+        theme: {
+          color: '#10231D'
+        },
+        handler: async function (response) {
+          const verifiedDetails = {
+            transactionId: response.razorpay_payment_id || `txn_${Date.now()}`,
+            orderId: response.razorpay_order_id || orderRes.orderId,
+            signature: response.razorpay_signature || 'rzp_verified',
+            method: 'razorpay',
+            amount: quote?.totals?.total || 0,
+            paidAt: new Date()
+          };
+          await executeBookingCreation(verifiedDetails);
+        },
+        modal: {
+          ondismiss: function () {
+            setIsSubmitting(false);
+            toast.info('Online payment was cancelled. You can retry or switch to Cash on Service.');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(rzpOptions);
+      rzp.on('payment.failed', function (resp) {
+        setIsSubmitting(false);
+        toast.error(`Payment failed: ${resp.error?.description || 'Transaction declined'}`);
+      });
+      rzp.open();
+    } catch (err) {
+      setIsSubmitting(false);
+      toast.error(err.message || 'Payment initiation error. Please try Cash on Service.');
     }
   };
 
@@ -291,78 +465,138 @@ export default function BookingPage() {
                 <div className="space-y-4">
                   {items.map((item, idx) => {
                     const svc = item.service;
-                    const hasVariants = svc.matrix && svc.matrix.length > 0;
                     const primaryOptionGroup = svc.optionGroups?.[0];
+                    const hasVariants = (svc.matrix && svc.matrix.length > 0) || (primaryOptionGroup && primaryOptionGroup.options?.length > 1);
+                    const currentVariantKey = item.selections?.[primaryOptionGroup?.key] || primaryOptionGroup?.options?.[0]?.key || '';
+                    const currentPriceInfo = getServiceVariantPrice(svc, currentVariantKey, primaryOptionGroup?.key);
+                    
+                    const quoteItem = quote?.items?.[idx];
+                    const unitPrice = quoteItem?.unitPrice ?? currentPriceInfo.price ?? svc.price ?? 0;
+                    const unitMrp = quoteItem?.unitMrp ?? currentPriceInfo.mrp ?? svc.mrp ?? unitPrice;
+                    const itemTotal = quoteItem?.totalPrice ?? (unitPrice * (item.qty || 1));
+                    const itemMrpTotal = quoteItem?.totalMrp ?? (unitMrp * (item.qty || 1));
+                    const itemSavings = quoteItem?.savings ?? Math.max(0, itemMrpTotal - itemTotal);
+
+                    const variantOptions = (primaryOptionGroup?.options || []).map((opt) => {
+                      const optPriceInfo = getServiceVariantPrice(svc, opt.key, primaryOptionGroup.key);
+                      return {
+                        value: opt.key,
+                        label: `${opt.label} · ₹${optPriceInfo.price.toLocaleString('en-IN')}`
+                      };
+                    });
 
                     return (
                       <div
                         key={idx}
-                        className="p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-xs space-y-3.5 transition-all"
                       >
-                        <div className="flex-1">
-                          <h4 className="font-display font-bold text-base text-[#10231D]">
-                            {svc.title}
-                          </h4>
-                          <p className="text-xs text-[#6B8077]">
-                            {svc.categoryName || 'Cleaning Service'}
-                          </p>
-
-                          {/* Interactive Variant Dropdown Selector INSIDE row */}
-                          {hasVariants && primaryOptionGroup && (
-                            <div className="mt-2.5 flex items-center gap-2">
-                              <span className="text-xs font-medium text-[#3D524A]">Variant:</span>
-                              <select
-                                value={item.selections?.[primaryOptionGroup.key] || ''}
-                                onChange={(e) => {
-                                  updateItemVariant(idx, {
-                                    ...item.selections,
-                                    [primaryOptionGroup.key]: e.target.value
-                                  });
-                                }}
-                                className="theme-select text-xs py-1 px-2.5 bg-[#ECE5D8] border-[#E2D9C8]"
-                              >
-                                {primaryOptionGroup.options.map((opt) => (
-                                  <option key={opt.key} value={opt.key}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
+                        {/* Top Row: Service Title & Header Actions (Stepper + Remove) */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-display font-bold text-base text-[#10231D] leading-snug">
+                                {svc.title}
+                              </h4>
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#10231D]/10 text-[#3D524A]">
+                                {svc.categoryName || 'Cleaning Service'}
+                              </span>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Quantity and Actions */}
-                        <div className="flex items-center gap-4 shrink-0">
-                          {/* Quantity Stepper */}
-                          <div className="flex items-center border border-[#E2D9C8] rounded-lg bg-[#ECE5D8] overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => updateItemQty(idx, (item.qty || 1) - 1)}
-                              className="px-2.5 py-1 text-sm font-bold text-[#10231D] hover:bg-[#E2D9C8]"
-                            >
-                              -
-                            </button>
-                            <span className="px-3 text-xs font-bold tnum">
-                              {item.qty || 1}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => updateItemQty(idx, (item.qty || 1) + 1)}
-                              className="px-2.5 py-1 text-sm font-bold text-[#10231D] hover:bg-[#E2D9C8]"
-                            >
-                              +
-                            </button>
                           </div>
 
-                          {/* Delete Item */}
-                          <button
-                            type="button"
-                            onClick={() => removeItem(idx)}
-                            className="p-1.5 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
-                            aria-label="Remove service"
-                          >
-                            <LuTrash2 className="w-4 h-4" />
-                          </button>
+                          {/* Quantity Stepper and Delete Icon */}
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="flex items-center border border-[#E2D9C8] rounded-xl bg-[#F4EFE6] overflow-hidden shadow-xs">
+                              <button
+                                type="button"
+                                onClick={() => updateItemQty(idx, (item.qty || 1) - 1)}
+                                className="px-2.5 py-1.5 text-xs font-bold text-[#10231D] hover:bg-[#ECE5D8] transition-colors"
+                                title="Decrease quantity"
+                              >
+                                -
+                              </button>
+                              <span className="px-3 text-xs font-bold text-[#10231D] tnum">
+                                {item.qty || 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateItemQty(idx, (item.qty || 1) + 1)}
+                                className="px-2.5 py-1.5 text-xs font-bold text-[#10231D] hover:bg-[#ECE5D8] transition-colors"
+                                title="Increase quantity"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => removeItem(idx)}
+                              className="p-2 text-[#C2512D] hover:bg-[#F9ECE8] rounded-lg transition-colors"
+                              aria-label="Remove service"
+                              title="Remove service"
+                            >
+                              <LuTrash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Middle Row: Variant CustomSelect (Dedicated row with full clearance) */}
+                        {hasVariants && primaryOptionGroup && (
+                          <div className="pt-1">
+                            <label className="block text-xs font-bold text-[#3D524A] mb-1.5">
+                              {primaryOptionGroup.label || 'Select Variant / Size'}:
+                            </label>
+                            <div className="max-w-md">
+                              <CustomSelect
+                                size="sm"
+                                value={currentVariantKey}
+                                onChange={(val) => {
+                                  updateItemVariant(idx, {
+                                    ...item.selections,
+                                    [primaryOptionGroup.key]: val
+                                  });
+                                }}
+                                options={variantOptions}
+                                placeholder="Choose variant..."
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bottom Row: Duration (Left) & Live Price + Savings Pill (Right) */}
+                        <div className="pt-2.5 border-t border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div>
+                            {currentPriceInfo.duration ? (
+                              <p className="text-xs text-[#6B8077] flex items-center gap-1.5">
+                                <LuClock className="w-3.5 h-3.5 text-[#E9A23B]" />
+                                <span>Estimated Duration: <strong className="text-[#10231D]">{currentPriceInfo.duration}</strong></span>
+                              </p>
+                            ) : (
+                              <span className="text-xs text-[#6B8077]">Standard service</span>
+                            )}
+                          </div>
+
+                          {/* Live Price Readout & Savings Badge */}
+                          <div className="flex items-center sm:justify-end gap-2.5 flex-wrap">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="font-display font-black text-lg text-[#10231D] tnum">
+                                ₹{itemTotal.toLocaleString('en-IN')}
+                              </span>
+                              {itemMrpTotal > itemTotal && (
+                                <span className="text-xs text-[#6B8077] line-through tnum">
+                                  ₹{itemMrpTotal.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                            {itemSavings > 0 ? (
+                              <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1B5E20]/15 text-[#1B5E20]">
+                                Save ₹{itemSavings.toLocaleString('en-IN')} ({Math.round((itemSavings / itemMrpTotal) * 100)}% OFF)
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-[#6B8077]">
+                                ₹{unitPrice.toLocaleString('en-IN')} / unit
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -373,35 +607,64 @@ export default function BookingPage() {
 
             {/* STEP 2: ADDRESS (With Saved Dropdown & Temporary Checkbox) */}
             <div className="p-6 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-[#E2D9C8] mb-5">
-                <span className="w-7 h-7 rounded-full bg-[#10231D] text-[#F4EFE6] text-xs font-black flex items-center justify-center">
-                  2
-                </span>
-                <h2 className="font-display font-bold text-xl text-[#10231D]">
-                  Service Location & Address
-                </h2>
+              <div className="flex items-center justify-between pb-4 border-b border-[#E2D9C8] mb-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-full bg-[#10231D] text-[#F4EFE6] text-xs font-black flex items-center justify-center">
+                    2
+                  </span>
+                  <h2 className="font-display font-bold text-xl text-[#10231D]">
+                    Service Location & Address
+                  </h2>
+                </div>
+                {user ? (
+                  <Link to="/dashboard" className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B] flex items-center gap-1">
+                    <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>My Address Book</span>
+                  </Link>
+                ) : (
+                  <Link to="/login" className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B]">
+                    Log in to use saved addresses
+                  </Link>
+                )}
               </div>
 
-              {/* Saved Address Dropdown (If authenticated with addresses) */}
-              {user && user.addresses && user.addresses.length > 0 && !isTemporaryAddress && (
-                <div className="mb-4">
-                  <label className="block text-xs font-bold text-[#10231D] mb-1.5">
-                    Choose from Saved Addresses:
-                  </label>
+              {/* Saved Address Dropdown (If authenticated with addresses and NOT using temporary address) */}
+              {user && user.addresses && user.addresses.length > 0 && !isTemporaryAddress ? (
+                <div className="mb-4 p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Select from Your Saved Addresses:
+                    </label>
+                    {isSavedAddressSelected && (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <LuCheck className="w-3 h-3 text-emerald-700" />
+                        <span>Address Selected & Locked</span>
+                      </span>
+                    )}
+                  </div>
                   <CustomSelect
                     value={selectedSavedAddressId}
                     onChange={(val) => handleSavedAddressChange(val)}
                     options={[
                       ...user.addresses.map((a) => ({
                         value: a._id,
-                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})`
+                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})${a.isDefault ? ' ★ Default' : ''}`
                       })),
-                      { value: 'new', label: '+ Add a different address' }
+                      { value: 'new', label: '+ Enter a different address' }
                     ]}
                     placeholder="Choose from Saved Addresses..."
                   />
                 </div>
-              )}
+              ) : user && (!user.addresses || user.addresses.length === 0) && !isTemporaryAddress ? (
+                <div className="mb-4 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex items-center justify-between text-xs">
+                  <span className="text-[#6B8077]">
+                    💡 No saved addresses yet. Enter your address below and it will be saved to your profile!
+                  </span>
+                  <Link to="/dashboard" className="font-bold text-[#10231D] underline hover:text-[#E9A23B] shrink-0 ml-2">
+                    Manage in Dashboard
+                  </Link>
+                </div>
+              ) : null}
 
               {/* Temporary Address Checkbox requested by user */}
               <div className="mb-5 flex items-center gap-2.5 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
@@ -409,7 +672,7 @@ export default function BookingPage() {
                   type="checkbox"
                   id="tempAddressToggle"
                   checked={isTemporaryAddress}
-                  onChange={(e) => setIsTemporaryAddress(e.target.checked)}
+                  onChange={handleToggleTemporaryAddress}
                   className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
                 />
                 <label htmlFor="tempAddressToggle" className="text-xs font-bold text-[#10231D] cursor-pointer select-none">
@@ -417,45 +680,51 @@ export default function BookingPage() {
                 </label>
               </div>
 
-              {/* Conditional Inputs based on Checkbox */}
-              {isTemporaryAddress ? (
+              {/* Address Fields: Typing disabled in case of saved address, allowed for temporary or new address */}
+              <div className="space-y-4">
+                {isSavedAddressSelected && (
+                  <div className="p-2.5 rounded-xl bg-[#ECE5D8] border border-[#D2C8B8] flex items-center gap-2 text-xs text-[#3D524A]">
+                    <LuShieldCheck className="w-4 h-4 text-[#10231D] shrink-0" />
+                    <span>
+                      Address details locked from your saved profile. To edit or enter a different location, select <strong>"+ Enter a different address"</strong> or check <strong>"Use temporary address"</strong> above.
+                    </span>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Temporary Address Details:
+                    Street Address / House No. / Flat / Society:
                   </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter complete temporary address (flat/house no, building, street, landmark)..."
-                    value={addressForm.tempText}
-                    onChange={(e) => setAddressForm({ ...addressForm, tempText: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  <input
+                    type="text"
+                    placeholder="e.g. Flat 302, Green Valley Apartments"
+                    value={addressForm.line1}
+                    readOnly={isSavedAddressSelected}
+                    disabled={isSavedAddressSelected}
+                    onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                    className={`w-full p-3 rounded-xl border text-sm transition-colors ${
+                      isSavedAddressSelected
+                        ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
+                        : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                    }`}
                     required
                   />
-                  <p className="text-[11px] text-[#6B8077] mt-1">
-                    This temporary address will only be used for this specific booking.
-                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Street Address / House No. / Society:
+                      Service City:
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Flat 302, Green Valley Apartments"
-                      value={addressForm.line1}
-                      onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-[#10231D] mb-1">
-                        Service City:
-                      </label>
+                    {isSavedAddressSelected ? (
+                      <input
+                        type="text"
+                        value={addressForm.cityText}
+                        readOnly
+                        disabled
+                        className="w-full p-2.5 rounded-xl border bg-[#ECE5D8]/70 border-[#D2C8B8] text-sm text-[#10231D] cursor-not-allowed select-none"
+                      />
+                    ) : (
                       <CustomSelect
                         value={addressForm.cityText}
                         onChange={(val) => {
@@ -471,36 +740,65 @@ export default function BookingPage() {
                         })}
                         placeholder="Select City..."
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#10231D] mb-1">
-                        Landmark (Optional):
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Near Water Tank"
-                        value={addressForm.landmark}
-                        onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
-                        className="w-full p-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#10231D] mb-1">
-                        6-Digit Pincode:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 244001"
-                        maxLength={6}
-                        value={addressForm.pincode}
-                        onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                        className="w-full p-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                        required
-                      />
-                    </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Landmark (Optional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Near Water Tank"
+                      value={addressForm.landmark}
+                      readOnly={isSavedAddressSelected}
+                      disabled={isSavedAddressSelected}
+                      onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
+                      className={`w-full p-2.5 rounded-xl border text-sm transition-colors ${
+                        isSavedAddressSelected
+                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
+                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      6-Digit Pincode:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 244001"
+                      maxLength={6}
+                      value={addressForm.pincode}
+                      readOnly={isSavedAddressSelected}
+                      disabled={isSavedAddressSelected}
+                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                      className={`w-full p-2.5 rounded-xl border text-sm transition-colors ${
+                        isSavedAddressSelected
+                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
+                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                      }`}
+                      required
+                    />
                   </div>
                 </div>
-              )}
+
+                {user && !isTemporaryAddress && (!selectedSavedAddressId || selectedSavedAddressId === 'new') && (
+                  <div className="pt-1 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="saveAddressCheck"
+                      checked={saveAddressToProfile}
+                      onChange={(e) => setSaveAddressToProfile(e.target.checked)}
+                      className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
+                    />
+                    <label htmlFor="saveAddressCheck" className="text-xs text-[#3D524A] cursor-pointer select-none">
+                      Save this address to my profile address book for future bookings
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* STEP 3: SCHEDULE SLOT & CONTACT */}
@@ -694,19 +992,102 @@ export default function BookingPage() {
                   )}
                 </div>
 
-                {/* Payment Option */}
-                <div className="pt-2 text-xs text-[#6B8077] flex items-center gap-1.5">
-                  <LuShieldCheck className="w-4 h-4 text-[#10231D]" />
-                  <span>Payment Mode: <strong>Cash / UPI upon service completion</strong></span>
-                </div>
+                {/* Payment Option Selection */}
+                {acceptOnlinePayments ? (
+                  <div className="pt-3 border-t border-[#E2D9C8] space-y-2.5">
+                    <span className="block text-xs font-bold text-[#10231D]">
+                      Payment Method:
+                    </span>
+
+                    <div className="space-y-2">
+                      {/* Cash on Service */}
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          paymentChoice === 'cash_on_service'
+                            ? 'bg-[#F4EFE6] border-[#10231D] ring-1 ring-[#10231D] shadow-xs'
+                            : 'bg-[#F4EFE6]/60 border-[#E2D9C8] hover:bg-[#F4EFE6]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentChoice"
+                          value="cash_on_service"
+                          checked={paymentChoice === 'cash_on_service'}
+                          onChange={() => setPaymentChoice('cash_on_service')}
+                          className="mt-0.5 text-[#10231D] focus:ring-[#10231D] w-4 h-4 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                              <LuBanknote className="w-4 h-4 text-[#3D524A]" />
+                              Pay on Service Completion
+                            </span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#3D524A] bg-[#ECE5D8] px-2 py-0.5 rounded-full">
+                              Default
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#6B8077] mt-0.5">
+                            Pay via Cash or UPI to cleaning crew after the job is completed.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Pay Online Now */}
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          paymentChoice === 'online_before'
+                            ? 'bg-[#F4EFE6] border-[#E9A23B] ring-2 ring-[#E9A23B] shadow-xs'
+                            : 'bg-[#F4EFE6]/60 border-[#E2D9C8] hover:bg-[#F4EFE6]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentChoice"
+                          value="online_before"
+                          checked={paymentChoice === 'online_before'}
+                          onChange={() => setPaymentChoice('online_before')}
+                          className="mt-0.5 text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                              <LuCreditCard className="w-4 h-4 text-[#E9A23B]" />
+                              Pay Online Now (Razorpay)
+                            </span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+                              UPI · Cards
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#6B8077] mt-0.5">
+                            Instant online payment via UPI, Credit/Debit Cards, or NetBanking.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-2 text-xs text-[#6B8077] flex items-center gap-1.5">
+                    <LuShieldCheck className="w-4 h-4 text-[#10231D]" />
+                    <span>Payment Mode: <strong>Cash / UPI upon service completion</strong></span>
+                  </div>
+                )}
 
                 {/* Submit Booking Button */}
                 <button
                   type="submit"
                   disabled={isSubmitting || items.length === 0}
-                  className="w-full py-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-base shadow-lg transition-transform active:scale-95"
+                  className="w-full py-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-base shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? 'Confirming Reservation...' : 'Confirm Cleaning Booking'}
+                  {isSubmitting ? (
+                    'Processing Reservation...'
+                  ) : paymentChoice === 'online_before' && acceptOnlinePayments ? (
+                    <>
+                      <LuCreditCard className="w-5 h-5" />
+                      <span>Pay ₹{(quote?.totals?.total || 0).toLocaleString('en-IN')} & Confirm</span>
+                    </>
+                  ) : (
+                    <span>Confirm Cleaning Booking (Pay Later)</span>
+                  )}
                 </button>
               </div>
             </div>
@@ -753,7 +1134,14 @@ export default function BookingPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    addItem(s, {}, 1);
+                    const defaultSelection = {};
+                    if (s.optionGroups?.[0]?.key) {
+                      const defaultOpt = s.optionGroups[0].options?.find(o => o.isDefault) || s.optionGroups[0].options?.[0];
+                      if (defaultOpt) {
+                        defaultSelection[s.optionGroups[0].key] = defaultOpt.key;
+                      }
+                    }
+                    addItem(s, defaultSelection, 1);
                     setIsAddServiceOpen(false);
                   }}
                   className="px-3.5 py-1.5 rounded-lg bg-[#E9A23B] text-[#10231D] text-xs font-bold hover:bg-[#D48E28] transition-colors shrink-0"
@@ -762,6 +1150,72 @@ export default function BookingPage() {
                 </button>
               </div>
             ))}
+          </div>
+        </Modal>
+
+        {/* Modal: Test / Sandbox Mode Payment Simulator */}
+        <Modal
+          isOpen={testPaymentModalOpen}
+          onClose={() => {
+            setTestPaymentModalOpen(false);
+            setPendingPaymentOrder(null);
+          }}
+          title="Simulate Online Payment (Sandbox Mode)"
+          subtitle="Test gateway enabled without live banking debits"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Order Reference:</span>
+                <span className="font-mono font-bold text-[#10231D]">{pendingPaymentOrder?.orderId}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Payable Amount:</span>
+                <span className="font-mono font-bold text-base text-[#10231D]">
+                  ₹{(pendingPaymentOrder?.amount ? pendingPaymentOrder.amount / 100 : quote?.totals?.total || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#6B8077]">Customer Name:</span>
+                <span className="font-bold text-[#10231D]">{customer.name}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#3D524A] leading-relaxed">
+              This sandbox order simulates instant payment completion via UPI/Card. Click <strong>"Approve Test Payment"</strong> to complete this reservation.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setTestPaymentModalOpen(false);
+                  const verifiedDetails = {
+                    transactionId: `mock_pay_${Date.now()}`,
+                    orderId: pendingPaymentOrder?.orderId || `order_${Date.now()}`,
+                    signature: 'mock_verified_signature',
+                    method: 'upi',
+                    amount: quote?.totals?.total || 0,
+                    paidAt: new Date()
+                  };
+                  await executeBookingCreation(verifiedDetails);
+                }}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
+              >
+                Approve Test Payment (₹{(quote?.totals?.total || 0).toLocaleString('en-IN')})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTestPaymentModalOpen(false);
+                  setPendingPaymentOrder(null);
+                }}
+                className="px-4 py-3 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </Modal>
       </div>

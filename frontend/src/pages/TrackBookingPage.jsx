@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { LuSearch, LuCalendar, LuMapPin, LuClock, LuPhone, LuShieldCheck } from 'react-icons/lu';
 import { apiRequest } from '../api/client';
 import { useToast } from '../context/ToastContext';
+import { useBooking } from '../context/BookingContext';
 
 export default function TrackBookingPage() {
+  const { settings } = useBooking();
   const { code } = useParams();
   const [searchCode, setSearchCode] = useState(code || '');
   const [booking, setBooking] = useState(null);
@@ -115,7 +117,7 @@ export default function TrackBookingPage() {
                       >
                         {idx + 1}
                       </div>
-                      <span className="text-[10px] text-center mt-2 max-w-[80px] font-semibold text-[#10231D]">
+                      <span className="text-[9px] sm:text-[10px] text-center mt-2 max-w-[68px] sm:max-w-[80px] font-semibold text-[#10231D] leading-tight">
                         {st.label}
                       </span>
                     </div>
@@ -179,8 +181,11 @@ export default function TrackBookingPage() {
             {/* Support Callout */}
             <div className="pt-4 border-t border-[#E2D9C8] flex items-center justify-between text-xs text-[#3D524A]">
               <span>Need help or rescheduling?</span>
-              <a href="tel:9897766002" className="font-bold text-[#10231D] hover:underline flex items-center gap-1">
-                <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" /> Call 98977 66002
+              <a
+                href={`tel:${(settings?.phone || '+919897766002').replace(/[^0-9+]/g, '')}`}
+                className="font-bold text-[#10231D] hover:underline flex items-center gap-1"
+              >
+                <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" /> Call {settings?.phone || '+91 98977 66002'}
               </a>
             </div>
           </div>

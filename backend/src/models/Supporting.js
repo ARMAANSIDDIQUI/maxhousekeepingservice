@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const contactMessageSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  email: { type: String, required: true, trim: true },
+  email: { type: String, trim: true, default: '' },
   phone: { type: String, trim: true },
-  subject: { type: String, trim: true },
+  subject: { type: String, trim: true, default: 'General Inquiry' },
   message: { type: String, required: true, trim: true },
   status: { type: String, enum: ['unread', 'read', 'replied'], default: 'unread', index: true }
 }, {
@@ -16,10 +16,22 @@ export const ContactMessage = mongoose.model('ContactMessage', contactMessageSch
 const waitlistRequestSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   phone: { type: String, required: true, trim: true },
-  cityText: { type: String, required: true, trim: true },
+  city: { type: String, trim: true },
+  cityText: { type: String, trim: true },
+  pincode: { type: String, trim: true },
+  serviceNeeded: { type: String, trim: true },
   serviceInterest: { type: String, trim: true }
 }, {
   timestamps: true
+});
+
+// Ensure cityText is populated from city if provided
+waitlistRequestSchema.pre('save', function (next) {
+  if (this.city && !this.cityText) this.cityText = this.city;
+  if (this.cityText && !this.city) this.city = this.cityText;
+  if (this.serviceNeeded && !this.serviceInterest) this.serviceInterest = this.serviceNeeded;
+  if (this.serviceInterest && !this.serviceNeeded) this.serviceNeeded = this.serviceInterest;
+  next();
 });
 
 export const WaitlistRequest = mongoose.model('WaitlistRequest', waitlistRequestSchema);

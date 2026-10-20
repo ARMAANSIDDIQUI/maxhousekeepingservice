@@ -15,10 +15,11 @@ import { useBooking } from '../../context/BookingContext';
 import { apiRequest } from '../../api';
 import { getServiceIcon } from '../../utils/iconHelper';
 import Modal from './Modal';
+import UserAvatar from './UserAvatar';
 
 export default function Header() {
   const { user, logout, isAdmin } = useAuth();
-  const { selectedCity, setSelectedCity, cities: contextCities, items } = useBooking();
+  const { selectedCity, setSelectedCity, cities: contextCities, items, settings } = useBooking();
   const [cities, setCities] = useState(contextCities || []);
   const [servicesList, setServicesList] = useState([]);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
@@ -90,17 +91,27 @@ export default function Header() {
             <div className="flex items-center gap-3">
               <span className="inline-block w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
               <span>Direct Booking Hotline:</span>
-              <a href="tel:9897766002" className="font-semibold text-[#E9A23B] hover:underline flex items-center gap-1">
-                <LuPhone className="w-3.5 h-3.5" /> 98977 66002
+              <a
+                href={`tel:${(settings?.primaryPhone || settings?.phone || '9897766002').replace(/[^0-9+]/g, '')}`}
+                className="font-semibold text-[#E9A23B] hover:underline flex items-center gap-1"
+              >
+                <LuPhone className="w-3.5 h-3.5" /> {settings?.primaryPhone || settings?.phone || '98977 66002'}
               </a>
-              <span className="hidden sm:inline text-[#E2D9C8]/40">|</span>
-              <a href="tel:8210523309" className="hidden sm:inline hover:underline text-[#E2D9C8]/80">
-                82105 23309
-              </a>
+              {(settings?.secondaryPhone || settings?.alternatePhone) && (
+                <>
+                  <span className="hidden sm:inline text-[#E2D9C8]/40">|</span>
+                  <a
+                    href={`tel:${(settings.secondaryPhone || settings.alternatePhone).replace(/[^0-9+]/g, '')}`}
+                    className="hidden sm:inline hover:underline text-[#E2D9C8]/80"
+                  >
+                    {settings.secondaryPhone || settings.alternatePhone}
+                  </a>
+                </>
+              )}
             </div>
 
             <div className="flex items-center gap-4 text-[11px] text-[#E2D9C8]/70">
-              <span className="hidden md:inline">Open 7 Days (8:00 AM – 8:00 PM)</span>
+              <span className="hidden md:inline">{settings?.workingHours || '8:00 AM – 8:00 PM (Monday – Sunday)'}</span>
               {/* City Quick Selector */}
               <button
                 type="button"
@@ -128,9 +139,6 @@ export default function Header() {
             <div className="flex flex-col">
               <span className="font-display font-black text-lg sm:text-xl tracking-tight text-[#10231D] leading-none group-hover:text-[#E9A23B] transition-colors">
                 Max <span className="text-[#E9A23B]">House</span> Keeping Service
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-[#6B8077] font-semibold mt-0.5">
-                WESTERN UP
               </span>
             </div>
           </Link>
@@ -254,11 +262,7 @@ export default function Header() {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
                 >
-                  <img
-                    src={user.avatarUrl || 'https://api.dicebear.com/7.x/initials/svg?seed=MH&backgroundColor=10231D&textColor=F4EFE6'}
-                    alt={user.name}
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
+                  <UserAvatar user={user} size="sm" />
                   <span className="text-xs font-semibold text-[#10231D] max-w-[90px] truncate">
                     {user.name}
                   </span>

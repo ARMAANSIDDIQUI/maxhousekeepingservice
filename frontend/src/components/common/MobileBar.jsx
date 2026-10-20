@@ -1,17 +1,26 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { LuPhone, LuCalendar } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import { useBooking } from '../../context/BookingContext';
 
 export default function MobileBar() {
-  const { items } = useBooking();
+  const { items, settings } = useBooking();
+  const { pathname } = useLocation();
+
+  // Hide mobile consumer bar on admin dashboard
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
+
+  const phoneHref = `tel:${(settings?.phone || '9897766002').replace(/[^0-9+]/g, '')}`;
+  const whatsappHref = `https://wa.me/${(settings?.whatsappNumber || '9897766002').replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hello ' + (settings?.brandName || 'Max Housekeeping Service') + ', I would like to book a cleaning service.')}`;
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#F4EFE6]/95 backdrop-blur-md border-t border-[#E2D9C8] p-2.5 px-3 flex items-center justify-between gap-2 shadow-2xl">
       {/* Call Button */}
       <a
-        href="tel:9897766002"
+        href={phoneHref}
         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg border border-[#10231D] text-[#10231D] bg-[#ECE5D8] text-xs font-bold transition-transform active:scale-95"
       >
         <LuPhone className="w-4 h-4 text-[#10231D]" />
@@ -20,7 +29,7 @@ export default function MobileBar() {
 
       {/* WhatsApp Button */}
       <a
-        href="https://wa.me/919897766002?text=Hello%20Max%20Housekeeping%20Service,%20I%20would%20like%20to%20book%20a%20cleaning%20service."
+        href={whatsappHref}
         target="_blank"
         rel="noopener noreferrer"
         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#25D366] text-white text-xs font-bold transition-transform active:scale-95 shadow-sm"

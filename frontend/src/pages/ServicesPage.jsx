@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
 
 export default function ServicesPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCategory = searchParams.get('category') || '';
   
@@ -162,17 +163,26 @@ export default function ServicesPage() {
               return (
                 <div
                   key={service._id}
-                  className="rounded-2xl border border-[#E2D9C8] bg-[#ECE5D8]/70 overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg transition-all hover:-translate-y-1"
+                  onClick={() => navigate(`/services/${service.slug}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/services/${service.slug}`);
+                    }
+                  }}
+                  className="group rounded-2xl border border-[#E2D9C8] hover:border-[#E9A23B] bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#E9A23B]/60"
                 >
                   {/* Photo Banner */}
-                  <div className="h-44 overflow-hidden relative">
+                  <div className="h-48 overflow-hidden relative">
                     <img
                       src={service.media?.hero?.url || `/media/categories/${service.categorySlug || 'home-deep-cleaning'}.jpg`}
                       alt={service.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
                       onError={(e) => { e.currentTarget.src = '/media/site/hero-clean-home.jpg'; }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#10231D]/70 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#10231D]/80 via-[#10231D]/20 to-transparent" />
                     <div className="absolute top-3 right-3 flex items-center gap-1.5">
                       {discountPct > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-black shadow-xs">
@@ -180,15 +190,18 @@ export default function ServicesPage() {
                         </span>
                       )}
                     </div>
-                    <div className="absolute bottom-3 left-4 text-white text-xs font-mono font-semibold">
-                      {service.categoryName} · {service.duration || '1 hr'}
+                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-mono font-semibold">
+                      <span>{service.categoryName} · {service.duration || '1 hr'}</span>
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1 text-[#E9A23B] font-bold text-[11px]">
+                        Details <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                      </span>
                     </div>
                   </div>
 
                   {/* Body Content */}
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display font-bold text-xl text-[#10231D] mb-2 leading-snug">
+                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug">
                         {service.title}
                       </h3>
                       <p className="text-xs text-[#3D524A] leading-relaxed line-clamp-2 mb-4">
@@ -196,7 +209,7 @@ export default function ServicesPage() {
                       </p>
 
                       {/* Pricing Box */}
-                      <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] mb-4">
+                      <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] group-hover:border-[#E9A23B]/40 mb-4 transition-colors">
                         <div className="flex items-baseline gap-2.5">
                           <span className="font-display font-black text-2xl text-[#10231D] tnum">
                             ₹{service.price.toLocaleString('en-IN')}
@@ -228,20 +241,18 @@ export default function ServicesPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-3 pt-3 border-t border-[#E2D9C8]">
+                    <div className="pt-3 border-t border-[#E2D9C8]">
                       <button
                         type="button"
-                        onClick={() => addItem(service, {}, 1)}
-                        className="flex-1 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-black text-xs transition-colors shadow-sm text-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addItem(service, {}, 1);
+                        }}
+                        className="w-full py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] active:scale-[0.98] text-[#10231D] font-black text-xs transition-all shadow-sm hover:shadow-md text-center flex items-center justify-center gap-2"
                       >
-                        Add to Booking
+                        <span>Add to Booking</span>
+                        <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                       </button>
-                      <Link
-                        to={`/services/${service.slug}`}
-                        className="px-4 py-2.5 rounded-xl border border-[#10231D] text-[#10231D] hover:bg-[#10231D] hover:text-[#F4EFE6] text-xs font-bold transition-colors"
-                      >
-                        View
-                      </Link>
                     </div>
                   </div>
                 </div>

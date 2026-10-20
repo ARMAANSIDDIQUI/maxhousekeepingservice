@@ -13,6 +13,48 @@ import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
 
+// Helper to compute exact variant pricing for any service and variant key
+function getVariantPricingInfo(service, optKey, groupKey) {
+  if (!service) return { price: 0, mrp: 0, duration: '1 hr' };
+
+  // 1. Matrix row match
+  if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
+    for (const row of service.matrix) {
+      if (row.isActive === false) continue;
+      const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
+      const rowVal = String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase().trim();
+      if (rowVal === String(optKey).toLowerCase().trim()) {
+        return {
+          price: row.price,
+          mrp: row.mrp || row.price,
+          duration: row.duration || service.duration || '1 hr'
+        };
+      }
+    }
+  }
+
+  // 2. Option group delta / multiplier match
+  const basePrice = service.price || 0;
+  const baseMrp = service.mrp || service.price || 0;
+  const group = service.optionGroups?.find(g => g.key === groupKey) || service.optionGroups?.[0];
+  const opt = group?.options?.find(o => o.key === optKey);
+  if (opt) {
+    let p = basePrice + (opt.priceDelta || 0);
+    let m = baseMrp + (opt.mrpDelta || opt.priceDelta || 0);
+    if (opt.multiplier && opt.multiplier > 0) {
+      p = Math.round(p * opt.multiplier);
+      m = Math.round(m * opt.multiplier);
+    }
+    return {
+      price: p,
+      mrp: m,
+      duration: opt.durationDelta || service.duration || '1 hr'
+    };
+  }
+
+  return { price: basePrice, mrp: baseMrp, duration: service.duration || '1 hr' };
+}
+
 export default function ServiceDetailPage() {
   const { slug } = useParams();
   const [service, setService] = useState(null);
@@ -31,11 +73,10 @@ export default function ServiceDetailPage() {
         const res = await apiRequest(`/services/${slug}`);
         if (res && res.success && res.service) {
           setService(res.service);
-          if (res.service.matrix && res.service.matrix.length > 0) {
-            const firstRow = res.service.matrix[0];
-            const firstKey = Object.values(firstRow.selection || {})[0];
-            setSelectedVariant(firstKey || '');
-          }
+          const primaryGroup = res.service.optionGroups?.[0];
+          const defaultOpt = primaryGroup?.options?.find(o => o.isDefault) || primaryGroup?.options?.[0];
+          const defaultKey = defaultOpt?.key || (res.service.matrix?.[0] ? Object.values(res.service.matrix[0].selection || {})[0] : '');
+          setSelectedVariant(defaultKey || '');
         } else {
           setService(null);
         }
@@ -69,28 +110,18 @@ export default function ServiceDetailPage() {
   }
 
   // Calculate pricing based on selected variant
-  let currentPrice = service.price;
-  let currentMrp = service.mrp;
-  let currentDuration = service.duration || '1 hr';
-
-  if (selectedVariant && service.matrix && service.matrix.length > 0) {
-    const matchedRow = service.matrix.find(row => {
-      const vals = Object.values(row.selection || {});
-      return vals.includes(selectedVariant);
-    });
-    if (matchedRow) {
-      currentPrice = matchedRow.price;
-      currentMrp = matchedRow.mrp;
-      if (matchedRow.duration) currentDuration = matchedRow.duration;
-    }
-  }
-
-  const savings = currentMrp - currentPrice;
-  const discountPct = currentMrp > 0 ? Math.round(((currentMrp - currentPrice) / currentMrp) * 100) : 0;
   const optionGroup = service.optionGroups?.[0];
+  const activeVariantKey = selectedVariant || optionGroup?.options?.[0]?.key || '';
+  const currentPricing = getVariantPricingInfo(service, activeVariantKey, optionGroup?.key || 'size');
+
+  const currentPrice = currentPricing.price;
+  const currentMrp = currentPricing.mrp;
+  const currentDuration = currentPricing.duration;
+  const savings = Math.max(0, currentMrp - currentPrice);
+  const discountPct = currentMrp > 0 ? Math.round(((currentMrp - currentPrice) / currentMrp) * 100) : 0;
 
   const handleBookNow = () => {
-    const selections = optionGroup ? { [optionGroup.key]: selectedVariant } : {};
+    const selections = optionGroup ? { [optionGroup.key]: activeVariantKey } : {};
     addItem(service, selections, 1);
     navigate('/book');
   };
@@ -148,21 +179,28 @@ export default function ServiceDetailPage() {
                 <label className="block text-xs font-bold text-[#10231D] mb-2">
                   Select {optionGroup.label}:
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {optionGroup.options.map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setSelectedVariant(opt.key)}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                        selectedVariant === opt.key
-                          ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                          : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-2.5">
+                  {optionGroup.options.map((opt) => {
+                    const optPrice = getVariantPricingInfo(service, opt.key, optionGroup.key);
+                    const isSelected = activeVariantKey === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setSelectedVariant(opt.key)}
+                        className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#10231D] text-[#F4EFE6] shadow-md ring-2 ring-[#E9A23B]'
+                            : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        <span className={`text-[11px] font-mono font-semibold ${isSelected ? 'text-[#E9A23B]' : 'text-[#6B8077]'}`}>
+                          · ₹{optPrice.price.toLocaleString('en-IN')}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -10,6 +10,7 @@ import { BookingProvider } from './context/BookingContext';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import MobileBar from './components/common/MobileBar';
+import ScrollToTopButton from './components/common/ScrollToTopButton';
 
 import HomePage from './pages/HomePage';
 import ServicesPage from './pages/ServicesPage';
@@ -26,7 +27,10 @@ import ContactPage from './pages/ContactPage';
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (window.lenis) {
+      window.lenis.scrollTo(0, { immediate: true });
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname]);
   return null;
 }
@@ -43,6 +47,8 @@ function LenisProvider({ children }) {
       wheelMultiplier: 0.9
     });
 
+    window.lenis = lenis;
+
     function raf(time) {
       lenis.raf(time);
       requestAnimationFrame(raf);
@@ -50,6 +56,7 @@ function LenisProvider({ children }) {
     requestAnimationFrame(raf);
 
     return () => {
+      window.lenis = null;
       lenis.destroy();
     };
   }, []);
@@ -94,6 +101,9 @@ export default function App() {
 
                   {/* Mobile Sticky Bar (<768px) */}
                   <MobileBar />
+
+                  {/* Floating Scroll To Top Button */}
+                  <ScrollToTopButton />
 
                   {/* Editorial Footer */}
                   <Footer />

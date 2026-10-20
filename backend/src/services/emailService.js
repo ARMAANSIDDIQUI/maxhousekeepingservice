@@ -5,7 +5,7 @@ const BRAND_COLOR = '#E9A23B';
 const BRAND_DARK = '#10231D';
 const BRAND_BG = '#F4EFE6';
 const SUPPORT_PHONE = '+91 98977 66002';
-const SUPPORT_EMAIL = 'contact@maxhousekeepingservice.com';
+const SUPPORT_EMAIL = 'vikasmax321@gmail.com';
 
 /**
  * Standard Email Shell Template with Brand Styling

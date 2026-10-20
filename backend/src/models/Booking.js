@@ -59,8 +59,27 @@ const bookingSchema = new mongoose.Schema({
     discountAmount: { type: Number, default: 0 }
   },
   priceVersion: { type: String, default: 'v1' },
-  paymentMode: { type: String, enum: ['cash_on_service', 'razorpay'], default: 'cash_on_service' },
-  paymentStatus: { type: String, enum: ['pending', 'paid', 'refunded'], default: 'pending' },
+  paymentMode: {
+    type: String,
+    enum: ['cash_on_service', 'online_before', 'online_after', 'razorpay'],
+    default: 'cash_on_service'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'refunded', 'failed'],
+    default: 'pending',
+    index: true
+  },
+  paymentDetails: {
+    transactionId: { type: String, trim: true },
+    orderId: { type: String, trim: true },
+    signature: { type: String },
+    provider: { type: String, default: 'razorpay' },
+    paidAt: { type: Date },
+    amount: { type: Number },
+    method: { type: String }, // 'upi' | 'card' | 'netbanking' | 'wallet'
+    receipt: { type: String }
+  },
   assignedCrew: {
     name: String,
     phone: String

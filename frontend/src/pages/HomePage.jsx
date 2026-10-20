@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   LuSparkles,
   LuShieldCheck,
@@ -17,19 +17,19 @@ import RoomMap from '../components/home/RoomMap';
 import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [featuredServices, setFeaturedServices] = useState([]);
   const [allServices, setAllServices] = useState([]);
   const [brands, setBrands] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
-  const { addItem, selectedCity } = useBooking();
+  const { addItem, selectedCity, settings } = useBooking();
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [catsRes, srvsRes, allSrvsRes, brandsRes, testsRes] = await Promise.allSettled([
+        const [catsRes, allSrvsRes, brandsRes, testsRes] = await Promise.allSettled([
           apiRequest('/categories'),
-          apiRequest('/services?popular=true'),
           apiRequest('/services'),
           apiRequest('/public/brands'),
           apiRequest('/public/testimonials')
@@ -41,16 +41,14 @@ export default function HomePage() {
           setCategories([]);
         }
 
-        if (srvsRes.status === 'fulfilled' && srvsRes.value?.services && srvsRes.value.services.length > 0) {
-          setFeaturedServices(srvsRes.value.services);
-        } else {
-          setFeaturedServices([]);
-        }
-
         if (allSrvsRes.status === 'fulfilled' && allSrvsRes.value?.services && allSrvsRes.value.services.length > 0) {
-          setAllServices(allSrvsRes.value.services);
+          const srvList = allSrvsRes.value.services;
+          setAllServices(srvList);
+          const popular = srvList.filter(s => s.isPopular);
+          setFeaturedServices(popular.length > 0 ? popular : srvList.slice(0, 4));
         } else {
           setAllServices([]);
+          setFeaturedServices([]);
         }
 
         if (brandsRes.status === 'fulfilled' && brandsRes.value?.brands && brandsRes.value.brands.length > 0) {
@@ -87,7 +85,7 @@ export default function HomePage() {
             <div className="lg:col-span-7">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] mb-4 sm:mb-6">
                 <span className="w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
-                <span>Rated 4.9/5 by 10,000+ happy homes</span>
+                <span>{settings?.ratingClaim || 'Rated 4.9/5 by 10,000+ happy homes'}</span>
               </div>
 
               <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#10231D] leading-[1.08] tracking-tight mb-4 sm:mb-6">
@@ -293,7 +291,16 @@ export default function HomePage() {
               return (
                 <div
                   key={service._id}
-                  className="rounded-2xl border border-[#E2D9C8] bg-[#ECE5D8]/70 p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+                  onClick={() => navigate(`/services/${service.slug}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/services/${service.slug}`);
+                    }
+                  }}
+                  className="group rounded-2xl border border-[#E2D9C8] hover:border-[#E9A23B] bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] p-6 flex flex-col justify-between shadow-xs hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#E9A23B]/60"
                 >
                   <div>
                     {/* Header Badges */}
@@ -308,10 +315,8 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <h3 className="font-display font-bold text-xl text-[#10231D] mb-2 leading-snug">
-                      <Link to={`/services/${service.slug}`} className="hover:text-[#E9A23B] transition-colors">
-                        {service.title}
-                      </Link>
+                    <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug">
+                      {service.title}
                     </h3>
 
                     <p className="text-xs text-[#3D524A] leading-relaxed mb-6 line-clamp-2">
@@ -321,7 +326,7 @@ export default function HomePage() {
 
                   {/* Dual Pricing Footer */}
                   <div className="pt-4 border-t border-[#E2D9C8]">
-                    <div className="flex items-baseline justify-between mb-3">
+                    <div className="flex items-baseline justify-between mb-4">
                       <div>
                         <span className="text-xs text-[#6B8077] block font-mono">Offered Price</span>
                         <div className="flex items-baseline gap-2">
@@ -345,21 +350,17 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <Link
-                        to={`/services/${service.slug}`}
-                        className="py-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] hover:bg-[#E2D9C8] text-center text-xs font-bold text-[#10231D] transition-colors"
-                      >
-                        Details
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => addItem(service)}
-                        className="py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] text-center text-xs font-bold transition-all shadow-sm"
-                      >
-                        Add to Ticket
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addItem(service);
+                      }}
+                      className="w-full py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] active:scale-[0.98] text-[#181511] font-black text-xs transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                    >
+                      <span>Add to Ticket</span>
+                      <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
                   </div>
                 </div>
               );

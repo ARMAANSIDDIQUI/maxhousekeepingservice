@@ -9,7 +9,6 @@ const fileFilter = (req, file, cb) => {
     'image/jpg',
     'image/png',
     'image/webp',
-    'image/svg+xml',
     'image/gif',
     'image/avif'
   ];
@@ -17,7 +16,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files (JPEG, PNG, WebP, GIF, SVG, AVIF) are allowed.'), false);
+    cb(new Error('Only image files (JPEG, PNG, WebP, GIF, AVIF) are allowed.'), false);
   }
 };
 

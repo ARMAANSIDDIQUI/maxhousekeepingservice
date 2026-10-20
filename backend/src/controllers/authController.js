@@ -4,7 +4,7 @@ import OtpVerification from '../models/OtpVerification.js';
 import { sendOtpEmail } from '../config/email.js';
 import { sendWelcomeEmail } from '../services/emailService.js';
 
-// Helper to sign JWT token
+// Helper to sign JWT token (strictly valid for 7 days)
 function generateToken(user) {
   return jwt.sign(
     { id: user._id, role: user.role, email: user.email },
@@ -13,25 +13,31 @@ function generateToken(user) {
   );
 }
 
-// Helper to attach cookie
+// Helper to attach 7-day persistent session cookie
 function sendTokenResponse(user, statusCode, res) {
   const token = generateToken(user);
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds (604,800,000 ms)
 
   const cookieOptions = {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    expires: new Date(Date.now() + SEVEN_DAYS_MS),
+    maxAge: SEVEN_DAYS_MS,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   };
 
+  const sanitizedPhone = (user.phone && user.phone.startsWith('g_')) ? '' : (user.phone || '');
+
   const userSafe = {
     id: user._id,
+    _id: user._id,
     name: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: sanitizedPhone,
     role: user.role,
-    avatarUrl: user.avatarUrl,
-    addresses: user.addresses || []
+    avatarUrl: user.avatarUrl || '',
+    addresses: user.addresses || [],
+    authProvider: user.authProvider || 'local'
   };
 
   res.status(statusCode).cookie('token', token, cookieOptions).json({
@@ -153,6 +159,13 @@ export async function register(req, res, next) {
 
     if (otpRecord.code !== otp.trim()) {
       otpRecord.attempts = (otpRecord.attempts || 0) + 1;
+      if (otpRecord.attempts >= 5) {
+        await OtpVerification.deleteOne({ _id: otpRecord._id });
+        return res.status(400).json({
+          success: false,
+          message: 'Too many incorrect attempts. Verification code invalidated. Please request a new code.'
+        });
+      }
       await otpRecord.save();
       return res.status(400).json({
         success: false,
@@ -336,6 +349,14 @@ export async function verifyOtp(req, res, next) {
 
     if (user.otpSecret.code !== code.trim()) {
       user.otpSecret.attempts = (user.otpSecret.attempts || 0) + 1;
+      if (user.otpSecret.attempts >= 5) {
+        user.otpSecret = { code: null, expiresAt: null, attempts: 0 };
+        await user.save();
+        return res.status(400).json({
+          success: false,
+          message: 'Too many incorrect attempts. Verification code invalidated. Please request a new code.'
+        });
+      }
       await user.save();
       return res.status(400).json({
         success: false,
@@ -365,35 +386,56 @@ export async function verifyOtp(req, res, next) {
 }
 
 /**
- * Google OAuth Login / Sync
+ * Google OAuth Login / Sync (Cryptographically Verified)
  * POST /api/v1/auth/google
  */
 export async function googleLogin(req, res, next) {
   try {
-    let { email, name, avatarUrl, googleId, credential } = req.body;
+    const { credential } = req.body;
+    let email = null;
+    let name = null;
+    let avatarUrl = null;
 
-    // Decode Google JWT ID token if credential is provided by Google Identity Services
-    if (credential) {
-      try {
-        const parts = credential.split('.');
-        if (parts.length === 3) {
-          // Google JWT payload uses RFC 7519 base64url encoding
-          const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
-          const googleUser = JSON.parse(payloadJson);
-          email = googleUser.email || email;
-          name = googleUser.name || name;
-          avatarUrl = googleUser.picture || avatarUrl;
-          googleId = googleUser.sub || googleId;
-        }
-      } catch (err) {
-        console.warn('[Google Auth] Could not decode credential payload:', err.message);
-      }
-    }
-
-    if (!email) {
+    if (!credential) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required from Google sign-in.'
+        message: 'Google ID token credential is required.'
+      });
+    }
+
+    // Cryptographically verify Google ID Token via Google tokeninfo service
+    try {
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      if (!googleRes.ok) {
+        return res.status(401).json({
+          success: false,
+          message: 'Google authentication token verification failed or token has expired.'
+        });
+      }
+      const googleUser = await googleRes.json();
+
+      const expectedClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      if (expectedClientId && googleUser.aud !== expectedClientId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Google token audience mismatch.'
+        });
+      }
+
+      if (!googleUser.email || String(googleUser.email_verified) !== 'true') {
+        return res.status(400).json({
+          success: false,
+          message: 'Unverified Google email account.'
+        });
+      }
+
+      email = googleUser.email;
+      name = googleUser.name || googleUser.email.split('@')[0];
+      avatarUrl = googleUser.picture;
+    } catch (verifyErr) {
+      return res.status(401).json({
+        success: false,
+        message: 'Could not verify token with Google auth servers: ' + verifyErr.message
       });
     }
 
@@ -402,20 +444,22 @@ export async function googleLogin(req, res, next) {
 
     if (!user) {
       user = new User({
-        name: name || cleanEmail.split('@')[0],
+        name: name.trim(),
         email: cleanEmail,
-        phone: `g_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        phone: '', // Google does not provide phone number; user is prompted to add it
         role: 'customer',
         authProvider: 'google',
-        avatarUrl: avatarUrl || User.generateDefaultAvatar(name || cleanEmail),
+        avatarUrl: avatarUrl || '',
         emailVerified: true
       });
     } else {
-      // Sync Google profile photo if user was created or logged in via Google
+      // Clean up legacy dummy g_ numbers if present
+      if (user.phone && user.phone.startsWith('g_')) {
+        user.phone = '';
+      }
       if (avatarUrl && (!user.avatarUrl || user.authProvider === 'google')) {
         user.avatarUrl = avatarUrl;
       }
-      user.authProvider = 'google';
       user.emailVerified = true;
     }
 
@@ -434,9 +478,16 @@ export async function googleLogin(req, res, next) {
 export async function getMe(req, res, next) {
   try {
     const user = await User.findById(req.user._id).select('-passwordHash -otpSecret');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userObj = user.toObject();
+    if (userObj.phone && userObj.phone.startsWith('g_')) {
+      userObj.phone = '';
+    }
     res.status(200).json({
       success: true,
-      user
+      user: userObj
     });
   } catch (err) {
     next(err);
@@ -517,6 +568,161 @@ export async function deleteAddress(req, res, next) {
       success: true,
       message: 'Address removed successfully.',
       addresses: user.addresses
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Set Default Address
+ * PUT /api/v1/auth/addresses/:id/default
+ */
+export async function setDefaultAddress(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    user.addresses.forEach(addr => {
+      addr.isDefault = addr._id.toString() === req.params.id;
+    });
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Default address updated successfully.',
+      addresses: user.addresses
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update Saved Address
+ * PUT /api/v1/auth/addresses/:id
+ */
+export async function updateAddress(req, res, next) {
+  try {
+    const { label, line1, landmark, city, state, pincode, isDefault } = req.body;
+
+    if (!line1 || !city || !pincode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Street address, city, and pincode are required.'
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const addrIndex = user.addresses.findIndex(a => a._id.toString() === req.params.id);
+    if (addrIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Address not found in your profile.' });
+    }
+
+    if (isDefault) {
+      user.addresses.forEach(a => { a.isDefault = false; });
+    }
+
+    user.addresses[addrIndex].label = label ? label.trim() : (user.addresses[addrIndex].label || 'Home');
+    user.addresses[addrIndex].line1 = line1.trim();
+    user.addresses[addrIndex].landmark = landmark ? landmark.trim() : '';
+    user.addresses[addrIndex].city = city.trim();
+    user.addresses[addrIndex].state = state ? state.trim() : 'Uttar Pradesh';
+    user.addresses[addrIndex].pincode = pincode.trim();
+    if (typeof isDefault === 'boolean') {
+      user.addresses[addrIndex].isDefault = isDefault;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Address updated successfully.',
+      addresses: user.addresses
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update Profile Details (Name, Image / Avatar, Email, Phone)
+ * PUT /api/v1/auth/profile
+ */
+export async function updateProfile(req, res, next) {
+  try {
+    const { name, avatarUrl, email, phone } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+
+    if (avatarUrl !== undefined) {
+      user.avatarUrl = (avatarUrl || '').trim();
+    }
+
+    if (email && email.trim() && email.trim().toLowerCase() !== user.email?.toLowerCase()) {
+      const existingEmail = await User.findOne({
+        email: email.trim().toLowerCase(),
+        _id: { $ne: user._id }
+      });
+      if (existingEmail) {
+        return res.status(400).json({ success: false, message: 'This email is already linked with another account.' });
+      }
+      user.email = email.trim().toLowerCase();
+    }
+
+    if (phone !== undefined) {
+      const cleanPhone = (phone || '').trim().replace(/\D/g, '');
+      if (cleanPhone) {
+        if (cleanPhone.length !== 10) {
+          return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number.' });
+        }
+        if (cleanPhone !== user.phone) {
+          const existingPhone = await User.findOne({
+            phone: cleanPhone,
+            _id: { $ne: user._id }
+          });
+          if (existingPhone) {
+            return res.status(400).json({ success: false, message: 'This mobile number is already linked with another account.' });
+          }
+          user.phone = cleanPhone;
+        }
+      } else {
+        // Only allow empty phone if user has an email linked (e.g. Google user)
+        if (!user.email) {
+          return res.status(400).json({ success: false, message: 'Mobile number cannot be empty for accounts without email.' });
+        }
+        user.phone = '';
+      }
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile details updated successfully.',
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        phone: user.phone || '',
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl || '',
+        addresses: user.addresses || [],
+        authProvider: user.authProvider || 'local'
+      }
     });
   } catch (err) {
     next(err);
@@ -609,6 +815,14 @@ export async function resetPassword(req, res, next) {
 
     if (user.otpSecret.code !== code.trim()) {
       user.otpSecret.attempts = (user.otpSecret.attempts || 0) + 1;
+      if (user.otpSecret.attempts >= 5) {
+        user.otpSecret = { code: null, expiresAt: null, attempts: 0 };
+        await user.save();
+        return res.status(400).json({
+          success: false,
+          message: 'Too many incorrect attempts. Verification code invalidated. Please request a new code.'
+        });
+      }
       await user.save();
       return res.status(400).json({
         success: false,
@@ -692,7 +906,9 @@ export default {
   getMe,
   logout,
   addAddress,
+  updateAddress,
   deleteAddress,
+  setDefaultAddress,
   forgotPassword,
   resetPassword,
   changePassword

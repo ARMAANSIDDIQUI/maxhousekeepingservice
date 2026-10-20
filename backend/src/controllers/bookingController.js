@@ -1,10 +1,65 @@
+import mongoose from 'mongoose';
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
 import City from '../models/City.js';
 import Coupon from '../models/Coupon.js';
 import User from '../models/User.js';
+import Counter from '../models/Counter.js';
 import { calculateQuote } from '../services/pricing/engine.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
+
+/**
+ * Guaranteed Unique, Non-Repeating Sequential Booking Code Generator
+ * Uses MongoDB atomic $inc on Counter collection with collision verification
+ */
+export async function generateUniqueBookingCode() {
+  const year = new Date().getFullYear();
+  const counterId = `booking_${year}`;
+  let isUnique = false;
+  let code = '';
+  let attempts = 0;
+
+  while (!isUnique && attempts < 20) {
+    attempts++;
+    // Atomic sequential increment guaranteed non-repeating across concurrent requests
+    const counter = await Counter.findByIdAndUpdate(
+      counterId,
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    // Format: MH-YYYY-XXXXX (e.g. MH-2026-01001, MH-2026-01002)
+    const formattedSeq = String(counter.seq).padStart(5, '0');
+    code = `MH-${year}-${formattedSeq}`;
+
+    // Verify uniqueness in bookings collection
+    const exists = await Booking.exists({ bookingCode: code });
+    if (!exists) {
+      isUnique = true;
+    }
+  }
+
+  // Fallback in case of collision with legacy records
+  if (!isUnique) {
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    code = `MH-${year}-${Date.now().toString().slice(-4)}${randomSuffix.toString().slice(-2)}`;
+  }
+
+  return code;
+}
+
+/**
+ * Helper to find a booking by either Mongo _id or human-readable bookingCode
+ */
+export async function findBookingByIdOrCode(idOrCode) {
+  if (!idOrCode) return null;
+  const trimmed = String(idOrCode).trim();
+  if (mongoose.isValidObjectId(trimmed)) {
+    const byId = await Booking.findById(trimmed);
+    if (byId) return byId;
+  }
+  return await Booking.findOne({ bookingCode: trimmed.toUpperCase() }) || await Booking.findOne({ bookingCode: trimmed });
+}
 
 /**
  * Generate Live Price Quote with Dual-Pricing Breakdown
@@ -49,11 +104,19 @@ export async function getQuote(req, res, next) {
     // Check coupon if provided
     let coupon = null;
     if (couponCode && couponCode.trim()) {
+      const now = new Date();
       coupon = await Coupon.findOne({
         code: couponCode.trim().toUpperCase(),
         isActive: true,
-        validUntil: { $gte: new Date() }
+        $or: [
+          { validUntil: { $gte: now } },
+          { expiryDate: { $gte: now } },
+          { expiryDate: { $exists: false }, validUntil: { $exists: false } }
+        ]
       });
+      if (coupon && coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
+        coupon = null;
+      }
     }
 
     const calculation = calculateQuote(enrichedItems, citySlug, coupon);
@@ -83,6 +146,8 @@ export async function createBooking(req, res, next) {
       notes,
       couponCode,
       paymentMode,
+      paymentStatus,
+      paymentDetails,
       saveAddressToProfile // Boolean to save newly entered permanent address
     } = req.body;
 
@@ -137,19 +202,25 @@ export async function createBooking(req, res, next) {
 
     let coupon = null;
     if (couponCode && couponCode.trim()) {
+      const now = new Date();
       coupon = await Coupon.findOne({
         code: couponCode.trim().toUpperCase(),
         isActive: true,
-        validUntil: { $gte: new Date() }
+        $or: [
+          { validUntil: { $gte: now } },
+          { expiryDate: { $gte: now } },
+          { expiryDate: { $exists: false }, validUntil: { $exists: false } }
+        ]
       });
+      if (coupon && coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
+        coupon = null;
+      }
     }
 
     const quote = calculateQuote(enrichedItems, cityDoc?.slug, coupon);
 
-    // Generate unique human-readable Booking Code (e.g. MH-2026-8921)
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const year = new Date().getFullYear();
-    const bookingCode = `MH-${year}-${randomCode}`;
+    // Generate foolproof, guaranteed non-repeating unique Booking Code
+    const bookingCode = await generateUniqueBookingCode();
 
     // Prepare item snapshots with both shown and offered prices
     const itemSnapshots = quote.items.map(i => ({
@@ -189,19 +260,28 @@ export async function createBooking(req, res, next) {
         window: slot.window
       },
       notes: notes ? notes.trim() : '',
-      status: 'pending',
+      status: (paymentStatus === 'paid' || paymentDetails?.transactionId) ? 'confirmed' : 'pending',
       totals: quote.totals,
       appliedCoupon: quote.coupon,
       paymentMode: paymentMode || 'cash_on_service',
-      paymentStatus: 'pending',
+      paymentStatus: paymentStatus || (paymentDetails?.transactionId ? 'paid' : 'pending'),
+      paymentDetails: paymentDetails || undefined,
       statusHistory: [{
-        status: 'pending',
+        status: (paymentStatus === 'paid' || paymentDetails?.transactionId) ? 'confirmed' : 'pending',
         timestamp: new Date(),
-        note: 'Booking submitted by customer'
+        note: (paymentStatus === 'paid' || paymentDetails?.transactionId)
+          ? `Booking confirmed with advance payment via ${(paymentDetails?.method || 'online').toUpperCase()} (Txn #${paymentDetails?.transactionId || ''})`
+          : 'Booking submitted by customer'
       }]
     };
 
     const newBooking = await Booking.create(bookingData);
+
+    // Increment coupon usage count if applied
+    if (coupon) {
+      coupon.usedCount = (coupon.usedCount || 0) + 1;
+      await coupon.save().catch(err => console.warn('[Coupon Count Update Warning]:', err.message));
+    }
 
     // Automated Email Dispatch: Customer Confirmation + Admin Alert
     Promise.allSettled([
@@ -239,7 +319,7 @@ export async function createBooking(req, res, next) {
 }
 
 /**
- * Track Booking by Code
+ * Track Booking by Code (Privacy Protected)
  * GET /api/v1/bookings/track/:code
  */
 export async function trackBooking(req, res, next) {
@@ -255,9 +335,44 @@ export async function trackBooking(req, res, next) {
       });
     }
 
+    const bookingObj = booking.toObject();
+
+    // Check if requester is authenticated owner/admin or provided verification phone query
+    const verifyPhone = req.query.phone ? String(req.query.phone).trim().replace(/\D/g, '') : null;
+    const isOwner = req.user && (
+      req.user.role === 'admin' ||
+      (booking.user && booking.user.toString() === req.user._id.toString()) ||
+      booking.customer?.phone === req.user.phone
+    );
+    const isPhoneVerified = verifyPhone && booking.customer?.phone && (
+      booking.customer.phone.endsWith(verifyPhone) || verifyPhone.endsWith(booking.customer.phone)
+    );
+
+    if (!isOwner && !isPhoneVerified) {
+      // Mask phone (e.g. 98977***** or ***-***-6002)
+      if (bookingObj.customer?.phone) {
+        const rawPhone = bookingObj.customer.phone;
+        bookingObj.customer.phone = rawPhone.length >= 4
+          ? rawPhone.slice(0, 3) + '*****' + rawPhone.slice(-2)
+          : '******';
+      }
+      // Mask email
+      if (bookingObj.customer?.email) {
+        const [userPart, domain] = bookingObj.customer.email.split('@');
+        bookingObj.customer.email = (userPart ? userPart[0] + '***@' : '') + (domain || '');
+      }
+      // Partially mask street address for privacy
+      if (bookingObj.address?.line1) {
+        const parts = bookingObj.address.line1.split(' ');
+        bookingObj.address.line1 = parts.slice(0, 2).join(' ') + ', [Address Protected]';
+      }
+      // Strip internal messages from public tracker
+      delete bookingObj.messages;
+    }
+
     res.status(200).json({
       success: true,
-      booking
+      booking: bookingObj
     });
   } catch (err) {
     next(err);
@@ -287,8 +402,18 @@ export async function getMyBookings(req, res, next) {
   }
 }
 
+// Helper to verify user permissions on a booking
+function isAuthorizedForBooking(booking, user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  if (booking.user && booking.user.toString() === user._id.toString()) return true;
+  if (booking.customer?.phone && user.phone && booking.customer.phone === user.phone) return true;
+  if (booking.customer?.email && user.email && booking.customer.email.toLowerCase() === user.email.toLowerCase()) return true;
+  return false;
+}
+
 /**
- * Edit Booking Details by Customer
+ * Edit Booking Details by Customer or Admin
  * PUT /api/v1/bookings/:id/edit
  */
 export async function editBookingDetails(req, res, next) {
@@ -296,9 +421,16 @@ export async function editBookingDetails(req, res, next) {
     const { id } = req.params;
     const { customer, address, slot, notes } = req.body;
 
-    const booking = await Booking.findById(id);
+    const booking = await findBookingByIdOrCode(id);
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to edit this booking.'
+      });
     }
 
     if (['completed', 'cancelled', 'in_progress'].includes(booking.status)) {
@@ -324,7 +456,7 @@ export async function editBookingDetails(req, res, next) {
     booking.statusHistory.push({
       status: booking.status,
       timestamp: new Date(),
-      note: 'Details updated by customer',
+      note: req.user?.role === 'admin' ? 'Details updated by administrator' : 'Details updated by customer',
       updatedBy: req.user?._id
     });
 
@@ -334,6 +466,44 @@ export async function editBookingDetails(req, res, next) {
       success: true,
       message: 'Booking details updated successfully.',
       booking
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get messages for booking communication thread (saved for 7 days)
+ * GET /api/v1/bookings/:id/messages
+ */
+export async function getBookingMessages(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await findBookingByIdOrCode(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to view messages for this booking.'
+      });
+    }
+
+    // Chat retention: Retain messages for 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const validMessages = (booking.messages || []).filter(m => new Date(m.timestamp) >= sevenDaysAgo);
+    
+    // Automatically purge expired messages from DB
+    if (validMessages.length !== (booking.messages || []).length) {
+      booking.messages = validMessages;
+      await booking.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      messages: validMessages
     });
   } catch (err) {
     next(err);
@@ -353,21 +523,33 @@ export async function addBookingMessage(req, res, next) {
       return res.status(400).json({ success: false, message: 'Message text cannot be empty.' });
     }
 
-    const booking = await Booking.findById(id);
+    const booking = await findBookingByIdOrCode(id);
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to send messages for this booking.'
+      });
     }
 
     const senderRole = req.user?.role === 'admin' ? 'admin' : 'customer';
     const authorName = senderName || req.user?.name || (senderRole === 'admin' ? 'Max Housekeeping Admin' : booking.customer.name);
 
-    booking.messages.push({
+    // Prune messages older than 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const validMessages = (booking.messages || []).filter(m => new Date(m.timestamp) >= sevenDaysAgo);
+
+    validMessages.push({
       sender: senderRole,
       senderName: authorName,
       text: text.trim(),
       timestamp: new Date()
     });
 
+    booking.messages = validMessages;
     await booking.save();
 
     res.status(201).json({
@@ -380,11 +562,100 @@ export async function addBookingMessage(req, res, next) {
   }
 }
 
+/**
+ * Cancel Booking by Customer or Admin
+ * PUT /api/v1/bookings/:id/cancel
+ */
+export async function cancelBooking(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await findBookingByIdOrCode(id);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to cancel this booking.'
+      });
+    }
+
+    if (['in_progress', 'completed', 'cancelled'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel booking that is already ${booking.status}.`
+      });
+    }
+
+    booking.status = 'cancelled';
+    booking.statusHistory.push({
+      status: 'cancelled',
+      timestamp: new Date(),
+      note: req.body?.reason || (req.user?.role === 'admin' ? 'Cancelled by admin' : 'Cancelled by customer'),
+      updatedBy: req.user?._id
+    });
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Booking ${booking.bookingCode} has been cancelled.`,
+      booking
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Delete Booking by Customer or Admin
+ * DELETE /api/v1/bookings/:id
+ */
+export async function deleteBooking(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await findBookingByIdOrCode(id);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to delete this booking.'
+      });
+    }
+
+    if (req.user?.role !== 'admin' && ['in_progress', 'completed'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete booking that is currently in progress or completed.'
+      });
+    }
+
+    await Booking.deleteOne({ _id: booking._id });
+
+    res.status(200).json({
+      success: true,
+      message: `Booking ${booking.bookingCode || id} deleted successfully.`
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getQuote,
   createBooking,
   trackBooking,
   getMyBookings,
   editBookingDetails,
-  addBookingMessage
+  addBookingMessage,
+  getBookingMessages,
+  cancelBooking,
+  deleteBooking
 };
+

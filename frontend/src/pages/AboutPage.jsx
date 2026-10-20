@@ -12,7 +12,7 @@ import {
 import { useBooking } from '../context/BookingContext';
 
 export default function AboutPage() {
-  const { cities } = useBooking();
+  const { cities, settings } = useBooking();
   const displayCities = cities && cities.length > 0
     ? cities.map(c => typeof c === 'string' ? c : (c.name || c.slug))
     : ['Moradabad', 'Rampur', 'Amroha', 'Sambhal', 'Chandausi', 'Noorpur', 'Dhampur', 'Bijnor', 'Kanth'];
@@ -20,13 +20,6 @@ export default function AboutPage() {
     <div className="py-12 md:py-20 bg-[#F4EFE6] text-[#10231D]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Breadcrumb / Editorial kicker */}
-        <div className="mb-6 flex items-center gap-2 text-xs font-mono tracking-widest text-[#6B8077] uppercase">
-          <Link to="/" className="hover:text-[#10231D] underline underline-offset-4">Home</Link>
-          <span>/</span>
-          <span className="text-[#10231D]">About Max Housekeeping</span>
-        </div>
-
         {/* Hero Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center pb-16 border-b border-[#E2D9C8]">
           <div>
@@ -48,11 +41,11 @@ export default function AboutPage() {
                 Book Inspection / Service
               </Link>
               <a
-                href="tel:9897766002"
+                href={`tel:${(settings?.phone || '+919897766002').replace(/[^0-9+]/g, '')}`}
                 className="px-6 py-3.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-sm border border-[#E2D9C8] transition-all flex items-center gap-2"
               >
                 <LuPhone className="w-4 h-4 text-[#E9A23B]" />
-                <span>Call 9897766002</span>
+                <span>Call {settings?.phone || '+91 98977 66002'}</span>
               </a>
             </div>
           </div>

@@ -21,7 +21,14 @@ import {
   LuInbox,
   LuPhone,
   LuMail,
-  LuMapPin
+  LuMapPin,
+  LuTicket,
+  LuSettings,
+  LuMenu,
+  LuSearch,
+  LuRotateCcw,
+  LuClock,
+  LuCreditCard
 } from 'react-icons/lu';
 import {
   apiRequest,
@@ -29,12 +36,25 @@ import {
 } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useBooking } from '../../context/BookingContext';
 import Modal from '../../components/common/Modal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import CustomSelect from '../../components/common/CustomSelect';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
 
+const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
+  value: ic.key,
+  label: `${ic.key} (${ic.label})`,
+  icon: getServiceIcon(ic.key, 'w-4 h-4 text-[#E9A23B]')
+}));
+
 export default function AdminDashboard() {
+  const { refreshSettings } = useBooking();
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'cities' | 'testimonials' | 'messages'
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [bookingSearch, setBookingSearch] = useState('');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
+  const [confirmModalConfig, setConfirmModalConfig] = useState(null);
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
   const [services, setServices] = useState([]);
@@ -42,6 +62,56 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
+  const [coupons, setCoupons] = useState([]);
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discountType: 'flat',
+    discountValue: 100,
+    minOrderValue: 499,
+    maxDiscount: 500,
+    expiryDate: '',
+    usageLimit: 1000
+  });
+  const [savingCoupon, setSavingCoupon] = useState(false);
+
+  const [settingsForm, setSettingsForm] = useState({
+    brandName: 'Max House Keeping Service',
+    tagline: 'A spotless home, without lifting a finger.',
+    phone: '+91 98977 66002',
+    alternatePhone: '+91 82105 23309',
+    whatsappNumber: '+91 98977 66002',
+    email: 'vikasmax321@gmail.com',
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+    workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
+    gstEnabled: false,
+    gstPercentage: 18,
+    ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
+    acceptOnlinePayments: false,
+    paymentGatewayProvider: 'razorpay',
+    razorpayKeyId: '',
+    razorpayKeySecret: '',
+    paymentTestMode: true
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const [createServiceModalOpen, setCreateServiceModalOpen] = useState(false);
+  const [newServiceForm, setNewServiceForm] = useState({
+    title: '',
+    slug: '',
+    price: 499,
+    mrp: 699,
+    duration: '1.5 hrs',
+    icon: 'Sparkles',
+    shortDescription: '',
+    description: '',
+    imageUrl: '',
+    variantGroupLabel: 'Apartment / House Size',
+    variantGroupKey: 'size',
+    variants: []
+  });
+  const [savingNewService, setSavingNewService] = useState(false);
+  const [uploadingNewServiceImage, setUploadingNewServiceImage] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Edit Service Dual-Pricing Modal State
@@ -92,30 +162,32 @@ export default function AdminDashboard() {
   const [adminReplyText, setAdminReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Guard: if not admin, redirect
+  // Guard: if not admin, redirect only after authentication check finishes
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAuthLoading && !isAdmin) {
       toast.error('Admin authentication required.');
       navigate('/login');
     }
-  }, [isAdmin]);
+  }, [isAdmin, isAuthLoading]);
 
   // Load All Admin Data
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [statsRes, bookingsRes, servicesRes, citiesRes, usersRes, testsRes, msgsRes] = await Promise.allSettled([
+      const [statsRes, bookingsRes, servicesRes, citiesRes, usersRes, testsRes, msgsRes, couponsRes, settingsRes] = await Promise.allSettled([
         apiRequest('/admin/stats'),
         apiRequest('/admin/bookings?limit=50'),
         apiRequest('/admin/services'),
         adminAPI.getCities(),
         adminAPI.getUsers(),
         adminAPI.getTestimonials(),
-        adminAPI.getContactMessages()
+        adminAPI.getContactMessages(),
+        adminAPI.getCoupons(),
+        adminAPI.getSettings()
       ]);
 
       if (statsRes.status === 'fulfilled' && statsRes.value?.stats) {
@@ -138,6 +210,12 @@ export default function AdminDashboard() {
       }
       if (msgsRes.status === 'fulfilled' && msgsRes.value?.messages) {
         setContactMessages(msgsRes.value.messages);
+      }
+      if (couponsRes.status === 'fulfilled' && Array.isArray(couponsRes.value?.coupons)) {
+        setCoupons(couponsRes.value.coupons);
+      }
+      if (settingsRes.status === 'fulfilled' && settingsRes.value?.settings) {
+        setSettingsForm(prev => ({ ...prev, ...settingsRes.value.settings }));
       }
     } catch (err) {
       console.warn('Failed loading live admin data from MongoDB:', err);
@@ -166,22 +244,77 @@ export default function AdminDashboard() {
     }
   };
 
-  // Open Edit Service Modal
+  // Delete Booking permanently
+  const handleDeleteBooking = (bookingId, bookingCode) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete Booking #${bookingCode}`,
+      message: `Are you sure you want to permanently delete booking #${bookingCode}? This action cannot be undone and will erase this booking record.`,
+      confirmText: 'Delete Booking',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteBooking(bookingId);
+          if (res.success) {
+            toast.success(`Booking #${bookingCode} deleted successfully`);
+            setBookings(prev => prev.filter(b => b._id !== bookingId));
+            setStats(prev => ({
+              ...prev,
+              totalBookings: Math.max(0, (prev?.totalBookings || 1) - 1)
+            }));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete booking.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  // Open Edit Service Modal with Variants Parser
   const openEditService = (service) => {
     setEditingService(service);
+    const optGroup = service.optionGroups?.[0];
+    const groupKey = optGroup?.key || 'size';
+    const groupLabel = optGroup?.label || 'Apartment / House Size';
+
+    let variants = [];
+    if (service.matrix && service.matrix.length > 0) {
+      variants = service.matrix.map((r, i) => {
+        const sel = r.selection instanceof Map ? Object.fromEntries(r.selection) : (r.selection || {});
+        const key = sel[groupKey] || Object.values(sel)[0] || `var-${i + 1}`;
+        const opt = optGroup?.options?.find(o => o.key === key);
+        return {
+          key,
+          label: opt?.label || key.replace(/-/g, ' ').toUpperCase(),
+          price: r.price,
+          mrp: r.mrp || r.price,
+          duration: r.duration || service.duration || '1.5 hrs',
+          isDefault: Boolean(opt?.isDefault ?? (i === 0))
+        };
+      });
+    } else if (optGroup && optGroup.options?.length > 0) {
+      variants = optGroup.options.map((opt, i) => ({
+        key: opt.key,
+        label: opt.label,
+        price: service.price + (opt.priceDelta || 0),
+        mrp: service.mrp + (opt.mrpDelta || opt.priceDelta || 0),
+        duration: opt.durationDelta || service.duration || '1.5 hrs',
+        isDefault: Boolean(opt.isDefault ?? (i === 0))
+      }));
+    }
+
     setServiceForm({
       title: service.title,
       slug: service.slug || '',
       icon: service.icon || 'Sparkles',
       price: service.price,
       mrp: service.mrp,
-      duration: service.duration || '1 hr',
-      matrix: (service.matrix || []).map(r => ({
-        selection: r.selection instanceof Map ? Object.fromEntries(r.selection) : r.selection,
-        price: r.price,
-        mrp: r.mrp,
-        duration: r.duration || ''
-      })),
+      duration: service.duration || '1.5 hrs',
+      variantGroupLabel: groupLabel,
+      variantGroupKey: groupKey,
+      variants,
       imageUrl: service.media?.hero?.url || ''
     });
   };
@@ -208,7 +341,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Save Service Dual-Pricing Updates
+  // Save Service Dual-Pricing Updates with Dynamic Variants
   const handleSaveService = async (e) => {
     e.preventDefault();
     if (!editingService) return;
@@ -221,7 +354,9 @@ export default function AdminDashboard() {
         price: Number(serviceForm.price),
         mrp: Number(serviceForm.mrp),
         duration: serviceForm.duration,
-        matrix: serviceForm.matrix
+        variantGroupLabel: serviceForm.variantGroupLabel || 'Apartment / House Size',
+        variantGroupKey: serviceForm.variantGroupKey || 'size',
+        variants: serviceForm.variants || []
       };
 
       if (serviceForm.imageUrl) {
@@ -239,12 +374,215 @@ export default function AdminDashboard() {
       });
 
       if (res.success && res.service) {
-        toast.success(`Updated details and pricing for ${res.service.title}`);
+        toast.success(`Updated details, variants and pricing for ${res.service.title}`);
         setServices(prev => prev.map(s => s._id === res.service._id ? res.service : s));
         setEditingService(null);
       }
     } catch (err) {
       toast.error(err.message || 'Failed to update service pricing.');
+    }
+  };
+
+  // Delete Service
+  const handleDeleteService = (id, title) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete Service "${title}"`,
+      message: `Permanently delete service "${title}"? This cannot be undone. Any active bookings referencing this service will retain historical snapshots.`,
+      confirmText: 'Delete Service',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteService(id);
+          if (res.success) {
+            toast.success(`Service "${title}" deleted.`);
+            setServices(prev => prev.filter(s => s._id !== id));
+          }
+        } catch (err) {
+          toast.error('Failed to delete service.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  // Create Service
+  const handleCreateService = async (e) => {
+    e.preventDefault();
+    if (!newServiceForm.title.trim()) {
+      toast.error('Service title is required.');
+      return;
+    }
+    setSavingNewService(true);
+    try {
+      const payload = {
+        title: newServiceForm.title.trim(),
+        slug: newServiceForm.slug.trim() || newServiceForm.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+        price: Number(newServiceForm.price),
+        mrp: Number(newServiceForm.mrp),
+        duration: newServiceForm.duration || '1.5 hrs',
+        icon: newServiceForm.icon || 'Sparkles',
+        shortDescription: newServiceForm.shortDescription,
+        description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max House Keeping Service.`,
+        variantGroupLabel: newServiceForm.variantGroupLabel || 'Apartment / House Size',
+        variantGroupKey: newServiceForm.variantGroupKey || 'size',
+        variants: newServiceForm.variants || []
+      };
+      if (newServiceForm.imageUrl) {
+        payload.media = {
+          hero: {
+            url: newServiceForm.imageUrl,
+            alt: `${newServiceForm.title} service photo`
+          }
+        };
+      }
+      const res = await adminAPI.createService(payload);
+      if (res.success && res.service) {
+        toast.success(`Service "${res.service.title}" created successfully with ${res.service.matrix?.length || 0} variant tiers!`);
+        setServices(prev => [res.service, ...prev]);
+        setCreateServiceModalOpen(false);
+        setNewServiceForm({
+          title: '',
+          slug: '',
+          price: 499,
+          mrp: 699,
+          duration: '1.5 hrs',
+          icon: 'Sparkles',
+          shortDescription: '',
+          description: '',
+          imageUrl: '',
+          variantGroupLabel: 'Apartment / House Size',
+          variantGroupKey: 'size',
+          variants: []
+        });
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to create service.');
+    } finally {
+      setSavingNewService(false);
+    }
+  };
+
+  // Upload New Service Image
+  const handleNewServiceImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingNewServiceImage(true);
+    try {
+      const res = await adminAPI.uploadImage(file, 'max-housekeeping/services');
+      if (res && res.url) {
+        setNewServiceForm(prev => ({ ...prev, imageUrl: res.url }));
+        toast.success('Service photo uploaded to Cloudinary!');
+      } else {
+        toast.error('Upload completed, but URL was missing.');
+      }
+    } catch (err) {
+      toast.error('Failed to upload service image.');
+    } finally {
+      setUploadingNewServiceImage(false);
+    }
+  };
+
+  // Coupon Handlers
+  const handleCreateCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponForm.code.trim()) {
+      toast.error('Coupon code is required.');
+      return;
+    }
+    setSavingCoupon(true);
+    try {
+      const payload = {
+        code: couponForm.code.trim().toUpperCase(),
+        discountType: couponForm.discountType,
+        discountValue: Number(couponForm.discountValue),
+        minOrderValue: Number(couponForm.minOrderValue) || 0,
+        minBookingAmount: Number(couponForm.minOrderValue) || 0,
+        maxDiscount: couponForm.discountType === 'percentage' && couponForm.maxDiscount ? Number(couponForm.maxDiscount) : undefined,
+        usageLimit: Number(couponForm.usageLimit) || 1000,
+        expiryDate: couponForm.expiryDate ? new Date(couponForm.expiryDate) : undefined,
+        validUntil: couponForm.expiryDate ? new Date(couponForm.expiryDate) : undefined,
+        isActive: true
+      };
+      const res = await adminAPI.createCoupon(payload);
+      if (res.success && res.coupon) {
+        toast.success(`Coupon "${res.coupon.code}" created successfully!`);
+        setCoupons(prev => [res.coupon, ...prev]);
+        setCouponModalOpen(false);
+        setCouponForm({
+          code: '',
+          discountType: 'flat',
+          discountValue: 100,
+          minOrderValue: 499,
+          maxDiscount: 500,
+          expiryDate: '',
+          usageLimit: 1000
+        });
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to create coupon.');
+    } finally {
+      setSavingCoupon(false);
+    }
+  };
+
+  const handleDeleteCoupon = (id, code) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete Coupon "${code}"`,
+      message: `Permanently delete discount code "${code}"? Customers will no longer be able to apply this discount.`,
+      confirmText: 'Delete Coupon',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteCoupon(id);
+          if (res.success) {
+            toast.success(`Coupon "${code}" deleted.`);
+            setCoupons(prev => prev.filter(c => c._id !== id));
+          }
+        } catch (err) {
+          toast.error('Failed to delete coupon.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  const handleToggleCouponStatus = async (coupon) => {
+    try {
+      const nextStatus = !coupon.isActive;
+      const res = await adminAPI.updateCoupon(coupon._id, { isActive: nextStatus });
+      if (res.success) {
+        toast.success(`Coupon "${coupon.code}" is now ${nextStatus ? 'active' : 'inactive'}.`);
+        setCoupons(prev => prev.map(c => c._id === coupon._id ? { ...c, isActive: nextStatus } : c));
+      }
+    } catch (err) {
+      toast.error('Failed to toggle coupon status.');
+    }
+  };
+
+  // Settings Handlers
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const res = await adminAPI.updateSettings(settingsForm);
+      if (res.success) {
+        toast.success('Business settings and contact configuration saved successfully!');
+        if (res.settings) {
+          setSettingsForm(prev => ({ ...prev, ...res.settings }));
+        }
+        if (typeof refreshSettings === 'function') {
+          refreshSettings();
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to save settings.');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -354,17 +692,27 @@ export default function AdminDashboard() {
   };
 
   // Delete Testimonial
-  const handleDeleteTestimonial = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this customer testimonial?')) return;
-    try {
-      const res = await adminAPI.deleteTestimonial(id);
-      if (res.success) {
-        toast.success('Testimonial deleted successfully.');
-        setTestimonials(prev => prev.filter(t => t._id !== id));
+  const handleDeleteTestimonial = (id) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Delete Testimonial',
+      message: 'Are you sure you want to permanently delete this customer testimonial from the website?',
+      confirmText: 'Delete Testimonial',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteTestimonial(id);
+          if (res.success) {
+            toast.success('Testimonial deleted successfully.');
+            setTestimonials(prev => prev.filter(t => t._id !== id));
+          }
+        } catch (err) {
+          toast.error('Failed to delete testimonial.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
       }
-    } catch (err) {
-      toast.error('Failed to delete testimonial.');
-    }
+    });
   };
 
   // Update Contact Message Status
@@ -383,17 +731,27 @@ export default function AdminDashboard() {
   };
 
   // Delete Contact Message
-  const handleDeleteMessage = async (id) => {
-    if (!window.confirm('Delete this contact inquiry permanently?')) return;
-    try {
-      const res = await adminAPI.deleteContactMessage(id);
-      if (res.success) {
-        toast.success('Contact inquiry removed.');
-        setContactMessages(prev => prev.filter(m => m._id !== id));
+  const handleDeleteMessage = (id) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: 'Delete Inquiry',
+      message: 'Are you sure you want to permanently delete this customer contact inquiry?',
+      confirmText: 'Delete Inquiry',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteContactMessage(id);
+          if (res.success) {
+            toast.success('Contact inquiry removed.');
+            setContactMessages(prev => prev.filter(m => m._id !== id));
+          }
+        } catch (err) {
+          toast.error('Failed to delete contact inquiry.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
       }
-    } catch (err) {
-      toast.error('Failed to delete contact inquiry.');
-    }
+    });
   };
 
   // Open City Modal
@@ -482,17 +840,27 @@ export default function AdminDashboard() {
   };
 
   // Delete City
-  const handleDeleteCity = async (id, cityName) => {
-    if (!window.confirm(`Are you sure you want to delete "${cityName}"?`)) return;
-    try {
-      const res = await adminAPI.deleteCity(id);
-      if (res.success) {
-        toast.success(`City "${cityName}" deleted successfully.`);
-        setCities(prev => prev.filter(c => c._id !== id));
+  const handleDeleteCity = (id, cityName) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete City "${cityName}"`,
+      message: `Are you sure you want to remove "${cityName}" from serviceable locations? Customers will not be able to select this city.`,
+      confirmText: 'Delete City',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteCity(id);
+          if (res.success) {
+            toast.success(`City "${cityName}" deleted successfully.`);
+            setCities(prev => prev.filter(c => c._id !== id));
+          }
+        } catch (err) {
+          toast.error('Failed to delete city.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
       }
-    } catch (err) {
-      toast.error('Failed to delete city.');
-    }
+    });
   };
 
   // Update User Role
@@ -509,176 +877,370 @@ export default function AdminDashboard() {
   };
 
   // Delete User Account
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) return;
-    try {
-      const res = await adminAPI.deleteUser(userId);
-      if (res.success) {
-        toast.success(`User "${userName}" removed.`);
-        setUsers(prev => prev.filter(u => u._id !== userId));
+  const handleDeleteUser = (userId, userName) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete User "${userName}"`,
+      message: `Are you sure you want to delete user "${userName}"? This will terminate their account and access immediately.`,
+      confirmText: 'Delete User',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteUser(userId);
+          if (res.success) {
+            toast.success(`User "${userName}" removed.`);
+            setUsers(prev => prev.filter(u => u._id !== userId));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete user.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
       }
-    } catch (err) {
-      toast.error(err.message || 'Failed to delete user.');
-    }
+    });
   };
 
   const unreadMessagesCount = contactMessages.filter(m => m.status === 'unread').length;
 
+  const adminTabs = [
+    { id: 'bookings', label: 'Bookings & Dispatch', icon: LuCalendar, count: bookings.length },
+    { id: 'services', label: 'Services & Dual-Pricing', icon: LuSparkles, count: services.length },
+    { id: 'cities', label: 'Cities & Regions', icon: LuMapPin, count: cities.length },
+    { id: 'users', label: 'Users Database', icon: LuUsers, count: users.length },
+    { id: 'testimonials', label: 'Testimonials', icon: LuStar, count: testimonials.length },
+    { id: 'messages', label: 'Inquiries', icon: LuMail, count: unreadMessagesCount, isAlert: unreadMessagesCount > 0 },
+    { id: 'coupons', label: 'Coupons & Promos', icon: LuTicket, count: coupons.length },
+    { id: 'settings', label: 'Business Settings', icon: LuSettings }
+  ];
+
+  const filteredBookings = bookings.filter((b) => {
+    const q = bookingSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      b.bookingCode?.toLowerCase().includes(q) ||
+      b.customer?.name?.toLowerCase().includes(q) ||
+      b.customer?.phone?.includes(q) ||
+      b.customer?.email?.toLowerCase().includes(q) ||
+      b.cityName?.toLowerCase().includes(q)
+    );
+    const matchesStatus = bookingStatusFilter === 'all' || b.status === bookingStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
-    <div className="bg-[#F4EFE6] min-h-screen py-10">
-      <div className="container mx-auto px-4 max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-6 border-b border-[#E2D9C8] mb-8 gap-4">
+    <div className="bg-[#F4EFE6] min-h-screen">
+      {/* Secondary Sticky Bar for Small Devices (Tablets & Phones) */}
+      <div className="lg:hidden sticky top-16 z-30 bg-[#10231D] text-[#F4EFE6] px-4 py-3 border-b border-[#2C4A3E] flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-black text-xs">
+            M
+          </div>
           <div>
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
-              MANAGEMENT CONSOLE
-            </span>
-            <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D]">
-              Admin Control Panel
-            </h1>
-            <p className="text-xs text-[#6B8077] mt-1">
-              Logged in as {user?.name} ({user?.email}) · Automated Email Dispatch Active
-            </p>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-[#E9A23B]">Admin Console</div>
+            <div className="text-xs font-bold text-[#F4EFE6]">
+              {adminTabs.find(t => t.id === activeTab)?.label || 'Console'}
+            </div>
           </div>
+        </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex flex-wrap rounded-xl bg-[#ECE5D8] p-1 border border-[#E2D9C8] gap-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab('bookings')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'bookings'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuCalendar className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Bookings & Dispatch</span>
-              {bookings.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
-                  {bookings.length}
+        {/* Secondary Hamburger Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold transition-colors cursor-pointer"
+          aria-label="Toggle Admin Sidebar"
+        >
+          {mobileSidebarOpen ? (
+            <LuX className="w-4 h-4 text-[#E9A23B]" />
+          ) : (
+            <LuMenu className="w-4 h-4 text-[#E9A23B]" />
+          )}
+          <span>{mobileSidebarOpen ? 'Close Menu' : 'Admin Menu'}</span>
+        </button>
+      </div>
+
+      {/* Mobile Slide-over Drawer Backdrop & Panel */}
+      {mobileSidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative w-72 max-w-[85vw] bg-[#10231D] text-[#F4EFE6] h-full shadow-2xl p-5 flex flex-col justify-between overflow-y-auto z-10 border-r border-[#2C4A3E]">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-display font-black text-sm">
+                    M
+                  </div>
+                  <div>
+                    <h4 className="font-display font-bold text-sm text-[#F4EFE6]">Max Admin</h4>
+                    <p className="text-[10px] text-[#A3B8B0]">Navigation Console</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors cursor-pointer"
+                >
+                  <LuX className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Mobile Tab Items */}
+              <nav className="space-y-1.5">
+                {adminTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setMobileSidebarOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#E9A23B] text-[#10231D] shadow-md font-black'
+                          : 'text-[#F4EFE6] hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 ${isActive ? 'text-[#10231D]' : 'text-[#E9A23B]'}`} />
+                        <span>{tab.label}</span>
+                      </div>
+                      {tab.count !== undefined && tab.count > 0 && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                            tab.isAlert
+                              ? 'bg-[#C2512D] text-white animate-pulse'
+                              : isActive
+                              ? 'bg-[#10231D] text-[#E9A23B]'
+                              : 'bg-white/15 text-[#F4EFE6]'
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            <div className="pt-4 border-t border-white/10 text-[11px] text-[#A3B8B0]">
+              <p className="truncate font-medium">{user?.name}</p>
+              <p className="text-[10px] truncate text-[#6B8077]">{user?.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Desktop Container with Left Sidebar */}
+      <div className="container mx-auto px-4 max-w-7xl py-6 lg:py-10">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          {/* Desktop Left Sidebar */}
+          <aside className="hidden lg:block w-72 shrink-0 sticky top-24">
+            <div className="rounded-3xl bg-[#10231D] text-[#F4EFE6] p-5 shadow-xl border border-[#2C4A3E]">
+              {/* Sidebar Header */}
+              <div className="pb-4 border-b border-white/10 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#E9A23B] to-[#D48E28] text-[#10231D] flex items-center justify-center font-display font-black text-lg shadow-md">
+                    M
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
+                      MANAGEMENT
+                    </span>
+                    <h3 className="font-display font-bold text-base text-[#F4EFE6]">
+                      Admin Console
+                    </h3>
+                  </div>
+                </div>
+                <div className="mt-3 p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px]">
+                  <p className="font-bold text-white truncate">{user?.name}</p>
+                  <p className="text-[#A3B8B0] text-[10px] truncate">{user?.email}</p>
+                </div>
+              </div>
+
+              {/* Navigation Items */}
+              <nav className="space-y-1.5">
+                {adminTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                        isActive
+                          ? 'bg-[#E9A23B] text-[#10231D] shadow-lg translate-x-1 font-black'
+                          : 'text-[#F4EFE6] hover:bg-white/10 hover:translate-x-0.5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#10231D]' : 'text-[#E9A23B]'}`} />
+                        <span>{tab.label}</span>
+                      </div>
+                      {tab.count !== undefined && tab.count > 0 && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                            tab.isAlert
+                              ? 'bg-[#C2512D] text-white animate-pulse'
+                              : isActive
+                              ? 'bg-[#10231D] text-[#E9A23B]'
+                              : 'bg-white/15 text-[#F4EFE6]'
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Sidebar Footer Status */}
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-[#A3B8B0]">
+                {/* <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse"></span>
+                  <span>System Active</span>
+                </div> */}
+                {/* <span className="font-mono text-[10px] text-[#E9A23B]">Dispatch On</span> */}
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="flex-1 min-w-0 w-full">
+            {/* Header Title Section (clean without wrapped tabs) */}
+            <div className="pb-6 border-b border-[#E2D9C8] mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
+                  ADMINISTRATIVE OVERVIEW
                 </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('services')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'services'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Services & Dual-Pricing</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('cities')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'cities'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Cities & Regions</span>
-              {cities.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
-                  {cities.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('users')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'users'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuUsers className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Users Database</span>
-              {users.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
+                <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D]">
+                  {adminTabs.find(t => t.id === activeTab)?.label || 'Control Panel'}
+                </h1>
+                <p className="text-xs text-[#6B8077] mt-1">
+                  Automated Email Dispatch Active · Manage reservations, inventory prices, coverage, and clients.
+                </p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2">
+                {/* <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#DDEBE4] text-[#10231D] text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-[#25D366]"></span>
+                  Live Server
+                </span> */}
+              </div>
+            </div>
+
+            {/* Overview Stat Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#6B8077]">TOTAL ORDERS</span>
+                <p className="font-display font-black text-2xl sm:text-3xl text-[#10231D] mt-1 tnum truncate">
+                  {stats?.totalBookings || 0}
+                </p>
+              </div>
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#6B8077]">ACTIVE CITIES</span>
+                <p className="font-display font-black text-2xl sm:text-3xl text-[#E9A23B] mt-1 tnum truncate">
+                  {cities.filter(c => c.status === 'active').length || cities.length}
+                </p>
+              </div>
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#6B8077]">TOTAL REVENUE</span>
+                <p className="font-display font-black text-2xl sm:text-3xl text-[#10231D] mt-1 tnum truncate">
+                  ₹{(stats?.totalRevenue || 0).toLocaleString('en-IN')}
+                </p>
+              </div>
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#6B8077]">REGISTERED USERS</span>
+                <p className="font-display font-black text-2xl sm:text-3xl text-[#10231D] mt-1 tnum truncate">
                   {users.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('testimonials')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'testimonials'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuStar className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Testimonials</span>
-              {testimonials.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#E9A23B]/30 text-[#10231D]">
-                  {testimonials.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('messages')}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                activeTab === 'messages'
-                  ? 'bg-[#10231D] text-[#F4EFE6] shadow'
-                  : 'text-[#10231D] hover:bg-[#E2D9C8]'
-              }`}
-            >
-              <LuMail className="w-3.5 h-3.5 text-[#E9A23B]" />
-              <span>Inquiries</span>
-              {unreadMessagesCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-[#C2512D] text-white font-bold animate-pulse">
-                  {unreadMessagesCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Overview Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">TOTAL ORDERS</span>
-            <p className="font-display font-black text-3xl text-[#10231D] mt-1 tnum">
-              {stats?.totalBookings || 0}
-            </p>
-          </div>
-          <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">ACTIVE CITIES</span>
-            <p className="font-display font-black text-3xl text-[#E9A23B] mt-1 tnum">
-              {cities.filter(c => c.status === 'active').length || cities.length}
-            </p>
-          </div>
-          <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">TOTAL REVENUE</span>
-            <p className="font-display font-black text-3xl text-[#10231D] mt-1 tnum">
-              ₹{(stats?.totalRevenue || 0).toLocaleString('en-IN')}
-            </p>
-          </div>
-          <div className="p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-            <span className="text-[11px] font-mono font-bold text-[#6B8077]">REGISTERED USERS (DB)</span>
-            <p className="font-display font-black text-3xl text-[#10231D] mt-1 tnum">
-              {users.length}
-            </p>
-          </div>
-        </div>
+                </p>
+              </div>
+            </div>
 
         {/* ========================================================
             TAB 1: BOOKINGS MANAGEMENT
         ======================================================== */}
         {activeTab === 'bookings' && (
           <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
-            <h3 className="font-display font-bold text-xl text-[#10231D] mb-4">
-              All Cleaning Reservations ({bookings.length})
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+              <h3 className="font-display font-bold text-xl text-[#10231D]">
+                All Cleaning Reservations ({bookings.length})
+              </h3>
+              <span className="text-xs font-mono text-[#6B8077]">
+                Showing {filteredBookings.length} of {bookings.length} reservations
+              </span>
+            </div>
+
+            {/* Search and Filters Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6 p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8]">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                {/* Search input */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={bookingSearch}
+                    onChange={(e) => setBookingSearch(e.target.value)}
+                    placeholder="Search by code, customer, phone, city..."
+                    className="w-full pl-9 pr-7 py-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] placeholder-[#6B8077] focus:outline-none focus:border-[#E9A23B]"
+                  />
+                  {bookingSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBookingSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Filter Buttons */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { val: 'all', label: 'All Status' },
+                    { val: 'pending', label: 'Pending' },
+                    { val: 'confirmed', label: 'Confirmed' },
+                    { val: 'in_progress', label: 'In Progress' },
+                    { val: 'completed', label: 'Completed' },
+                    { val: 'cancelled', label: 'Cancelled' }
+                  ].map((st) => (
+                    <button
+                      key={st.val}
+                      type="button"
+                      onClick={() => setBookingStatusFilter(st.val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize cursor-pointer ${
+                        bookingStatusFilter === st.val
+                          ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#3D524A] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(bookingSearch || bookingStatusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingSearch('');
+                    setBookingStatusFilter('all');
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#C2512D] text-xs font-bold transition-colors self-start md:self-auto cursor-pointer"
+                >
+                  <LuRotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+            </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
@@ -690,61 +1252,79 @@ export default function AdminDashboard() {
                     <th className="py-3 px-3">Slot Date</th>
                     <th className="py-3 px-3">Total Payable</th>
                     <th className="py-3 px-3">Status Action</th>
-                    <th className="py-3 px-3">Messages</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E2D9C8]/60">
-                  {bookings.map((b) => (
-                    <tr key={b._id} className="hover:bg-[#F4EFE6]/50">
-                      <td className="py-3 px-3 font-mono font-bold text-[#10231D]">
-                        {b.bookingCode}
-                      </td>
-                      <td className="py-3 px-3">
-                        <p className="font-bold text-[#10231D]">{b.customer.name}</p>
-                        <p className="text-[#6B8077]">{b.customer.phone}</p>
-                        {b.customer.email && (
-                          <p className="text-[10px] text-[#3D524A]">{b.customer.email}</p>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 max-w-[200px] truncate">
-                        <span className="font-semibold text-[#10231D]">{b.cityName}</span>: {b.address.line1}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-[#3D524A]">
-                        {b.slot.date} ({b.slot.window.split(' ')[0]})
-                      </td>
-                      <td className="py-3 px-3 font-black text-[#10231D] tnum">
-                        ₹{b.totals.total.toLocaleString('en-IN')}
-                      </td>
-                      <td className="py-3 px-3 min-w-[140px]">
-                        <CustomSelect
-                          value={b.status}
-                          onChange={(val) => handleUpdateBookingStatus(b._id, val)}
-                          options={[
-                            { value: 'pending', label: 'Pending' },
-                            { value: 'confirmed', label: 'Confirmed' },
-                            { value: 'in_progress', label: 'In Progress' },
-                            { value: 'completed', label: 'Completed' },
-                            { value: 'cancelled', label: 'Cancelled' }
-                          ]}
-                          placeholder="Status..."
-                        />
-                      </td>
-                      <td className="py-3 px-3">
-                        <button
-                          type="button"
-                          onClick={() => setChatBooking(b)}
-                          className="px-2.5 py-1 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-[11px] flex items-center gap-1 transition-colors"
-                        >
-                          <span>Chat</span>
-                          {b.messages?.length > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-[#E9A23B] text-[#10231D] text-[10px] font-black">
-                              {b.messages.length}
-                            </span>
-                          )}
-                        </button>
+                  {filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-xs text-[#6B8077]">
+                        No bookings match your current search criteria.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredBookings.map((b) => (
+                      <tr key={b._id} className="hover:bg-[#F4EFE6]/50">
+                        <td className="py-3 px-3 font-mono font-bold text-[#10231D]">
+                          {b.bookingCode}
+                        </td>
+                        <td className="py-3 px-3">
+                          <p className="font-bold text-[#10231D]">{b.customer?.name}</p>
+                          <p className="text-[#6B8077]">{b.customer?.phone}</p>
+                          {b.customer?.email && (
+                            <p className="text-[10px] text-[#3D524A]">{b.customer?.email}</p>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 max-w-[200px] truncate">
+                          <span className="font-semibold text-[#10231D]">{b.cityName}</span>: {b.address?.line1}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#3D524A]">
+                          {b.slot?.date} ({b.slot?.window?.split(' ')[0] || 'Scheduled'})
+                        </td>
+                        <td className="py-3 px-3 font-black text-[#10231D] tnum">
+                          ₹{(b.totals?.total ?? b.total ?? 0).toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3 px-3 min-w-[140px]">
+                          <CustomSelect
+                            value={b.status}
+                            onChange={(val) => handleUpdateBookingStatus(b._id, val)}
+                            options={[
+                              { value: 'pending', label: 'Pending' },
+                              { value: 'confirmed', label: 'Confirmed' },
+                              { value: 'in_progress', label: 'In Progress' },
+                              { value: 'completed', label: 'Completed' },
+                              { value: 'cancelled', label: 'Cancelled' }
+                            ]}
+                            placeholder="Status..."
+                          />
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setChatBooking(b)}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <span>Chat</span>
+                              {b.messages?.length > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full bg-[#E9A23B] text-[#10231D] text-[10px] font-black">
+                                  {b.messages.length}
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBooking(b._id, b.bookingCode)}
+                              title="Delete booking permanently"
+                              className="p-1.5 rounded-lg border border-[#C2512D]/40 text-[#C2512D] hover:bg-[#C2512D] hover:text-white transition-colors cursor-pointer"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -758,13 +1338,24 @@ export default function AdminDashboard() {
           <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
               <div>
-                <h3 className="font-display font-bold text-xl text-[#10231D]">
-                  Shown Price (MRP) vs Offered Price Control
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Shown Price (MRP) vs Offered Price Control</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#E9A23B] text-[#10231D]">
+                    {services.length} Services
+                  </span>
                 </h3>
                 <p className="text-xs text-[#6B8077] mt-0.5">
                   Update customer crossed-out strikethrough price, real payable price, and Cloudinary media photos.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setCreateServiceModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
+              >
+                <LuPlus className="w-4 h-4" />
+                <span>Add New Service</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -800,9 +1391,22 @@ export default function AdminDashboard() {
                         )}
                       </div>
 
-                      <h4 className="font-display font-bold text-lg text-[#10231D] mb-3">
+                      <h4 className="font-display font-bold text-lg text-[#10231D] mb-2">
                         {svc.title}
                       </h4>
+
+                      {/* Variants Summary Badge */}
+                      {svc.optionGroups?.[0]?.options?.length > 1 && (
+                        <div className="mb-3 px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-[#10231D] flex items-center gap-1 shrink-0">
+                            <LuTicket className="w-3.5 h-3.5 text-[#E9A23B]" />
+                            <span>{svc.optionGroups[0].options.length} Variants</span>
+                          </span>
+                          <span className="text-[#6B8077] truncate max-w-[150px] text-right">
+                            {svc.optionGroups[0].options.map(o => o.label).slice(0, 3).join(', ')}{svc.optionGroups[0].options.length > 3 ? '...' : ''}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Pricing Comparison */}
                       <div className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-1 mb-4 text-xs">
@@ -825,14 +1429,24 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => openEditService(svc)}
-                      className="w-full py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <LuSquarePen className="w-4 h-4 text-[#E9A23B]" />
-                      <span>Edit Prices & Photo</span>
-                    </button>
+                    <div className="flex items-center gap-2 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => openEditService(svc)}
+                        className="flex-1 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <LuSquarePen className="w-4 h-4 text-[#E9A23B]" />
+                        <span>Edit Prices & Photo</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteService(svc._id, svc.title)}
+                        className="p-2.5 rounded-xl bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1] transition-colors"
+                        title="Delete Service"
+                      >
+                        <LuTrash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1339,6 +1953,335 @@ export default function AdminDashboard() {
         )}
 
         {/* ========================================================
+            TAB 7: COUPONS & DISCOUNT PROMOTIONS
+        ======================================================== */}
+        {activeTab === 'coupons' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Coupons & Discount Promotions</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#E9A23B] text-[#10231D]">
+                    {coupons.length} Active Codes
+                  </span>
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Create promo codes with flat or percentage discounts, minimum booking threshold, and validity dates.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCouponModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
+              >
+                <LuPlus className="w-4 h-4" />
+                <span>Create New Coupon</span>
+              </button>
+            </div>
+
+            {coupons.length === 0 ? (
+              <div className="py-12 text-center text-[#6B8077]">
+                <LuTicket className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#E9A23B]" />
+                <p className="text-sm font-bold text-[#10231D]">No promotional coupons configured</p>
+                <p className="text-xs text-[#6B8077] mt-1">Click "+ Create New Coupon" to publish a discount voucher code for checkout.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
+                      <th className="py-3 px-3">Promo Code</th>
+                      <th className="py-3 px-3">Discount Type & Value</th>
+                      <th className="py-3 px-3">Min Order</th>
+                      <th className="py-3 px-3">Max Cap</th>
+                      <th className="py-3 px-3">Usage</th>
+                      <th className="py-3 px-3">Expiry Date</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3 text-right">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E2D9C8]/60">
+                    {coupons.map((c) => (
+                      <tr key={c._id} className="hover:bg-[#F4EFE6]/50">
+                        <td className="py-3 px-3">
+                          <span className="font-mono font-black text-sm px-2.5 py-1 rounded-lg bg-[#10231D] text-[#E9A23B] tracking-wider">
+                            {c.code}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-[#10231D]">
+                          {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} FLAT OFF`}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#3D524A]">
+                          ₹{(c.minOrderValue || c.minBookingAmount || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#3D524A]">
+                          {c.maxDiscount ? `₹${c.maxDiscount}` : 'No Limit'}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#10231D]">
+                          <span className="font-bold">{c.usedCount || 0}</span> / {c.usageLimit || '∞'}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[#6B8077]">
+                          {(c.validUntil || c.expiryDate)
+                            ? new Date(c.validUntil || c.expiryDate).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                            : 'Never'}
+                        </td>
+                        <td className="py-3 px-3">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCouponStatus(c)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition-colors ${
+                              c.isActive
+                                ? 'bg-[#DDEBE4] text-[#10231D] border border-[#BED6CC]'
+                                : 'bg-[#EAE4DC] text-[#6B8077] border border-[#D5CCC0]'
+                            }`}
+                          >
+                            {c.isActive ? 'Active' : 'Disabled'}
+                          </button>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCoupon(c._id, c.code)}
+                            className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1]"
+                            title="Delete Coupon"
+                          >
+                            <LuTrash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB 8: SITE & BUSINESS SETTINGS
+        ======================================================== */}
+        {activeTab === 'settings' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
+            <div className="mb-6">
+              <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                <span>Business & Operational Settings</span>
+              </h3>
+              <p className="text-xs text-[#6B8077] mt-0.5">
+                Manage live customer service hotline numbers, head office address, business operating hours, and GST invoice settings.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
+              {/* Identity & Contact Details */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
+                  <LuPhone className="w-4 h-4 text-[#E9A23B]" />
+                  <span>Brand Identity & Contact Numbers</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Business Brand Name:
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.brandName || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, brandName: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Support Email:
+                    </label>
+                    <input
+                      type="email"
+                      value={settingsForm.email || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, email: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Primary Phone (Hotline):
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.phone || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
+                      placeholder="+91 98977 66002"
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Alternate Phone:
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.alternatePhone || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, alternatePhone: e.target.value })}
+                      placeholder="+91 82105 23309"
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      WhatsApp Dispatch Number:
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.whatsappNumber || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
+                      placeholder="+91 98977 66002"
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Working Hours / Operating Window:
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.workingHours || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, workingHours: e.target.value })}
+                      placeholder="Mon–Sun · 10:00 AM – 6:00 PM"
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address & Marketing Copy */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
+                  <LuMapPin className="w-4 h-4 text-[#E9A23B]" />
+                  <span>Headquarters & Trust Marketing</span>
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Operating Headquarters Address:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={settingsForm.address || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                    placeholder="e.g. Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001"
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Customer Rating Claim:
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.ratingClaim || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, ratingClaim: e.target.value })}
+                    placeholder="e.g. Rated 4.9/5 by 10,000+ happy homes"
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* GST & Invoicing Settings */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
+                  <LuDollarSign className="w-4 h-4 text-[#E9A23B]" />
+                  <span>GST Billing & Invoicing</span>
+                </h4>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="gstEnabled"
+                    checked={Boolean(settingsForm.gstEnabled)}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, gstEnabled: e.target.checked })}
+                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4"
+                  />
+                  <label htmlFor="gstEnabled" className="text-xs font-bold text-[#10231D] cursor-pointer">
+                    Enable GST on Customer Bookings
+                  </label>
+                </div>
+
+                {settingsForm.gstEnabled && (
+                  <div className="w-48">
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      GST Percentage (%):
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={28}
+                      value={settingsForm.gstPercentage || 18}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, gstPercentage: Number(e.target.value) })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Online Payment Settings */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
+                    <LuCreditCard className="w-4 h-4 text-[#E9A23B]" />
+                    <span>Online Payments (Razorpay)</span>
+                  </h4>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                    settingsForm.acceptOnlinePayments
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-stone-200 text-stone-700 border border-stone-300'
+                  }`}>
+                    {settingsForm.acceptOnlinePayments ? 'Active' : 'Cash on Service Only'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="acceptOnlinePaymentsToggle"
+                    checked={Boolean(settingsForm.acceptOnlinePayments)}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, acceptOnlinePayments: e.target.checked })}
+                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                  />
+                  <label htmlFor="acceptOnlinePaymentsToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
+                    Accept online payments through website (Cards, UPI, NetBanking)
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="px-6 py-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <LuCheck className="w-4 h-4 text-[#E9A23B]" />
+                  <span>{savingSettings ? 'Saving Settings...' : 'Save All Business Settings'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ========================================================
             MODAL 1: EDIT SERVICE DUAL-PRICING & CLOUDINARY IMAGE
         ======================================================== */}
         {editingService && (
@@ -1346,8 +2289,8 @@ export default function AdminDashboard() {
             isOpen={true}
             onClose={() => setEditingService(null)}
             title={`Edit Service: ${editingService.title}`}
-            subtitle="Update Shown Price (MRP), Offered Price, and Cloudinary Media Photo"
-            maxWidth="max-w-xl"
+            subtitle="Update Service Details, Shown Price (MRP), Payable Price, and Dynamic Variants"
+            maxWidth="max-w-2xl"
           >
             <form onSubmit={handleSaveService} className="space-y-4">
               <div>
@@ -1409,48 +2352,31 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Service Icon */}
+              {/* Service Icon (Select-Only) */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
                   Service Icon:
                 </label>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
-                    {getServiceIcon(serviceForm.icon, 'w-5 h-5 text-[#E9A23B]')}
+                  <div className="w-11 h-11 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
+                    {getServiceIcon(serviceForm.icon, 'w-6 h-6 text-[#E9A23B]')}
                   </div>
-                  <input
-                    type="text"
-                    value={serviceForm.icon}
-                    onChange={(e) => setServiceForm({ ...serviceForm, icon: e.target.value })}
-                    className="flex-1 p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] font-mono"
-                    required
-                  />
-                </div>
-                {/* Quick Icon Selector Chips */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {AVAILABLE_ICONS.map((ic) => (
-                    <button
-                      key={ic.key}
-                      type="button"
-                      onClick={() => setServiceForm({ ...serviceForm, icon: ic.key })}
-                      className={`px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                        serviceForm.icon === ic.key
-                          ? 'bg-[#10231D] text-[#F4EFE6]'
-                          : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
-                      }`}
-                    >
-                      {getServiceIcon(ic.key, 'w-3 h-3')}
-                      <span>{ic.key}</span>
-                    </button>
-                  ))}
+                  <div className="flex-1 min-w-0">
+                    <CustomSelect
+                      value={serviceForm.icon}
+                      onChange={(val) => setServiceForm(prev => ({ ...prev, icon: val }))}
+                      options={ICON_SELECT_OPTIONS}
+                      placeholder="Select Service Icon..."
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Shown Price (MRP) */}
+              {/* Base Prices */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Shown Price (MRP Crossed Out):
+                    Base Shown Price (MRP Crossed Out):
                   </label>
                   <input
                     type="number"
@@ -1461,10 +2387,9 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                {/* Offered Price */}
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Offered Price (Payable):
+                    Base Offered Price (Payable):
                   </label>
                   <input
                     type="number"
@@ -1476,7 +2401,290 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-3">
+              {/* Dynamic Service Variants & Tiered Rates (N Variants) */}
+              <div className="pt-4 border-t border-[#E2D9C8]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                      <LuTicket className="w-4 h-4 text-[#E9A23B]" />
+                      <span>Service Variants & Tiered Rates ({serviceForm.variants?.length || 0})</span>
+                    </h4>
+                    <p className="text-[11px] text-[#6B8077]">
+                      Add 1, 2, 3, 4, 5+ BHK variants or custom sizes with individual rates & MRPs.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newIdx = (serviceForm.variants?.length || 0) + 1;
+                      setServiceForm(prev => {
+                        const newVar = {
+                          key: `variant-${newIdx}`,
+                          label: `${newIdx} BHK`,
+                          price: (prev.price || 2800) + (newIdx * 1000),
+                          mrp: (prev.mrp || 2999) + (newIdx * 1500),
+                          duration: `${newIdx + 2}-${newIdx + 3} hrs`,
+                          isDefault: (prev.variants?.length || 0) === 0
+                        };
+                        return {
+                          ...prev,
+                          variants: [...(prev.variants || []), newVar]
+                        };
+                      });
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto transition-colors shadow-xs"
+                  >
+                    <LuPlus className="w-4 h-4" />
+                    <span>Add Variant</span>
+                  </button>
+                </div>
+
+                {/* Variant Group Label */}
+                <div className="mb-3">
+                  <label className="block text-[11px] font-bold text-[#3D524A] mb-1">
+                    Variant Group Label (e.g. Apartment / House Size, Sofa Seats, Tank Capacity):
+                  </label>
+                  <input
+                    type="text"
+                    value={serviceForm.variantGroupLabel || ''}
+                    placeholder="e.g. Apartment / House Size"
+                    onChange={(e) => setServiceForm({ ...serviceForm, variantGroupLabel: e.target.value })}
+                    className="w-full p-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-semibold text-[#10231D]"
+                  />
+                </div>
+
+                {/* List of Dynamic Variants */}
+                {(!serviceForm.variants || serviceForm.variants.length === 0) ? (
+                  <div className="p-4 rounded-xl border-2 border-dashed border-[#E2D9C8] bg-[#ECE5D8]/40 text-center">
+                    <p className="text-xs text-[#6B8077]">
+                      No variants added. This service currently uses a single flat rate.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Apartment / House Size',
+                            variantGroupKey: 'size',
+                            price: 2800,
+                            mrp: 2999,
+                            duration: '4-5 hrs',
+                            variants: [
+                              { key: '1-bhk', label: '1 BHK', price: 2800, mrp: 2999, duration: '4-5 hrs', isDefault: true },
+                              { key: '2-bhk', label: '2 BHK', price: 6000, mrp: 7499, duration: '5-7 hrs', isDefault: false },
+                              { key: '3-bhk', label: '3 BHK', price: 9500, mrp: 10500, duration: '7-9 hrs', isDefault: false },
+                              { key: '4-bhk', label: '4 BHK', price: 12500, mrp: 15000, duration: '2 Days', isDefault: false },
+                              { key: 'villa', label: 'Villa / Kothi (5+ BHK)', price: 18000, mrp: 22000, duration: '2-3 Days', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#E9A23B] px-3 py-1.5 rounded-lg hover:bg-[#D48E28] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load 1 to 5 BHK Apartment Preset</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Seating Configuration',
+                            variantGroupKey: 'seats',
+                            price: 1750,
+                            mrp: 1999,
+                            duration: '2-3 hrs',
+                            variants: [
+                              { key: '5-seater', label: '5 Seater (3+1+1)', price: 1750, mrp: 1999, duration: '2-3 hrs', isDefault: true },
+                              { key: '7-seater', label: '7 Seater (3+2+2)', price: 2450, mrp: 2500, duration: '3-4 hrs', isDefault: false },
+                              { key: '9-seater', label: '9 Seater (L-Shape / Sectional)', price: 3150, mrp: 3500, duration: '4-5 hrs', isDefault: false },
+                              { key: '12-seater', label: '12 Seater Grand Royal', price: 4200, mrp: 4500, duration: '5-6 hrs', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load Sofa Seats Preset</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Water Tank Capacity',
+                            variantGroupKey: 'capacity',
+                            price: 400,
+                            mrp: 499,
+                            duration: '1-1.5 hrs',
+                            variants: [
+                              { key: '500l', label: 'Up to 500 Liters', price: 400, mrp: 499, duration: '1-1.5 hrs', isDefault: true },
+                              { key: '750l', label: '500L – 750 Liters', price: 500, mrp: 699, duration: '1.5-2 hrs', isDefault: false },
+                              { key: '1000l', label: '750L – 1,000 Liters', price: 700, mrp: 1000, duration: '2-2.5 hrs', isDefault: false },
+                              { key: '1500l', label: '1,000L – 1,500 Liters', price: 900, mrp: 1300, duration: '2.5-3 hrs', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load Water Tank Preset</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {serviceForm.variants.map((v, vIdx) => {
+                      const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
+
+                      return (
+                        <div
+                          key={vIdx}
+                          className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2 transition-colors hover:border-[#10231D]/30"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
+                                {vIdx + 1}
+                              </span>
+                              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#10231D]">
+                                <input
+                                  type="radio"
+                                  name="defaultVariantRadio"
+                                  checked={Boolean(v.isDefault)}
+                                  onChange={() => {
+                                    setServiceForm(prev => ({
+                                      ...prev,
+                                      price: v.price,
+                                      mrp: v.mrp,
+                                      duration: v.duration,
+                                      variants: prev.variants.map((varItem, i) => ({
+                                        ...varItem,
+                                        isDefault: i === vIdx
+                                      }))
+                                    }));
+                                  }}
+                                  className="text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
+                                />
+                                <span>Default Selection</span>
+                              </label>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {discount > 0 && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1B5E20]/15 text-[#1B5E20]">
+                                  {discount}% OFF
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setServiceForm(prev => ({
+                                    ...prev,
+                                    variants: prev.variants.filter((_, i) => i !== vIdx)
+                                  }));
+                                }}
+                                className="p-1 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
+                                title="Delete variant"
+                              >
+                                <LuTrash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="sm:col-span-2">
+                              <input
+                                type="text"
+                                placeholder="Variant Label (e.g. 2 BHK)"
+                                value={v.label}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setServiceForm(prev => {
+                                    const updated = [...prev.variants];
+                                    updated[vIdx] = {
+                                      ...updated[vIdx],
+                                      label: val,
+                                      key: val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || updated[vIdx].key
+                                    };
+                                    return { ...prev, variants: updated };
+                                  });
+                                }}
+                                className="w-full p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-bold text-[#10231D]"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder="Payable"
+                                  title="Payable Price"
+                                  value={v.price}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setServiceForm(prev => {
+                                      const updated = [...prev.variants];
+                                      updated[vIdx] = { ...updated[vIdx], price: val };
+                                      return { ...prev, variants: updated };
+                                    });
+                                  }}
+                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-black text-[#10231D] tnum"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder="MRP"
+                                  title="Shown Price (MRP Crossed Out)"
+                                  value={v.mrp}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setServiceForm(prev => {
+                                      const updated = [...prev.variants];
+                                      updated[vIdx] = { ...updated[vIdx], mrp: val };
+                                      return { ...prev, variants: updated };
+                                    });
+                                  }}
+                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="text-[#6B8077] shrink-0">Duration:</span>
+                            <input
+                              type="text"
+                              placeholder="e.g. 4-5 hrs, 2 Days"
+                              value={v.duration || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setServiceForm(prev => {
+                                  const updated = [...prev.variants];
+                                  updated[vIdx] = { ...updated[vIdx], duration: val };
+                                  return { ...prev, variants: updated };
+                                });
+                              }}
+                              className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
                 <button
                   type="button"
                   onClick={() => setEditingService(null)}
@@ -1486,7 +2694,7 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                  className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs shadow-md transition-all active:scale-95"
                 >
                   Save Service Changes
                 </button>
@@ -1692,7 +2900,11 @@ export default function AdminDashboard() {
             subtitle={`Customer: ${chatBooking.customer?.name} (${chatBooking.customer?.phone})`}
             maxWidth="max-w-md"
           >
-            <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#DDEBE4] text-[#10231D] text-[11px] font-medium border border-[#A3B8B0]/40">
+                <LuClock className="w-3.5 h-3.5 text-[#10231D] shrink-0" />
+                <span>Chat history is saved for 7 days. Older messages are automatically cleared.</span>
+              </div>
               <div className="h-64 overflow-y-auto p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-3">
                 {(!chatBooking.messages || chatBooking.messages.length === 0) ? (
                   <p className="text-center text-xs text-[#6B8077] py-8">
@@ -1795,7 +3007,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
                     URL Slug:
@@ -1823,7 +3035,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
                     Service Radius (km):
@@ -1901,6 +3113,612 @@ export default function AdminDashboard() {
             </form>
           </Modal>
         )}
+
+        {/* ========================================================
+            MODAL 5: CREATE NEW SERVICE
+        ======================================================== */}
+        {createServiceModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setCreateServiceModalOpen(false)}
+            title="Create New Cleaning Service"
+            subtitle="Add a new service offering to the catalogue with dual-pricing, tiered variants and details"
+            maxWidth="max-w-3xl"
+          >
+            <form onSubmit={handleCreateService} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Service Title:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Kitchen Chimney & Hob Deep Cleaning"
+                  value={newServiceForm.title}
+                  onChange={(e) => setNewServiceForm({ ...newServiceForm, title: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    URL Slug (optional):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. kitchen-chimney-cleaning"
+                    value={newServiceForm.slug}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, slug: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Service Duration:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1.5 hrs"
+                    value={newServiceForm.duration}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, duration: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D]"
+                  />
+                </div>
+              </div>
+
+              {/* Service Icon (Select-Only) */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Service Icon:
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
+                    {getServiceIcon(newServiceForm.icon, 'w-6 h-6 text-[#E9A23B]')}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <CustomSelect
+                      value={newServiceForm.icon}
+                      onChange={(val) => setNewServiceForm(prev => ({ ...prev, icon: val }))}
+                      options={ICON_SELECT_OPTIONS}
+                      placeholder="Select Service Icon..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Base Prices */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Base Shown Price (MRP Crossed Out):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newServiceForm.mrp}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, mrp: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-bold text-[#10231D] tnum"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Base Offered Price (Payable):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newServiceForm.price}
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Service Variants & Tiered Rates (N Variants) */}
+              <div className="pt-4 border-t border-[#E2D9C8]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                      <LuTicket className="w-4 h-4 text-[#E9A23B]" />
+                      <span>Service Variants & Tiered Rates ({newServiceForm.variants?.length || 0})</span>
+                    </h4>
+                    <p className="text-[11px] text-[#6B8077]">
+                      Add 1, 2, 3, 4, 5+ BHK variants, sofa seats, or custom sizes with individual rates & MRPs.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newIdx = (newServiceForm.variants?.length || 0) + 1;
+                      setNewServiceForm(prev => {
+                        const newVar = {
+                          key: `variant-${newIdx}`,
+                          label: `${newIdx} BHK`,
+                          price: (Number(prev.price) || 2800) + (newIdx * 1000),
+                          mrp: (Number(prev.mrp) || 2999) + (newIdx * 1500),
+                          duration: `${newIdx + 2}-${newIdx + 3} hrs`,
+                          isDefault: (prev.variants?.length || 0) === 0
+                        };
+                        return {
+                          ...prev,
+                          variants: [...(prev.variants || []), newVar]
+                        };
+                      });
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto transition-colors shadow-xs"
+                  >
+                    <LuPlus className="w-4 h-4" />
+                    <span>Add Variant</span>
+                  </button>
+                </div>
+
+                {/* Variant Group Label */}
+                <div className="mb-3">
+                  <label className="block text-[11px] font-bold text-[#3D524A] mb-1">
+                    Variant Group Label (e.g. Apartment / House Size, Sofa Seats, Tank Capacity):
+                  </label>
+                  <input
+                    type="text"
+                    value={newServiceForm.variantGroupLabel || ''}
+                    placeholder="e.g. Apartment / House Size"
+                    onChange={(e) => setNewServiceForm({ ...newServiceForm, variantGroupLabel: e.target.value })}
+                    className="w-full p-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-semibold text-[#10231D]"
+                  />
+                </div>
+
+                {/* List of Dynamic Variants */}
+                {(!newServiceForm.variants || newServiceForm.variants.length === 0) ? (
+                  <div className="p-4 rounded-xl border-2 border-dashed border-[#E2D9C8] bg-[#ECE5D8]/40 text-center space-y-2">
+                    <p className="text-xs text-[#6B8077]">
+                      No variants added. This service will use a single flat rate unless variants are added.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Apartment / House Size',
+                            variantGroupKey: 'size',
+                            price: 2800,
+                            mrp: 2999,
+                            duration: '4-5 hrs',
+                            variants: [
+                              { key: '1-bhk', label: '1 BHK', price: 2800, mrp: 2999, duration: '4-5 hrs', isDefault: true },
+                              { key: '2-bhk', label: '2 BHK', price: 6000, mrp: 7499, duration: '5-7 hrs', isDefault: false },
+                              { key: '3-bhk', label: '3 BHK', price: 9500, mrp: 10500, duration: '7-9 hrs', isDefault: false },
+                              { key: '4-bhk', label: '4 BHK', price: 12500, mrp: 15000, duration: '2 Days', isDefault: false },
+                              { key: 'villa', label: 'Villa / Kothi (5+ BHK)', price: 18000, mrp: 22000, duration: '2-3 Days', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#E9A23B] px-3 py-1.5 rounded-lg hover:bg-[#D48E28] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load 1 to 5 BHK Apartment Preset</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Seating Configuration',
+                            variantGroupKey: 'seats',
+                            price: 1750,
+                            mrp: 1999,
+                            duration: '2-3 hrs',
+                            variants: [
+                              { key: '5-seater', label: '5 Seater (3+1+1)', price: 1750, mrp: 1999, duration: '2-3 hrs', isDefault: true },
+                              { key: '7-seater', label: '7 Seater (3+2+2)', price: 2450, mrp: 2500, duration: '3-4 hrs', isDefault: false },
+                              { key: '9-seater', label: '9 Seater (L-Shape / Sectional)', price: 3150, mrp: 3500, duration: '4-5 hrs', isDefault: false },
+                              { key: '12-seater', label: '12 Seater Grand Royal', price: 4200, mrp: 4500, duration: '5-6 hrs', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load Sofa Seats Preset</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewServiceForm(prev => ({
+                            ...prev,
+                            variantGroupLabel: 'Water Tank Capacity',
+                            variantGroupKey: 'capacity',
+                            price: 400,
+                            mrp: 499,
+                            duration: '1-1.5 hrs',
+                            variants: [
+                              { key: '500l', label: 'Up to 500 Liters', price: 400, mrp: 499, duration: '1-1.5 hrs', isDefault: true },
+                              { key: '750l', label: '500L – 750 Liters', price: 500, mrp: 699, duration: '1.5-2 hrs', isDefault: false },
+                              { key: '1000l', label: '750L – 1,000 Liters', price: 700, mrp: 1000, duration: '2-2.5 hrs', isDefault: false },
+                              { key: '1500l', label: '1,000L – 1,500 Liters', price: 900, mrp: 1300, duration: '2.5-3 hrs', isDefault: false }
+                            ]
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
+                      >
+                        <LuPlus className="w-3.5 h-3.5" />
+                        <span>Load Water Tank Preset</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {newServiceForm.variants.map((v, vIdx) => {
+                      const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
+
+                      return (
+                        <div
+                          key={vIdx}
+                          className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2 transition-colors hover:border-[#10231D]/30"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
+                                {vIdx + 1}
+                              </span>
+                              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#10231D]">
+                                <input
+                                  type="radio"
+                                  name="newServiceDefaultVariantRadio"
+                                  checked={Boolean(v.isDefault)}
+                                  onChange={() => {
+                                    setNewServiceForm(prev => ({
+                                      ...prev,
+                                      price: v.price,
+                                      mrp: v.mrp,
+                                      duration: v.duration,
+                                      variants: prev.variants.map((varItem, i) => ({
+                                        ...varItem,
+                                        isDefault: i === vIdx
+                                      }))
+                                    }));
+                                  }}
+                                  className="text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
+                                />
+                                <span>Default Selection</span>
+                              </label>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {discount > 0 && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1B5E20]/15 text-[#1B5E20]">
+                                  {discount}% OFF
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewServiceForm(prev => ({
+                                    ...prev,
+                                    variants: prev.variants.filter((_, i) => i !== vIdx)
+                                  }));
+                                }}
+                                className="p-1 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
+                                title="Delete variant"
+                              >
+                                <LuTrash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="sm:col-span-2">
+                              <input
+                                type="text"
+                                placeholder="Variant Label (e.g. 2 BHK)"
+                                value={v.label}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setNewServiceForm(prev => {
+                                    const updated = [...prev.variants];
+                                    updated[vIdx] = {
+                                      ...updated[vIdx],
+                                      label: val,
+                                      key: val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || updated[vIdx].key
+                                    };
+                                    return { ...prev, variants: updated };
+                                  });
+                                }}
+                                className="w-full p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-bold text-[#10231D]"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder="Payable"
+                                  title="Payable Price"
+                                  value={v.price}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setNewServiceForm(prev => {
+                                      const updated = [...prev.variants];
+                                      updated[vIdx] = { ...updated[vIdx], price: val };
+                                      return { ...prev, variants: updated };
+                                    });
+                                  }}
+                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-black text-[#10231D] tnum"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  placeholder="MRP"
+                                  title="Shown Price (MRP Crossed Out)"
+                                  value={v.mrp}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setNewServiceForm(prev => {
+                                      const updated = [...prev.variants];
+                                      updated[vIdx] = { ...updated[vIdx], mrp: val };
+                                      return { ...prev, variants: updated };
+                                    });
+                                  }}
+                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="text-[#6B8077] shrink-0">Duration:</span>
+                            <input
+                              type="text"
+                              placeholder="e.g. 4-5 hrs, 2 Days"
+                              value={v.duration || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setNewServiceForm(prev => {
+                                  const updated = [...prev.variants];
+                                  updated[vIdx] = { ...updated[vIdx], duration: val };
+                                  return { ...prev, variants: updated };
+                                });
+                              }}
+                              className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Short Description:
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Brief summary shown on service cards..."
+                  value={newServiceForm.shortDescription}
+                  onChange={(e) => setNewServiceForm({ ...newServiceForm, shortDescription: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D]"
+                />
+              </div>
+
+              {/* Service Cover Photo */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Service Cover Photo:
+                </label>
+                <div className="flex items-center gap-3">
+                  {newServiceForm.imageUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#E2D9C8] shrink-0 bg-[#ECE5D8]">
+                      <img
+                        src={newServiceForm.imageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewServiceForm(prev => ({ ...prev, imageUrl: '' }))}
+                        className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
+                      >
+                        <LuX className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-[#E2D9C8] flex items-center justify-center text-[#6B8077] shrink-0">
+                      <LuImage className="w-6 h-6" />
+                    </div>
+                  )}
+
+                  <div className="flex-1">
+                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors">
+                      <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{uploadingNewServiceImage ? 'Uploading...' : 'Upload Image'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleNewServiceImageUpload}
+                        className="hidden"
+                        disabled={uploadingNewServiceImage}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setCreateServiceModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingNewService}
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                >
+                  {savingNewService ? 'Creating Service...' : 'Create Service'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* ========================================================
+            MODAL 6: CREATE NEW COUPON
+        ======================================================== */}
+        {couponModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setCouponModalOpen(false)}
+            title="Create New Discount Coupon"
+            subtitle="Configure a voucher code redeemable during booking checkout"
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleCreateCoupon} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Coupon Code:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. MAXCLEAN20, DIWALI100"
+                  value={couponForm.code}
+                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-mono font-black text-[#10231D] uppercase"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Discount Type:
+                  </label>
+                  <CustomSelect
+                    value={couponForm.discountType}
+                    onChange={(val) => setCouponForm({ ...couponForm, discountType: val })}
+                    options={[
+                      { value: 'flat', label: 'Flat (₹ off)' },
+                      { value: 'percentage', label: 'Percentage (% off)' }
+                    ]}
+                    placeholder="Type..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Discount Value ({couponForm.discountType === 'percentage' ? '%' : '₹'}):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponForm.discountValue}
+                    onChange={(e) => setCouponForm({ ...couponForm, discountValue: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Min Order Value (₹):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={couponForm.minOrderValue}
+                    onChange={(e) => setCouponForm({ ...couponForm, minOrderValue: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Max Discount Cap (₹):
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Optional"
+                    value={couponForm.maxDiscount || ''}
+                    onChange={(e) => setCouponForm({ ...couponForm, maxDiscount: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Expiry Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={couponForm.expiryDate}
+                    onChange={(e) => setCouponForm({ ...couponForm, expiryDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Usage Limit:
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={couponForm.usageLimit}
+                    onChange={(e) => setCouponForm({ ...couponForm, usageLimit: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setCouponModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCoupon}
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                >
+                  {savingCoupon ? 'Creating...' : 'Create Coupon'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* Global Action Confirmation Modal */}
+        {confirmModalConfig && (
+          <ConfirmModal
+            isOpen={Boolean(confirmModalConfig)}
+            onClose={() => setConfirmModalConfig(null)}
+            {...confirmModalConfig}
+          />
+        )}
+          </main>
+        </div>
       </div>
     </div>
   );

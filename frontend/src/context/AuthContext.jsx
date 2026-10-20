@@ -4,6 +4,14 @@ import { useToast } from './ToastContext';
 
 const AuthContext = createContext(null);
 
+function cleanUser(raw) {
+  if (!raw) return null;
+  return {
+    ...raw,
+    phone: (raw.phone && (raw.phone.startsWith('g_') || raw.phone.startsWith('otp_'))) ? '' : (raw.phone || '')
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +23,7 @@ export function AuthProvider({ children }) {
       try {
         const data = await apiRequest('/auth/me');
         if (data.success && data.user) {
-          setUser(data.user);
+          setUser(cleanUser(data.user));
         }
       } catch {
         // User not logged in, keep null
@@ -53,6 +61,7 @@ export function AuthProvider({ children }) {
         body: userData
       });
       if (data.success && data.user) {
+        if (data.token) localStorage.setItem('token', data.token);
         setUser(data.user);
         toast.success(`Account created! Welcome, ${data.user.name}!`);
         return { success: true, user: data.user };
@@ -71,6 +80,7 @@ export function AuthProvider({ children }) {
         body: { identifier, password }
       });
       if (data.success && data.user) {
+        if (data.token) localStorage.setItem('token', data.token);
         setUser(data.user);
         toast.success(`Welcome back, ${data.user.name}!`);
         return { success: true, user: data.user };
@@ -106,6 +116,7 @@ export function AuthProvider({ children }) {
         body: { email, code, name, phone }
       });
       if (data.success && data.user) {
+        if (data.token) localStorage.setItem('token', data.token);
         setUser(data.user);
         toast.success(`Verified! Welcome to Max Housekeeping, ${data.user.name}.`);
         return { success: true, user: data.user };
@@ -124,9 +135,10 @@ export function AuthProvider({ children }) {
         body: googlePayload
       });
       if (data.success && data.user) {
-        setUser(data.user);
+        if (data.token) localStorage.setItem('token', data.token);
+        setUser(cleanUser(data.user));
         toast.success(`Signed in with Google as ${data.user.name}`);
-        return { success: true, user: data.user };
+        return { success: true, user: cleanUser(data.user) };
       }
     } catch (err) {
       toast.error(err.message || 'Google sign in failed.');
@@ -141,6 +153,7 @@ export function AuthProvider({ children }) {
     } catch {
       // Ignore
     } finally {
+      localStorage.removeItem('token');
       setUser(null);
       toast.info('Logged out successfully.');
     }
@@ -177,6 +190,41 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       toast.error(err.message || 'Failed to remove address.');
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Set default address
+  const setDefaultAddress = async (addressId) => {
+    try {
+      const data = await apiRequest(`/auth/addresses/${addressId}/default`, {
+        method: 'PUT'
+      });
+      if (data.success && data.addresses) {
+        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        toast.success('Default address updated.');
+        return { success: true, addresses: data.addresses };
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update default address.');
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Update saved address
+  const updateAddress = async (addressId, addressData) => {
+    try {
+      const data = await apiRequest(`/auth/addresses/${addressId}`, {
+        method: 'PUT',
+        body: addressData
+      });
+      if (data.success && data.addresses) {
+        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        toast.success('Address updated successfully.');
+        return { success: true, addresses: data.addresses };
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update address.');
       return { success: false, error: err.message };
     }
   };
@@ -235,12 +283,32 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Update Profile details (name, avatarUrl, email, phone)
+  const updateProfile = async (profileData) => {
+    try {
+      const data = await apiRequest('/auth/profile', {
+        method: 'PUT',
+        body: profileData
+      });
+      if (data.success && data.user) {
+        setUser((prev) => cleanUser({ ...prev, ...data.user }));
+        toast.success(data.message || 'Profile updated successfully.');
+        return { success: true, user: cleanUser(data.user) };
+      }
+      return { success: false, message: data.message };
+    } catch (err) {
+      toast.error(err.message || 'Failed to update profile.');
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAdmin: user?.role === 'admin',
+        updateProfile,
         sendSignupOtp,
         register,
         login,
@@ -249,7 +317,9 @@ export function AuthProvider({ children }) {
         googleLogin,
         logout,
         addAddress,
+        updateAddress,
         deleteAddress,
+        setDefaultAddress,
         changePassword,
         forgotPassword,
         resetPassword

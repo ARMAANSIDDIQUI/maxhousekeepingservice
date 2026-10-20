@@ -1,4 +1,5 @@
 import Service from '../models/Service.js';
+import Category from '../models/Category.js';
 import Booking from '../models/Booking.js';
 import City from '../models/City.js';
 import Coupon from '../models/Coupon.js';
@@ -68,8 +69,12 @@ export async function getAdminBookings(req, res, next) {
       query.status = status;
     }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
     if (search && search.trim()) {
-      const regex = new RegExp(search.trim(), 'i');
+      const regex = new RegExp(escapeRegex(search.trim()), 'i');
       query.$or = [
         { bookingCode: regex },
         { 'customer.name': regex },
@@ -155,6 +160,28 @@ export async function updateBooking(req, res, next) {
 }
 
 /**
+ * Delete Booking Permanently (Admin)
+ * DELETE /api/v1/admin/bookings/:id
+ */
+export async function deleteBooking(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await Booking.findByIdAndDelete(id);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Booking ${booking.bookingCode || id} deleted permanently.`
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * Get all services for Admin (includes inactive and full matrix)
  * GET /api/v1/admin/services
  */
@@ -175,13 +202,78 @@ export async function getAdminServices(req, res, next) {
 }
 
 /**
+ * Helper to normalize and synchronize service variants, option groups, and matrix
+ */
+function processVariantsPayload(payload) {
+  if (Array.isArray(payload.variants)) {
+    const groupKey = (payload.variantGroupKey || 'size').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const groupLabel = (payload.variantGroupLabel || 'Apartment / House Size').trim();
+
+    const validVariants = payload.variants
+      .filter(v => v && (v.label || v.name))
+      .map((v, i) => {
+        const label = String(v.label || v.name).trim();
+        const key = (v.key || label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || `var-${i + 1}`;
+        const price = Math.max(0, Number(v.price) || 0);
+        const mrp = Math.max(price, Number(v.mrp || v.price) || price);
+        const duration = v.duration || '1.5 hrs';
+        const isDefault = Boolean(v.isDefault ?? (i === 0));
+        return { key, label, price, mrp, duration, isDefault };
+      });
+
+    if (validVariants.length > 0) {
+      const defaultVar = validVariants.find(v => v.isDefault) || validVariants[0];
+      payload.price = defaultVar.price;
+      payload.mrp = defaultVar.mrp;
+      payload.discountPct = defaultVar.mrp > defaultVar.price ? Math.round(((defaultVar.mrp - defaultVar.price) / defaultVar.mrp) * 100) : 0;
+      payload.duration = defaultVar.duration;
+      payload.pricingMode = 'tiered';
+
+      payload.matrix = validVariants.map(v => ({
+        selection: { [groupKey]: v.key },
+        price: v.price,
+        mrp: v.mrp,
+        duration: v.duration,
+        isActive: true
+      }));
+
+      payload.optionGroups = [
+        {
+          key: groupKey,
+          label: groupLabel,
+          type: 'single',
+          required: true,
+          sortOrder: 0,
+          options: validVariants.map(v => ({
+            key: v.key,
+            label: v.label,
+            isDefault: v.isDefault,
+            priceDelta: v.price - defaultVar.price,
+            mrpDelta: v.mrp - defaultVar.mrp,
+            durationDelta: v.duration,
+            isActive: true
+          }))
+        }
+      ];
+    } else {
+      payload.matrix = [];
+      payload.optionGroups = [];
+      payload.pricingMode = 'fixed';
+    }
+  }
+}
+
+/**
  * Update Service Dual-Pricing & Details
  * PUT /api/v1/admin/services/:id
  */
 export async function updateService(req, res, next) {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // Process dynamic variants if provided
+    processVariantsPayload(updates);
 
     // Recalculate discountPct if shown price (mrp) or offered price (price) updated
     if (updates.mrp && updates.price) {
@@ -219,12 +311,39 @@ export async function updateService(req, res, next) {
  */
 export async function createService(req, res, next) {
   try {
-    const serviceData = req.body;
+    const serviceData = { ...req.body };
+
+    // Process dynamic variants if provided
+    processVariantsPayload(serviceData);
+
+    if (!serviceData.slug && serviceData.title) {
+      serviceData.slug = serviceData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
 
     if (serviceData.mrp && serviceData.price) {
       const mrp = Number(serviceData.mrp);
       const price = Number(serviceData.price);
       serviceData.discountPct = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+    }
+
+    if (!serviceData.category) {
+      let defaultCat = await Category.findOne();
+      if (!defaultCat) {
+        defaultCat = await Category.create({ name: 'General Cleaning', slug: 'general-cleaning' });
+      }
+      serviceData.category = defaultCat._id;
+      serviceData.categoryName = defaultCat.name;
+      serviceData.categorySlug = defaultCat.slug;
+    } else {
+      const cat = await Category.findById(serviceData.category);
+      if (cat) {
+        serviceData.categoryName = cat.name;
+        serviceData.categorySlug = cat.slug;
+      }
+    }
+
+    if (!serviceData.description) {
+      serviceData.description = serviceData.shortDescription || `${serviceData.title} by Max House Keeping Service.`;
     }
 
     const service = await Service.create(serviceData);
@@ -304,10 +423,17 @@ export async function getSettings(req, res, next) {
     let settings = await Settings.findOne();
     if (!settings) {
       settings = await Settings.create({
+        brandName: 'Max House Keeping Service',
         businessName: 'Max House Keeping Service',
-        primaryPhone: '9897766002',
-        secondaryPhone: '8210523309',
-        supportEmail: 'contact@maxhousekeepingservice.com'
+        phone: '+91 98977 66002',
+        primaryPhone: '+91 98977 66002',
+        alternatePhone: '+91 82105 23309',
+        secondaryPhone: '+91 82105 23309',
+        whatsappNumber: '+91 98977 66002',
+        email: 'vikasmax321@gmail.com',
+        supportEmail: 'vikasmax321@gmail.com',
+        address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+        workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)'
       });
     }
     res.status(200).json({ success: true, settings });
@@ -563,7 +689,7 @@ export async function deleteCity(req, res, next) {
 export async function getAdminUsers(req, res, next) {
   try {
     const users = await User.find()
-      .select('-passwordHash')
+      .select('-passwordHash -otpSecret')
       .sort({ createdAt: -1 });
 
     res.status(200).json({

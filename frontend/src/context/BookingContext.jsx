@@ -48,6 +48,54 @@ export function BookingProvider({ children }) {
     loadCities();
   }, []);
 
+  // Dynamic Business & Operational Settings from MongoDB
+  const [settings, setSettings] = useState({
+    brandName: 'Max House Keeping Service',
+    businessName: 'Max House Keeping Service',
+    tagline: 'A spotless home, without lifting a finger.',
+    phone: '+91 98977 66002',
+    primaryPhone: '+91 98977 66002',
+    alternatePhone: '+91 82105 23309',
+    secondaryPhone: '+91 82105 23309',
+    whatsappNumber: '+91 98977 66002',
+    email: 'vikasmax321@gmail.com',
+    supportEmail: 'vikasmax321@gmail.com',
+    workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+    ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
+    acceptOnlinePayments: false
+  });
+
+  const refreshSettings = useCallback(async () => {
+    try {
+      const res = await apiRequest('/public/settings');
+      if (res && res.success !== false && res.settings) {
+        setSettings(prev => ({
+          ...prev,
+          ...res.settings,
+          brandName: res.settings.brandName || res.settings.businessName || prev.brandName,
+          phone: res.settings.phone || res.settings.primaryPhone || prev.phone,
+          primaryPhone: res.settings.primaryPhone || res.settings.phone || prev.primaryPhone,
+          alternatePhone: res.settings.alternatePhone || res.settings.secondaryPhone || prev.alternatePhone,
+          secondaryPhone: res.settings.secondaryPhone || res.settings.alternatePhone || prev.secondaryPhone,
+          whatsappNumber: res.settings.whatsappNumber || prev.whatsappNumber,
+          email: res.settings.email || res.settings.supportEmail || prev.email,
+          supportEmail: res.settings.supportEmail || res.settings.email || prev.supportEmail,
+          workingHours: res.settings.workingHours || prev.workingHours,
+          address: res.settings.address || prev.address,
+          ratingClaim: res.settings.ratingClaim || prev.ratingClaim,
+          acceptOnlinePayments: Boolean(res.settings.acceptOnlinePayments)
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to load dynamic business settings in BookingContext:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSettings();
+  }, [refreshSettings]);
+
   useEffect(() => {
     if (selectedCity) {
       try {
@@ -124,28 +172,50 @@ export function BookingProvider({ children }) {
         }
       }
     } catch {
-      // Offline fallback: calculate basic price
-      const subtotal = currentItems.reduce((acc, i) => acc + (i.service.price || 0) * (i.qty || 1), 0);
-      const mrpTotal = currentItems.reduce((acc, i) => acc + (i.service.mrp || i.service.price || 0) * (i.qty || 1), 0);
-      setQuote({
-        items: currentItems.map(i => ({
+      // Offline fallback: calculate accurate variant price locally
+      const enriched = currentItems.map(i => {
+        let p = i.service.price || 0;
+        let m = i.service.mrp || i.service.price || 0;
+        
+        // Matrix match
+        if (i.service.matrix && Array.isArray(i.service.matrix)) {
+          const match = i.service.matrix.find(row => {
+            if (row.isActive === false) return false;
+            const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
+            const keys = Object.keys(sel);
+            return keys.length > 0 && keys.every(k => String(sel[k]).toLowerCase().trim() === String((i.selections || {})[k] || '').toLowerCase().trim());
+          });
+          if (match) {
+            p = match.price;
+            m = match.mrp || match.price;
+          }
+        }
+        
+        const qty = i.qty || 1;
+        return {
           serviceId: i.service._id,
           title: i.service.title,
-          unitPrice: i.service.price,
-          unitMrp: i.service.mrp || i.service.price,
-          totalPrice: (i.service.price || 0) * (i.qty || 1),
-          totalMrp: (i.service.mrp || i.service.price || 0) * (i.qty || 1),
-          qty: i.qty || 1,
-          savings: Math.max(0, (i.service.mrp || i.service.price) - i.service.price) * (i.qty || 1),
-          discountPct: i.service.mrp ? Math.round(((i.service.mrp - i.service.price) / i.service.mrp) * 100) : 0
-        })),
+          unitPrice: p,
+          unitMrp: m,
+          totalPrice: p * qty,
+          totalMrp: m * qty,
+          qty,
+          savings: Math.max(0, m - p) * qty,
+          discountPct: m > 0 ? Math.round(((m - p) / m) * 100) : 0
+        };
+      });
+
+      const subtotal = enriched.reduce((acc, it) => acc + it.totalPrice, 0);
+      const mrpTotal = enriched.reduce((acc, it) => acc + it.totalMrp, 0);
+      setQuote({
+        items: enriched,
         totals: {
           subtotal,
           mrpTotal,
-          discount: mrpTotal - subtotal,
+          discount: Math.max(0, mrpTotal - subtotal),
           couponDiscount: 0,
           total: subtotal,
-          customerSaved: mrpTotal - subtotal,
+          customerSaved: Math.max(0, mrpTotal - subtotal),
           overallDiscountPct: mrpTotal > 0 ? Math.round(((mrpTotal - subtotal) / mrpTotal) * 100) : 0
         }
       });
@@ -161,25 +231,40 @@ export function BookingProvider({ children }) {
 
   // Add a service item to booking cart
   const addItem = (service, selections = {}, qty = 1) => {
+    if (!service) return;
+
+    // Check if service already exists with identical selections in current state
+    const existingIdx = items.findIndex(item => {
+      if (item.service?._id !== service._id) return false;
+      const s1 = JSON.stringify(item.selections || {});
+      const s2 = JSON.stringify(selections || {});
+      return s1 === s2;
+    });
+
+    const wasExisting = existingIdx > -1;
+
     setItems((prev) => {
-      // Check if service already exists with identical selections
-      const existingIdx = prev.findIndex(item => {
-        if (item.service._id !== service._id) return false;
+      const idx = prev.findIndex(item => {
+        if (item.service?._id !== service._id) return false;
         const s1 = JSON.stringify(item.selections || {});
         const s2 = JSON.stringify(selections || {});
         return s1 === s2;
       });
 
-      if (existingIdx > -1) {
+      if (idx > -1) {
         const updated = [...prev];
-        updated[existingIdx].qty += qty;
-        toast.info(`Updated quantity for ${service.title}`);
+        updated[idx] = { ...updated[idx], qty: (updated[idx].qty || 1) + qty };
         return updated;
       } else {
-        toast.success(`Added ${service.title} to booking list`);
         return [...prev, { service, selections, qty }];
       }
     });
+
+    if (wasExisting) {
+      toast.info(`Updated quantity for ${service.title}`);
+    } else {
+      toast.success(`Added ${service.title} to booking list`);
+    }
   };
 
   // Update item variant (e.g. BHK size, seats count)
@@ -202,7 +287,7 @@ export function BookingProvider({ children }) {
     setItems((prev) => {
       const updated = [...prev];
       if (updated[index]) {
-        updated[index].qty = newQty;
+        updated[index] = { ...updated[index], qty: newQty };
       }
       return updated;
     });
@@ -210,11 +295,11 @@ export function BookingProvider({ children }) {
 
   // Remove item
   const removeItem = (index) => {
-    setItems((prev) => {
-      const item = prev[index];
-      if (item) toast.info(`Removed ${item.service.title}`);
-      return prev.filter((_, idx) => idx !== index);
-    });
+    const item = items[index];
+    setItems((prev) => prev.filter((_, idx) => idx !== index));
+    if (item?.service?.title) {
+      toast.info(`Removed ${item.service.title}`);
+    }
   };
 
   // Clear all items
@@ -270,7 +355,9 @@ export function BookingProvider({ children }) {
         clearItems,
         applyCoupon,
         removeCoupon,
-        refreshQuote
+        refreshQuote,
+        settings,
+        refreshSettings
       }}
     >
       {children}
@@ -284,6 +371,11 @@ export function useBooking() {
     throw new Error('useBooking must be used within a BookingProvider');
   }
   return context;
+}
+
+export function useSettings() {
+  const context = useBooking();
+  return context.settings;
 }
 
 export default BookingContext;

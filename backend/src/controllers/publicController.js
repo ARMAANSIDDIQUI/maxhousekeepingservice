@@ -27,20 +27,29 @@ export async function getPublicSettings(req, res, next) {
     let settings = await Settings.findOne();
     if (!settings) {
       settings = {
+        brandName: 'Max House Keeping Service',
         businessName: 'Max House Keeping Service',
-        tagline: 'Housekeeping & Commercial Cleaning Experts',
-        primaryPhone: '9897766002',
-        secondaryPhone: '8210523309',
-        supportEmail: 'contact@maxhousekeepingservice.com',
-        headquarters: {
-          address: 'Moradabad, Uttar Pradesh, India',
-          city: 'Moradabad',
-          state: 'Uttar Pradesh'
-        },
+        tagline: 'A spotless home, without lifting a finger.',
+        phone: '+91 98977 66002',
+        primaryPhone: '+91 98977 66002',
+        alternatePhone: '+91 82105 23309',
+        secondaryPhone: '+91 82105 23309',
+        whatsappNumber: '+91 98977 66002',
+        email: 'vikasmax321@gmail.com',
+        supportEmail: 'vikasmax321@gmail.com',
+        address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
         workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)'
       };
     }
-    res.status(200).json({ success: true, settings });
+    const publicSettings = settings.toObject ? settings.toObject() : { ...settings };
+    delete publicSettings.razorpayKeySecret; // Never leak secret key
+
+    // If keyId is not set in DB, fallback to process.env.RAZORPAY_KEY_ID if defined
+    if (!publicSettings.razorpayKeyId && process.env.RAZORPAY_KEY_ID) {
+      publicSettings.razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+    }
+
+    res.status(200).json({ success: true, settings: publicSettings });
   } catch (err) {
     next(err);
   }

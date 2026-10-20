@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import {
   LuPhone,
   LuMail,
@@ -18,7 +17,7 @@ import CustomSelect from '../components/common/CustomSelect';
 
 export default function ContactPage() {
   const { toast } = useToast();
-  const { cities, selectedCity } = useBooking();
+  const { cities, selectedCity, settings: contextSettings } = useBooking();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -27,6 +26,16 @@ export default function ContactPage() {
     message: ''
   });
   const [submitting, setSubmitting] = useState(false);
+
+  const settings = contextSettings || {
+    brandName: 'Max House Keeping Service',
+    phone: '+91 98977 66002',
+    alternatePhone: '+91 82105 23309',
+    email: 'vikasmax321@gmail.com',
+    whatsappNumber: '+91 98977 66002',
+    workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,7 +65,7 @@ export default function ContactPage() {
       }
     } catch (err) {
       console.warn('Contact submission error:', err);
-      toast.success('Thank you! Your message has been noted by our field desk.');
+      toast.error(err.message || 'Failed to submit inquiry. Please try again or call our hotline.');
     } finally {
       setSubmitting(false);
     }
@@ -66,13 +75,6 @@ export default function ContactPage() {
     <div className="py-12 md:py-20 bg-[#F4EFE6] text-[#10231D]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Breadcrumb */}
-        <div className="mb-6 flex items-center gap-2 text-xs font-mono tracking-widest text-[#6B8077] uppercase">
-          <Link to="/" className="hover:text-[#10231D] underline underline-offset-4">Home</Link>
-          <span>/</span>
-          <span className="text-[#10231D]">Contact Office</span>
-        </div>
-
         {/* Header */}
         <div className="max-w-2xl mb-12">
           <h1 className="text-4xl md:text-5xl font-display font-black text-[#10231D] mb-4">
@@ -92,12 +94,20 @@ export default function ContactPage() {
                   Customer Hotline
                 </span>
                 <a
-                  href="tel:9897766002"
+                  href={`tel:${(settings.phone || '').replace(/[^0-9+]/g, '')}`}
                   className="text-2xl font-display font-bold text-[#F4EFE6] hover:text-[#E9A23B] transition-colors flex items-center gap-3"
                 >
                   <LuPhone className="w-5 h-5 text-[#E9A23B]" />
-                  <span>+91 98977 66002</span>
+                  <span>{settings.phone}</span>
                 </a>
+                {settings.alternatePhone && (
+                  <a
+                    href={`tel:${(settings.alternatePhone || '').replace(/[^0-9+]/g, '')}`}
+                    className="text-sm font-semibold text-[#DDEBE4]/80 hover:text-[#E9A23B] transition-colors flex items-center gap-2 mt-2 ml-8"
+                  >
+                    <span>Alternate: {settings.alternatePhone}</span>
+                  </a>
+                )}
               </div>
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
@@ -105,13 +115,13 @@ export default function ContactPage() {
                   WhatsApp Direct Dispatch
                 </span>
                 <a
-                  href="https://wa.me/919897766002?text=Hello%20Max%20Housekeeping%20Team%2C%20I%20need%20assistance%20with%20cleaning%20services"
+                  href={`https://wa.me/${(settings.whatsappNumber || '9897766002').replace(/[^0-9]/g, '')}?text=Hello%20Max%20Housekeeping%20Team%2C%20I%20need%20assistance%20with%20cleaning%20services`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] text-white text-xs font-bold hover:brightness-105 transition-all shadow-md"
                 >
                   <FaWhatsapp className="w-4 h-4" />
-                  <span>Chat on WhatsApp</span>
+                  <span>Chat on WhatsApp ({settings.whatsappNumber})</span>
                 </a>
               </div>
 
@@ -120,11 +130,11 @@ export default function ContactPage() {
                   Email Desk
                 </span>
                 <a
-                  href="mailto:contact@maxhousekeepingservice.com"
+                  href={`mailto:${settings.email}`}
                   className="text-sm font-sans text-[#DDEBE4] hover:text-white transition-colors flex items-center gap-2"
                 >
                   <LuMail className="w-4 h-4 text-[#E9A23B]" />
-                  <span>contact@maxhousekeepingservice.com</span>
+                  <span>{settings.email}</span>
                 </a>
               </div>
 
@@ -134,7 +144,7 @@ export default function ContactPage() {
                 </span>
                 <div className="flex items-center gap-2 text-sm text-[#DDEBE4]">
                   <LuClock className="w-4 h-4 text-[#E9A23B]" />
-                  <span>Monday – Sunday: 8:00 AM – 8:00 PM</span>
+                  <span>{settings.workingHours}</span>
                 </div>
               </div>
 
@@ -144,7 +154,7 @@ export default function ContactPage() {
                 </span>
                 <div className="flex items-start gap-2 text-sm text-[#DDEBE4]">
                   <LuMapPin className="w-4 h-4 text-[#E9A23B] mt-0.5 shrink-0" />
-                  <span>Civil Lines, Moradabad, Uttar Pradesh 244001, India</span>
+                  <span>{settings.address}</span>
                 </div>
               </div>
             </div>
@@ -166,7 +176,7 @@ export default function ContactPage() {
             <div className="p-8 md:p-10 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
               <h2 className="text-2xl font-display font-bold text-[#10231D] mb-6 flex items-center gap-2">
                 <LuMessageSquare className="w-5 h-5 text-[#E9A23B]" />
-                <span>Send Dispatch An Inquiry</span>
+                <span>Send An Inquiry</span>
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">

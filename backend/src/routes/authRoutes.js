@@ -9,7 +9,10 @@ import {
   getMe,
   logout,
   addAddress,
+  updateAddress,
   deleteAddress,
+  setDefaultAddress,
+  updateProfile,
   forgotPassword,
   resetPassword,
   changePassword
@@ -31,8 +34,11 @@ router.post('/logout', logout);
 
 // Protected endpoints
 router.get('/me', verifyAuth, getMe);
+router.put('/profile', verifyAuth, updateProfile);
 router.put('/change-password', verifyAuth, changePassword);
 router.post('/addresses', verifyAuth, addAddress);
+router.put('/addresses/:id', verifyAuth, updateAddress);
+router.put('/addresses/:id/default', verifyAuth, setDefaultAddress);
 router.delete('/addresses/:id', verifyAuth, deleteAddress);
 
 export default router;

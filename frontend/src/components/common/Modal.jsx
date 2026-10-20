@@ -41,7 +41,7 @@ export default function Modal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -58,7 +58,7 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className={`relative z-10 w-full ${maxWidth} theme-modal-card p-6 sm:p-8 max-h-[90vh] flex flex-col`}
+            className={`relative z-10 w-full ${maxWidth} theme-modal-card p-4 sm:p-6 md:p-8 max-h-[92vh] flex flex-col`}
           >
             {/* Header */}
             {(title || showClose) && (
