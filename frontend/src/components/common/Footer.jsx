@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck } from 'react-icons/lu';
+import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck, LuDownload, LuCheck } from 'react-icons/lu';
 import { apiRequest } from '../../api';
 import { useBooking } from '../../context/BookingContext';
+import { usePWA } from '../../context/PWAContext';
+import PWAInstallModal from './PWAInstallModal';
 
 export default function Footer() {
   const { selectedCity, setSelectedCity, cities: contextCities, settings: contextSettings } = useBooking();
+  const { isInstalled, promptInstall } = usePWA();
   const [cities, setCities] = useState(Array.isArray(contextCities) ? contextCities : []);
 
   const settings = contextSettings || {
@@ -49,6 +52,42 @@ export default function Footer() {
   return (
     <footer className="bg-[#10231D] text-[#F4EFE6] pt-14 pb-24 md:pb-14 border-t border-[#3D524A]">
       <div className="container mx-auto px-4">
+        {/* If app is not downloaded/installed, show Download / Install App banner */}
+        {!isInstalled && (
+          <div className="mb-12 p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-[#173228] to-[#10231D] border border-[#E9A23B]/40 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4 text-left w-full md:w-auto">
+              <img
+                src="/icon-192.png"
+                alt="Max Housekeeping App Icon"
+                className="w-14 h-14 rounded-xl border-2 border-[#E9A23B] shadow-md object-cover bg-[#0A1713] shrink-0"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-display font-bold text-base sm:text-lg text-[#F4EFE6]">
+                    Get the Max Housekeeping App
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#E9A23B]/20 text-[#E9A23B] border border-[#E9A23B]/30">
+                    Fast PWA
+                  </span>
+                </div>
+                <p className="text-xs text-[#DDEBE4]/80 mt-1 max-w-xl">
+                  Install our lightweight app directly to your device home screen for 1-tap bookings, real-time cleaner tracking, and instant updates.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={promptInstall}
+              id="footer-download-app-btn"
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#E9A23B] text-[#10231D] font-bold text-sm hover:bg-[#d89330] transition-all shadow-md active:scale-95 group cursor-pointer w-full md:w-auto"
+            >
+              <LuDownload className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" />
+              <span>Download / Install App</span>
+            </button>
+          </div>
+        )}
+
         {/* Top 4-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-[#3D524A]/70">
           {/* Col 1: Brand Info */}
@@ -202,11 +241,30 @@ export default function Footer() {
           <p>
             &copy; {new Date().getFullYear()} {settings.brandName || 'Max House Keeping Service'}. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-5 sm:gap-6 flex-wrap justify-center">
+            {!isInstalled ? (
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="hover:text-[#E9A23B] flex items-center gap-1.5 font-medium transition-colors cursor-pointer text-[#E9A23B]/90"
+                title="Download / Install Max Housekeeping App"
+              >
+                <LuDownload className="w-3.5 h-3.5" />
+                <span>Download App</span>
+              </button>
+            ) : (
+              <span className="flex items-center gap-1 text-[#E9A23B] font-mono text-[11px]">
+                <LuCheck className="w-3.5 h-3.5" />
+                <span>App Installed</span>
+              </span>
+            )}
             <Link to="/track" className="hover:text-[#F4EFE6]">Track Order</Link>
             <Link to="/login" className="hover:text-[#F4EFE6]">Login Page</Link>
           </div>
         </div>
+
+        {/* PWA Install Guide Modal for iOS & Desktop fallback */}
+        <PWAInstallModal />
       </div>
     </footer>
   );

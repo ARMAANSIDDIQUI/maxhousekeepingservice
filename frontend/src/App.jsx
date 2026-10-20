@@ -6,6 +6,7 @@ import { ToastProvider } from './context/ToastContext';
 import { LoadingProvider } from './context/LoadingContext';
 import { AuthProvider } from './context/AuthContext';
 import { BookingProvider } from './context/BookingContext';
+import { PWAProvider } from './context/PWAContext';
 
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
@@ -72,42 +73,44 @@ export default function App() {
           <LoadingProvider>
             <AuthProvider>
               <BookingProvider>
-                <div className="flex flex-col min-h-screen bg-[#F4EFE6] text-[#10231D]">
-                  <ScrollToTop />
-                  
-                  {/* Top Navigation */}
-                  <Header />
+                <PWAProvider>
+                  <div className="flex flex-col min-h-screen bg-[#F4EFE6] text-[#10231D]">
+                    <ScrollToTop />
+                    
+                    {/* Top Navigation */}
+                    <Header />
 
-                  {/* Main Route Content */}
-                  <main className="flex-1">
-                    <Routes>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/services" element={<ServicesPage />} />
-                      <Route path="/services/:slug" element={<ServiceDetailPage />} />
-                      <Route path="/book" element={<BookingPage />} />
-                      <Route path="/book/:slug" element={<BookingPage />} />
-                      <Route path="/about" element={<AboutPage />} />
-                      <Route path="/contact" element={<ContactPage />} />
-                      <Route path="/track" element={<TrackBookingPage />} />
-                      <Route path="/track/:code" element={<TrackBookingPage />} />
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/dashboard" element={<CustomerDashboard />} />
-                      <Route path="/my-bookings" element={<CustomerDashboard />} />
-                      <Route path="/admin/*" element={<AdminDashboard />} />
-                      {/* Broken / Non-existent links redirect to Home */}
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </main>
+                    {/* Main Route Content */}
+                    <main className="flex-1">
+                      <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/services" element={<ServicesPage />} />
+                        <Route path="/services/:slug" element={<ServiceDetailPage />} />
+                        <Route path="/book" element={<BookingPage />} />
+                        <Route path="/book/:slug" element={<BookingPage />} />
+                        <Route path="/about" element={<AboutPage />} />
+                        <Route path="/contact" element={<ContactPage />} />
+                        <Route path="/track" element={<TrackBookingPage />} />
+                        <Route path="/track/:code" element={<TrackBookingPage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/dashboard" element={<CustomerDashboard />} />
+                        <Route path="/my-bookings" element={<CustomerDashboard />} />
+                        <Route path="/admin/*" element={<AdminDashboard />} />
+                        {/* Broken / Non-existent links redirect to Home */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </main>
 
-                  {/* Mobile Sticky Bar (<768px) */}
-                  <MobileBar />
+                    {/* Mobile Sticky Bar (<768px) */}
+                    <MobileBar />
 
-                  {/* Floating Scroll To Top Button */}
-                  <ScrollToTopButton />
+                    {/* Floating Scroll To Top Button */}
+                    <ScrollToTopButton />
 
-                  {/* Editorial Footer */}
-                  <Footer />
-                </div>
+                    {/* Editorial Footer */}
+                    <Footer />
+                  </div>
+                </PWAProvider>
               </BookingProvider>
             </AuthProvider>
           </LoadingProvider>
