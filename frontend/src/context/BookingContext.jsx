@@ -6,7 +6,20 @@ const BookingContext = createContext(null);
 
 export function BookingProvider({ children }) {
   // Booking items in cart: [{ service, selections: { size: '2-bhk' }, qty: 1 }]
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('max_cart_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('max_cart_items', JSON.stringify(items));
+    } catch {}
+  }, [items]);
   const [selectedCity, setSelectedCity] = useState(() => {
     try {
       const saved = localStorage.getItem('max_selected_city');
@@ -307,6 +320,9 @@ export function BookingProvider({ children }) {
     setItems([]);
     setQuote(null);
     setAppliedCoupon(null);
+    try {
+      localStorage.removeItem('max_cart_items');
+    } catch {}
   };
 
   // Apply Coupon

@@ -151,16 +151,48 @@ export async function createBooking(req, res, next) {
       saveAddressToProfile // Boolean to save newly entered permanent address
     } = req.body;
 
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please log in to complete your booking.'
+      });
+    }
+
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Please select at least one service.' });
     }
 
-    if (!customer?.name || !customer?.phone) {
-      return res.status(400).json({ success: false, message: 'Customer name and phone number are required.' });
+    if (!customer?.name || !customer?.name.trim()) {
+      return res.status(400).json({ success: false, message: 'Customer name is required.' });
     }
 
-    if (!address?.line1 || !address?.cityText || !address?.pincode) {
+    const trimmedName = customer.name.trim();
+    if (!/^[a-zA-Z\s]{2,60}$/.test(trimmedName)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name can only contain alphabetic letters and spaces. No numbers or special symbols allowed.'
+      });
+    }
+
+    if (!customer?.phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required.' });
+    }
+
+    const cleanPhone = String(customer.phone).replace(/\D/g, '');
+    if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit mobile number starting with 6, 7, 8, or 9.'
+      });
+    }
+
+    if (!address?.line1 || address.line1.trim().length < 5 || !address?.cityText || !address?.pincode) {
       return res.status(400).json({ success: false, message: 'Complete service address is required.' });
+    }
+
+    const cleanPincode = String(address.pincode).replace(/\D/g, '');
+    if (cleanPincode.length !== 6) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid 6-digit postal pincode.' });
     }
 
     if (!slot?.date || !slot?.window) {
@@ -440,8 +472,27 @@ export async function editBookingDetails(req, res, next) {
       });
     }
 
-    if (customer?.name) booking.customer.name = customer.name.trim();
-    if (customer?.phone) booking.customer.phone = customer.phone.trim();
+    if (customer?.name) {
+      const trimmedName = customer.name.trim();
+      if (!/^[a-zA-Z\s]{2,60}$/.test(trimmedName)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name can only contain alphabetic letters and spaces. No numbers or special symbols allowed.'
+        });
+      }
+      booking.customer.name = trimmedName;
+    }
+
+    if (customer?.phone) {
+      const cleanPhone = String(customer.phone).replace(/\D/g, '');
+      if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 10-digit mobile number starting with 6, 7, 8, or 9.'
+        });
+      }
+      booking.customer.phone = cleanPhone;
+    }
     if (customer?.email) booking.customer.email = customer.email.trim();
 
     if (address?.line1) booking.address.line1 = address.line1.trim();

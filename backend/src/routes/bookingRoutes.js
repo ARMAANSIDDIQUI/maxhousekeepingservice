@@ -15,7 +15,7 @@ import { verifyAuth, optionalAuth } from '../middleware/auth.js';
 const router = express.Router();
 
 router.post('/quote', getQuote);
-router.post('/', optionalAuth, createBooking);
+router.post('/', verifyAuth, createBooking);
 router.get('/track/:code', optionalAuth, trackBooking);
 router.get('/my', verifyAuth, getMyBookings);
 router.put('/:id/edit', verifyAuth, editBookingDetails);

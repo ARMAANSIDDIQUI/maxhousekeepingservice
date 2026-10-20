@@ -409,17 +409,48 @@ export default function CustomerDashboard() {
     e.preventDefault();
     if (!editingBooking) return;
 
+    const trimmedName = editForm.name.trim();
+    if (!trimmedName || !/^[a-zA-Z\s]{2,60}$/.test(trimmedName)) {
+      if (/\d/.test(trimmedName)) {
+        toast.error('Customer name cannot contain numbers.');
+        return;
+      }
+      if (/[^a-zA-Z\s]/.test(trimmedName)) {
+        toast.error('Customer name cannot contain symbols or special characters.');
+        return;
+      }
+      toast.error('Customer name must be at least 2 characters long (letters and spaces only).');
+      return;
+    }
+
+    const cleanPhone = editForm.phone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast.error('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
+      return;
+    }
+
+    if (!editForm.line1.trim() || editForm.line1.trim().length < 5) {
+      toast.error('Please enter a complete street address (minimum 5 characters).');
+      return;
+    }
+
+    const cleanPincode = editForm.pincode.replace(/\D/g, '');
+    if (cleanPincode.length !== 6) {
+      toast.error('Please enter a valid 6-digit pincode.');
+      return;
+    }
+
     try {
       const res = await apiRequest(`/bookings/${editingBooking._id}/edit`, {
         method: 'PUT',
         body: {
           customer: {
-            name: editForm.name.trim(),
-            phone: editForm.phone.trim()
+            name: trimmedName,
+            phone: cleanPhone
           },
           address: {
             line1: editForm.line1.trim(),
-            pincode: editForm.pincode.trim()
+            pincode: cleanPincode
           },
           slot: {
             date: editForm.date,
@@ -1794,27 +1825,36 @@ export default function CustomerDashboard() {
           >
             <form onSubmit={handleSaveEdit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Customer Name:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#10231D]">
+                    Customer Name:
+                  </label>
+                  <span className="text-[10px] text-[#6B8077]">Letters & spaces only</span>
+                </div>
                 <input
                   type="text"
+                  placeholder="Full Name"
                   value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value.replace(/[^a-zA-Z\s]/g, '') })}
                   className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Contact Mobile Number:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#10231D]">
+                    Contact Mobile Number:
+                  </label>
+                  <span className="text-[10px] text-[#6B8077]">10 digits</span>
+                </div>
                 <input
                   type="tel"
+                  placeholder="9876543210"
+                  maxLength={10}
                   value={editForm.phone}
-                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                   required
                 />
               </div>
@@ -1851,9 +1891,11 @@ export default function CustomerDashboard() {
                   </label>
                   <input
                     type="text"
+                    maxLength={6}
+                    placeholder="244001"
                     value={editForm.pincode}
-                    onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                     required
                   />
                 </div>

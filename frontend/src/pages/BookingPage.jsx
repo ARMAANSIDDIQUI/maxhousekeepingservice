@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import {
   LuPlus,
   LuTrash2,
@@ -13,7 +13,10 @@ import {
   LuPhone,
   LuUser,
   LuCreditCard,
-  LuBanknote
+  LuBanknote,
+  LuLock,
+  LuLogIn,
+  LuCircleAlert
 } from 'react-icons/lu';
 import confetti from 'canvas-confetti';
 import { useBooking } from '../context/BookingContext';
@@ -77,9 +80,137 @@ export default function BookingPage() {
     setCustomer
   } = useBooking();
 
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Field validation errors & touched tracking
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touchedFields, setTouchedFields] = useState({});
+
+  // Real-time Field Validation & Cleaning Handlers
+  const handleNameChange = (e) => {
+    const raw = e.target.value;
+    // Strictly prevent numbers and symbols - allow only letters and spaces
+    const filtered = raw.replace(/[^a-zA-Z\s]/g, '');
+    setCustomer(prev => ({ ...prev, name: filtered }));
+
+    if (raw !== filtered) {
+      setFieldErrors(prev => ({
+        ...prev,
+        name: 'Numbers and symbols are not allowed in name.'
+      }));
+    } else if (filtered.trim().length > 0 && filtered.trim().length < 2) {
+      setFieldErrors(prev => ({
+        ...prev,
+        name: 'Name must be at least 2 characters long.'
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.name;
+        return next;
+      });
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    const raw = e.target.value;
+    // Only numeric digits, maximum 10 digits
+    const digitsOnly = raw.replace(/\D/g, '').slice(0, 10);
+    setCustomer(prev => ({ ...prev, phone: digitsOnly }));
+
+    if (digitsOnly.length === 0) {
+      setFieldErrors(prev => ({
+        ...prev,
+        phone: '10-digit mobile number is required.'
+      }));
+    } else if (digitsOnly.length < 10) {
+      setFieldErrors(prev => ({
+        ...prev,
+        phone: `Mobile number must be 10 digits (${digitsOnly.length}/10 digits entered).`
+      }));
+    } else if (!/^[6-9]/.test(digitsOnly)) {
+      setFieldErrors(prev => ({
+        ...prev,
+        phone: 'Mobile number must start with 6, 7, 8, or 9.'
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.phone;
+        return next;
+      });
+    }
+  };
+
+  const handlePincodeChange = (e) => {
+    const raw = e.target.value;
+    // 6-digit numeric postal code
+    const digitsOnly = raw.replace(/\D/g, '').slice(0, 6);
+    setAddressForm(prev => ({ ...prev, pincode: digitsOnly }));
+
+    if (digitsOnly.length === 0) {
+      setFieldErrors(prev => ({
+        ...prev,
+        pincode: '6-digit pincode is required.'
+      }));
+    } else if (digitsOnly.length < 6) {
+      setFieldErrors(prev => ({
+        ...prev,
+        pincode: `Pincode must be exactly 6 digits (${digitsOnly.length}/6 entered).`
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.pincode;
+        return next;
+      });
+    }
+  };
+
+  const handleLine1Change = (e) => {
+    const val = e.target.value;
+    setAddressForm(prev => ({ ...prev, line1: val }));
+
+    if (val.trim().length > 0 && val.trim().length < 5) {
+      setFieldErrors(prev => ({
+        ...prev,
+        line1: 'Please enter a complete street address (minimum 5 characters).'
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.line1;
+        return next;
+      });
+    }
+  };
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    setSlot(prev => ({ ...prev, date: val }));
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!val) {
+      setFieldErrors(prev => ({
+        ...prev,
+        date: 'Please select a date.'
+      }));
+    } else if (val < today) {
+      setFieldErrors(prev => ({
+        ...prev,
+        date: 'Booking date cannot be in the past.'
+      }));
+    } else {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next.date;
+        return next;
+      });
+    }
+  };
 
   // All catalog services for the "Add a service" popover
   const [allServices, setAllServices] = useState(FALLBACK_SERVICES);
@@ -306,18 +437,85 @@ export default function BookingPage() {
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
 
+    // 1. Enforce that only logged in users can use and submit the booking form
+    if (!user) {
+      toast.error('Please log in or register an account to book your cleaning service.');
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+
     if (items.length === 0) {
       toast.error('Please add at least one service to your booking.');
       return;
     }
 
-    if (!customer.name.trim() || !customer.phone.trim()) {
-      toast.error('Please provide your name and mobile number.');
+    // 2. Validate Full Name (No numbers, no symbols, min 2 chars)
+    const nameTrimmed = customer.name?.trim() || '';
+    if (!nameTrimmed) {
+      toast.error('Please provide your full name.');
+      setFieldErrors(prev => ({ ...prev, name: 'Full name is required.' }));
+      return;
+    }
+    if (/\d/.test(nameTrimmed)) {
+      toast.error('Name cannot contain numbers.');
+      setFieldErrors(prev => ({ ...prev, name: 'Numbers are not allowed in name.' }));
+      return;
+    }
+    if (/[^a-zA-Z\s]/.test(nameTrimmed)) {
+      toast.error('Name cannot contain symbols or special characters.');
+      setFieldErrors(prev => ({ ...prev, name: 'Symbols are not allowed in name.' }));
+      return;
+    }
+    if (nameTrimmed.length < 2) {
+      toast.error('Name must be at least 2 characters long.');
+      setFieldErrors(prev => ({ ...prev, name: 'Name must be at least 2 characters long.' }));
       return;
     }
 
-    if (!addressForm.line1.trim() || !addressForm.pincode.trim()) {
-      toast.error('Please enter complete street address and pincode.');
+    // 3. Validate Mobile Phone (10 digits starting with 6, 7, 8, or 9)
+    const phoneDigits = customer.phone ? String(customer.phone).replace(/\D/g, '') : '';
+    if (!phoneDigits) {
+      toast.error('Please provide your 10-digit mobile number.');
+      setFieldErrors(prev => ({ ...prev, phone: '10-digit mobile number is required.' }));
+      return;
+    }
+    if (phoneDigits.length !== 10) {
+      toast.error('Mobile number must be exactly 10 digits.');
+      setFieldErrors(prev => ({ ...prev, phone: 'Mobile number must be exactly 10 digits.' }));
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
+      toast.error('Mobile number must start with 6, 7, 8, or 9.');
+      setFieldErrors(prev => ({ ...prev, phone: 'Mobile number must start with 6, 7, 8, or 9.' }));
+      return;
+    }
+
+    // 4. Validate Street Address
+    const line1Trimmed = addressForm.line1?.trim() || '';
+    if (!line1Trimmed || line1Trimmed.length < 5) {
+      toast.error('Please enter complete street address (minimum 5 characters).');
+      setFieldErrors(prev => ({ ...prev, line1: 'Complete street address is required.' }));
+      return;
+    }
+
+    // 5. Validate 6-Digit Pincode
+    const pincodeDigits = addressForm.pincode ? String(addressForm.pincode).replace(/\D/g, '') : '';
+    if (pincodeDigits.length !== 6) {
+      toast.error('Please enter a valid 6-digit postal pincode.');
+      setFieldErrors(prev => ({ ...prev, pincode: 'Valid 6-digit pincode is required.' }));
+      return;
+    }
+
+    // 6. Validate Booking Date & Time Window
+    const today = new Date().toISOString().split('T')[0];
+    if (!slot.date || slot.date < today) {
+      toast.error('Please select an upcoming date for your cleaning service.');
+      setFieldErrors(prev => ({ ...prev, date: 'Please select an upcoming date.' }));
+      return;
+    }
+
+    if (!slot.window) {
+      toast.error('Please select a preferred service time window.');
       return;
     }
 
@@ -416,6 +614,33 @@ export default function BookingPage() {
             Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Select City'}</strong> (Western UP)
           </p>
         </div>
+
+        {/* Guest Notification Banner */}
+        {!user && !isAuthLoading && (
+          <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0">
+                <LuLock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-sm sm:text-base text-[#10231D]">
+                  Login Required to Place Booking
+                </h3>
+                <p className="text-xs text-[#3D524A] mt-0.5">
+                  Only logged-in customers can complete reservations. You can select services below and log in to confirm your booking.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/login', { state: { from: location.pathname } })}
+              className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#1A382F] text-[#F4EFE6] text-xs font-bold transition-all shadow-sm shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <LuLogIn className="w-4 h-4 text-[#E9A23B]" />
+              <span>Log In / Sign Up</span>
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleBookingSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Form Column (Steps 1, 2, 3) */}
@@ -616,11 +841,34 @@ export default function BookingPage() {
                     <span>My Address Book</span>
                   </Link>
                 ) : (
-                  <Link to="/login" className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B]">
-                    Log in to use saved addresses
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                    className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B] flex items-center gap-1 cursor-pointer"
+                  >
+                    <LuLock className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Log in to use saved addresses</span>
+                  </button>
                 )}
               </div>
+
+              {!user && !isAuthLoading && (
+                <div className="mb-5 p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-[#3D524A]">
+                    <LuLock className="w-4 h-4 text-[#10231D] shrink-0" />
+                    <span>
+                      Please log in to enter your address or select from your saved addresses.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#10231D] text-[#F4EFE6] font-bold text-xs hover:bg-[#3D524A] transition-colors shrink-0 cursor-pointer"
+                  >
+                    Log In
+                  </button>
+                </div>
+              )}
 
               {/* Saved Address Dropdown (If authenticated with addresses and NOT using temporary address) */}
               {user && user.addresses && user.addresses.length > 0 && !isTemporaryAddress ? (
@@ -665,9 +913,10 @@ export default function BookingPage() {
                 <input
                   type="checkbox"
                   id="tempAddressToggle"
+                  disabled={!user}
                   checked={isTemporaryAddress}
                   onChange={handleToggleTemporaryAddress}
-                  className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
+                  className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer disabled:opacity-50"
                 />
                 <label htmlFor="tempAddressToggle" className="text-xs font-bold text-[#10231D] cursor-pointer select-none">
                   Use temporary address (Do not save to my profile address book)
@@ -686,23 +935,39 @@ export default function BookingPage() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Street Address / House No. / Flat / Society:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Flat 302, Green Valley Apartments"
-                    value={addressForm.line1}
-                    readOnly={isSavedAddressSelected}
-                    disabled={isSavedAddressSelected}
-                    onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
-                    className={`w-full p-3 rounded-xl border text-sm transition-colors ${
-                      isSavedAddressSelected
-                        ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
-                        : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
-                    }`}
-                    required
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Street Address / House No. / Flat / Society: <span className="text-[#C2512D]">*</span>
+                    </label>
+                    <span className="text-[10px] text-[#6B8077]">Min. 5 characters</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. Flat 302, Green Valley Apartments"
+                      value={addressForm.line1}
+                      readOnly={isSavedAddressSelected}
+                      disabled={isSavedAddressSelected || !user}
+                      onChange={handleLine1Change}
+                      onBlur={() => setTouchedFields(prev => ({ ...prev, line1: true }))}
+                      className={`w-full p-3 rounded-xl border text-sm transition-colors ${
+                        isSavedAddressSelected || !user
+                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
+                          : fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0)
+                          ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
+                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                      }`}
+                      required
+                    />
+                    {fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0) && !isSavedAddressSelected && (
+                      <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3 top-3.5" />
+                    )}
+                  </div>
+                  {fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0) && !isSavedAddressSelected && (
+                    <p className="text-[11px] font-semibold text-[#C2512D] mt-1 flex items-center gap-1">
+                      <span>{fieldErrors.line1}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -710,7 +975,7 @@ export default function BookingPage() {
                     <label className="block text-xs font-bold text-[#10231D] mb-1">
                       Service City:
                     </label>
-                    {isSavedAddressSelected ? (
+                    {isSavedAddressSelected || !user ? (
                       <input
                         type="text"
                         value={addressForm.cityText}
@@ -746,10 +1011,10 @@ export default function BookingPage() {
                       placeholder="e.g. Near Water Tank"
                       value={addressForm.landmark}
                       readOnly={isSavedAddressSelected}
-                      disabled={isSavedAddressSelected}
+                      disabled={isSavedAddressSelected || !user}
                       onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
                       className={`w-full p-2.5 rounded-xl border text-sm transition-colors ${
-                        isSavedAddressSelected
+                        isSavedAddressSelected || !user
                           ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
                           : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
                       }`}
@@ -757,24 +1022,42 @@ export default function BookingPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      6-Digit Pincode:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 244001"
-                      maxLength={6}
-                      value={addressForm.pincode}
-                      readOnly={isSavedAddressSelected}
-                      disabled={isSavedAddressSelected}
-                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                      className={`w-full p-2.5 rounded-xl border text-sm transition-colors ${
-                        isSavedAddressSelected
-                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
-                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
-                      }`}
-                      required
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-[#10231D]">
+                        6-Digit Pincode: <span className="text-[#C2512D]">*</span>
+                      </label>
+                      {addressForm.pincode && (
+                        <span className="text-[10px] text-[#6B8077]">{addressForm.pincode.length}/6</span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="e.g. 244001"
+                        maxLength={6}
+                        value={addressForm.pincode}
+                        readOnly={isSavedAddressSelected}
+                        disabled={isSavedAddressSelected || !user}
+                        onChange={handlePincodeChange}
+                        onBlur={() => setTouchedFields(prev => ({ ...prev, pincode: true }))}
+                        className={`w-full p-2.5 rounded-xl border text-sm font-mono transition-colors ${
+                          isSavedAddressSelected || !user
+                            ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
+                            : fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0)
+                            ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
+                            : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                        }`}
+                        required
+                      />
+                      {fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0) && !isSavedAddressSelected && (
+                        <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3 top-3" />
+                      )}
+                    </div>
+                    {fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0) && !isSavedAddressSelected && (
+                      <p className="text-[11px] font-semibold text-[#C2512D] mt-1">
+                        {fieldErrors.pincode}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -797,75 +1080,178 @@ export default function BookingPage() {
 
             {/* STEP 3: SCHEDULE SLOT & CONTACT */}
             <div className="p-6 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-[#E2D9C8] mb-5">
-                <span className="w-7 h-7 rounded-full bg-[#10231D] text-[#F4EFE6] text-xs font-black flex items-center justify-center">
-                  3
-                </span>
-                <h2 className="font-display font-bold text-xl text-[#10231D]">
-                  Service Schedule & Contact
-                </h2>
+              <div className="flex items-center justify-between pb-4 border-b border-[#E2D9C8] mb-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-full bg-[#10231D] text-[#F4EFE6] text-xs font-black flex items-center justify-center">
+                    3
+                  </span>
+                  <h2 className="font-display font-bold text-xl text-[#10231D]">
+                    Service Schedule & Contact
+                  </h2>
+                </div>
+                {!user && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                    className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B] flex items-center gap-1 cursor-pointer"
+                  >
+                    <LuLock className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Log in to enter contact</span>
+                  </button>
+                )}
               </div>
+
+              {!user && !isAuthLoading && (
+                <div className="mb-5 p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-[#3D524A]">
+                    <LuLock className="w-4 h-4 text-[#10231D] shrink-0" />
+                    <span>
+                      Please log in to set contact details and schedule. Your saved profile name and phone will automatically pre-fill.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#10231D] text-[#F4EFE6] font-bold text-xs hover:bg-[#3D524A] transition-colors shrink-0 cursor-pointer"
+                  >
+                    Log In
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Select Date:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Select Date: <span className="text-[#C2512D]">*</span>
+                    </label>
+                  </div>
                   <input
                     type="date"
                     min={new Date().toISOString().split('T')[0]}
                     value={slot.date}
-                    onChange={(e) => setSlot({ ...slot, date: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D]"
+                    disabled={!user}
+                    onChange={handleDateChange}
+                    onBlur={() => setTouchedFields(prev => ({ ...prev, date: true }))}
+                    className={`w-full p-3 rounded-xl border text-sm transition-colors ${
+                      !user
+                        ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#6B8077] cursor-not-allowed select-none'
+                        : fieldErrors.date
+                        ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
+                        : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                    }`}
                     required
                   />
+                  {fieldErrors.date && (
+                    <p className="text-[11px] font-semibold text-[#C2512D] mt-1">
+                      {fieldErrors.date}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Preferred Time Window:
+                    Preferred Time Window: <span className="text-[#C2512D]">*</span>
                   </label>
-                  <CustomSelect
-                    value={slot.window}
-                    onChange={(val) => setSlot({ ...slot, window: val })}
-                    options={[
-                      { value: 'Morning (8:00 AM – 11:00 AM)', label: 'Morning (8:00 AM – 11:00 AM)' },
-                      { value: 'Midday (11:00 AM – 2:00 PM)', label: 'Midday (11:00 AM – 2:00 PM)' },
-                      { value: 'Afternoon (2:00 PM – 5:00 PM)', label: 'Afternoon (2:00 PM – 5:00 PM)' },
-                      { value: 'Evening (5:00 PM – 8:00 PM)', label: 'Evening (5:00 PM – 8:00 PM)' }
-                    ]}
-                    placeholder="Select Time Window..."
-                  />
+                  {user ? (
+                    <CustomSelect
+                      value={slot.window}
+                      onChange={(val) => setSlot({ ...slot, window: val })}
+                      options={[
+                        { value: 'Morning (8:00 AM – 11:00 AM)', label: 'Morning (8:00 AM – 11:00 AM)' },
+                        { value: 'Midday (11:00 AM – 2:00 PM)', label: 'Midday (11:00 AM – 2:00 PM)' },
+                        { value: 'Afternoon (2:00 PM – 5:00 PM)', label: 'Afternoon (2:00 PM – 5:00 PM)' },
+                        { value: 'Evening (5:00 PM – 8:00 PM)', label: 'Evening (5:00 PM – 8:00 PM)' }
+                      ]}
+                      placeholder="Select Time Window..."
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={slot.window}
+                      disabled
+                      readOnly
+                      className="w-full p-3 rounded-xl border bg-[#ECE5D8]/70 border-[#D2C8B8] text-sm text-[#6B8077] cursor-not-allowed select-none"
+                    />
+                  )}
                 </div>
               </div>
 
               {/* Customer Contact Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Full Name:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Your name"
-                    value={customer.name}
-                    onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D]"
-                    required
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Full Name: <span className="text-[#C2512D]">*</span>
+                    </label>
+                    <span className="text-[10px] text-[#6B8077]">Letters & spaces only</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={customer.name}
+                      disabled={!user}
+                      onChange={handleNameChange}
+                      onBlur={() => setTouchedFields(prev => ({ ...prev, name: true }))}
+                      className={`w-full p-3 rounded-xl border text-sm transition-colors ${
+                        !user
+                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#6B8077] cursor-not-allowed select-none'
+                          : fieldErrors.name && (touchedFields.name || customer.name.length > 0)
+                          ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
+                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                      }`}
+                      required
+                    />
+                    {fieldErrors.name && (touchedFields.name || customer.name.length > 0) && (
+                      <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3 top-3.5" />
+                    )}
+                  </div>
+                  {fieldErrors.name && (touchedFields.name || customer.name.length > 0) && (
+                    <p className="text-[11px] font-semibold text-[#C2512D] mt-1 flex items-center gap-1">
+                      <span>{fieldErrors.name}</span>
+                    </p>
+                  )}
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    WhatsApp / Mobile Number:
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    value={customer.phone}
-                    onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D]"
-                    required
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      WhatsApp / Mobile Number: <span className="text-[#C2512D]">*</span>
+                    </label>
+                    <span className="text-[10px] text-[#6B8077]">
+                      {customer.phone ? `${customer.phone.length}/10 digits` : '10 digits'}
+                    </span>
+                  </div>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-xs font-bold text-[#6B8077] select-none">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      placeholder="9876543210"
+                      maxLength={10}
+                      value={customer.phone}
+                      disabled={!user}
+                      onChange={handlePhoneChange}
+                      onBlur={() => setTouchedFields(prev => ({ ...prev, phone: true }))}
+                      className={`w-full pl-11 pr-3 py-3 rounded-xl border text-sm font-mono transition-colors ${
+                        !user
+                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#6B8077] cursor-not-allowed select-none'
+                          : fieldErrors.phone && (touchedFields.phone || customer.phone.length > 0)
+                          ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
+                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
+                      }`}
+                      required
+                    />
+                    {fieldErrors.phone && (touchedFields.phone || customer.phone.length > 0) && (
+                      <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3" />
+                    )}
+                  </div>
+                  {fieldErrors.phone && (touchedFields.phone || customer.phone.length > 0) && (
+                    <p className="text-[11px] font-semibold text-[#C2512D] mt-1 flex items-center gap-1">
+                      <span>{fieldErrors.phone}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1066,23 +1452,45 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                {/* Submit Booking Button */}
-                <button
-                  type="submit"
-                  disabled={isSubmitting || items.length === 0}
-                  className="w-full py-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-base shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    'Processing Reservation...'
-                  ) : paymentChoice === 'online_before' && acceptOnlinePayments ? (
-                    <>
-                      <LuCreditCard className="w-5 h-5" />
-                      <span>Pay ₹{(quote?.totals?.total || 0).toLocaleString('en-IN')} & Confirm</span>
-                    </>
-                  ) : (
-                    <span>Confirm Cleaning Booking (Pay Later)</span>
-                  )}
-                </button>
+                {/* Submit Booking Button or Login Redirect Button */}
+                {!user ? (
+                  <div className="space-y-3 pt-2">
+                    <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#D2C8B8] flex items-start gap-2.5 text-xs text-[#3D524A]">
+                      <LuLock className="w-4 h-4 text-[#10231D] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-[#10231D]">Account Login Required</p>
+                        <p className="text-[11px] text-[#6B8077] mt-0.5">
+                          Only registered customers can confirm reservations. Sign in to your account to complete this booking.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/login', { state: { from: location.pathname } })}
+                      className="w-full py-4 rounded-xl bg-[#10231D] hover:bg-[#1A382F] text-[#F4EFE6] font-black text-base shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 group cursor-pointer"
+                    >
+                      <LuLogIn className="w-5 h-5 text-[#E9A23B] group-hover:translate-x-0.5 transition-transform" />
+                      <span>Log In to Confirm Booking</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || items.length === 0}
+                    className="w-full py-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-base shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      'Processing Reservation...'
+                    ) : paymentChoice === 'online_before' && acceptOnlinePayments ? (
+                      <>
+                        <LuCreditCard className="w-5 h-5" />
+                        <span>Pay ₹{(quote?.totals?.total || 0).toLocaleString('en-IN')} & Confirm</span>
+                      </>
+                    ) : (
+                      <span>Confirm Cleaning Booking (Pay Later)</span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
