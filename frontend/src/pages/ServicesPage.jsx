@@ -4,6 +4,7 @@ import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar } from 'react-ico
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
+import { getServiceIcon } from '../utils/iconHelper';
 
 export default function ServicesPage() {
   const navigate = useNavigate();
@@ -140,13 +141,16 @@ export default function ServicesPage() {
                 key={c.slug}
                 type="button"
                 onClick={() => setSearchParams({ category: c.slug })}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
                   selectedCategory === c.slug
                     ? 'bg-[#10231D] text-[#F4EFE6]'
                     : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
                 }`}
               >
-                {c.name}
+                <span className={selectedCategory === c.slug ? 'text-[#E9A23B]' : 'text-[#6B8077]'}>
+                  {getServiceIcon(c.iconKey || c.slug, 'w-3.5 h-3.5')}
+                </span>
+                <span>{c.name}</span>
               </button>
             ))}
           </div>
@@ -209,8 +213,11 @@ export default function ServicesPage() {
                   {/* Body Content */}
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug">
-                        {service.title}
+                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug flex items-center gap-2">
+                        <span className="p-1 rounded-lg bg-[#ECE5D8] text-[#E9A23B] shrink-0 inline-flex">
+                          {getServiceIcon(service.icon, 'w-4 h-4')}
+                        </span>
+                        <span className="truncate">{service.title}</span>
                       </h3>
                       <p className="text-xs text-[#3D524A] leading-relaxed line-clamp-2 mb-4">
                         {service.shortDescription || service.description}

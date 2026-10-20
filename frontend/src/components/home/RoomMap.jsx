@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuSparkles, LuArrowRight } from 'react-icons/lu';
 import { apiRequest } from '../../api';
+import { getServiceIcon } from '../../utils/iconHelper';
 
 export default function RoomMap({ services = [] }) {
   const [activeRoom, setActiveRoom] = useState('living');
@@ -39,6 +40,7 @@ export default function RoomMap({ services = [] }) {
     living: {
       name: 'Living Room',
       categorySlug: 'sofa-carpet-cleaning',
+      icon: livingSvc?.icon || 'armchair',
       service: livingSvc?.title || 'Sofa & Carpet Cleaning',
       slug: livingSvc?.slug || 'sofa-carpet-cleaning',
       priceText: livingSvc ? `From ₹${livingSvc.price.toLocaleString('en-IN')}` : 'From ₹299 / seat',
@@ -47,6 +49,7 @@ export default function RoomMap({ services = [] }) {
     kitchen: {
       name: 'Kitchen & Chimney',
       categorySlug: 'kitchen-cleaning',
+      icon: kitchenSvc?.icon || 'cookingpot',
       service: kitchenSvc?.title || 'Kitchen Deep Cleaning',
       slug: kitchenSvc?.slug || 'kitchen-deep-cleaning',
       priceText: kitchenSvc ? `From ₹${kitchenSvc.price.toLocaleString('en-IN')}` : 'From ₹1,499',
@@ -55,6 +58,7 @@ export default function RoomMap({ services = [] }) {
     bathroom: {
       name: 'Bathroom & Washroom',
       categorySlug: 'bathroom-cleaning',
+      icon: bathroomSvc?.icon || 'bathtub',
       service: bathroomSvc?.title || 'Bathroom Deep Cleaning',
       slug: bathroomSvc?.slug || 'bathroom-deep-cleaning',
       priceText: bathroomSvc ? `From ₹${bathroomSvc.price.toLocaleString('en-IN')}` : 'From ₹799',
@@ -63,6 +67,7 @@ export default function RoomMap({ services = [] }) {
     bedroom: {
       name: 'Master Bedroom',
       categorySlug: 'home-deep-cleaning',
+      icon: bedroomSvc?.icon || 'houseline',
       service: bedroomSvc?.title || 'Full Home Deep Cleaning',
       slug: bedroomSvc?.slug || 'full-home-deep-cleaning',
       priceText: bedroomSvc ? `From ₹${bedroomSvc.price.toLocaleString('en-IN')}` : 'From ₹3,499 (1 BHK)',
@@ -204,8 +209,11 @@ export default function RoomMap({ services = [] }) {
                 </span>
               </div>
 
-              <h3 className="font-display font-black text-2xl text-[#10231D] mb-2">
-                {current.service}
+              <h3 className="font-display font-black text-2xl text-[#10231D] mb-2 flex items-center gap-2.5">
+                <span className="p-1.5 rounded-xl bg-[#ECE5D8] text-[#E9A23B] shrink-0 inline-flex shadow-xs border border-[#E2D9C8]">
+                  {getServiceIcon(current.icon || current.categorySlug, 'w-5 h-5')}
+                </span>
+                <span>{current.service}</span>
               </h3>
 
               <p className="text-sm text-[#3D524A] leading-relaxed mb-6">

@@ -328,15 +328,15 @@ export default function Header() {
               </Link>
             )}
 
-            {/* Book Now Primary Button */}
+            {/* Book Now Primary Button (Desktop only; mobile uses dedicated page CTA sections) */}
             <Link
               to="/book"
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] shadow-sm transition-all shrink-0"
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] shadow-sm transition-all shrink-0"
             >
-              <LuCalendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <LuCalendar className="w-4 h-4 shrink-0" />
               <span>Book now</span>
               {items.length > 0 && (
-                <span className="w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] flex items-center justify-center font-bold">
+                <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] flex items-center justify-center font-bold">
                   {items.length}
                 </span>
               )}

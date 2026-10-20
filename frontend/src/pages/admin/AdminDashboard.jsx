@@ -107,7 +107,9 @@ export default function AdminDashboard() {
     imageUrl: '',
     variantGroupLabel: 'Apartment / House Size',
     variantGroupKey: 'size',
-    variants: []
+    variants: [],
+    inclusions: '',
+    exclusions: ''
   });
   const [savingNewService, setSavingNewService] = useState(false);
   const [uploadingNewServiceImage, setUploadingNewServiceImage] = useState(false);
@@ -123,7 +125,9 @@ export default function AdminDashboard() {
     mrp: 0,   // Shown Price (regular)
     duration: '',
     matrix: [],
-    imageUrl: ''
+    imageUrl: '',
+    inclusions: '',
+    exclusions: ''
   });
   const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
 
@@ -314,7 +318,9 @@ export default function AdminDashboard() {
       variantGroupLabel: groupLabel,
       variantGroupKey: groupKey,
       variants,
-      imageUrl: service.media?.hero?.url || ''
+      imageUrl: service.media?.hero?.url || '',
+      inclusions: Array.isArray(service.inclusions) ? service.inclusions.join('\n') : (service.inclusions || ''),
+      exclusions: Array.isArray(service.exclusions) ? service.exclusions.join('\n') : (service.exclusions || '')
     });
   };
 
@@ -340,12 +346,18 @@ export default function AdminDashboard() {
     }
   };
 
-  // Save Service Dual-Pricing Updates with Dynamic Variants
+  // Save Service Dual-Pricing Updates with Dynamic Variants & Inclusions/Exclusions
   const handleSaveService = async (e) => {
     e.preventDefault();
     if (!editingService) return;
 
     try {
+      const parseList = (str) => {
+        if (!str) return [];
+        if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
+        return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      };
+
       const payload = {
         title: serviceForm.title,
         slug: serviceForm.slug,
@@ -355,7 +367,9 @@ export default function AdminDashboard() {
         duration: serviceForm.duration,
         variantGroupLabel: serviceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: serviceForm.variantGroupKey || 'size',
-        variants: serviceForm.variants || []
+        variants: serviceForm.variants || [],
+        inclusions: parseList(serviceForm.inclusions),
+        exclusions: parseList(serviceForm.exclusions)
       };
 
       if (serviceForm.imageUrl) {
@@ -415,6 +429,12 @@ export default function AdminDashboard() {
     }
     setSavingNewService(true);
     try {
+      const parseList = (str) => {
+        if (!str) return [];
+        if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
+        return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      };
+
       const payload = {
         title: newServiceForm.title.trim(),
         slug: newServiceForm.slug.trim() || newServiceForm.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
@@ -426,7 +446,9 @@ export default function AdminDashboard() {
         description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max House Keeping Service.`,
         variantGroupLabel: newServiceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: newServiceForm.variantGroupKey || 'size',
-        variants: newServiceForm.variants || []
+        variants: newServiceForm.variants || [],
+        inclusions: parseList(newServiceForm.inclusions),
+        exclusions: parseList(newServiceForm.exclusions)
       };
       if (newServiceForm.imageUrl) {
         payload.media = {
@@ -453,7 +475,9 @@ export default function AdminDashboard() {
           imageUrl: '',
           variantGroupLabel: 'Apartment / House Size',
           variantGroupKey: 'size',
-          variants: []
+          variants: [],
+          inclusions: '',
+          exclusions: ''
         });
       }
     } catch (err) {
@@ -2683,6 +2707,49 @@ export default function AdminDashboard() {
                 )}
               </div>
 
+              {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
+              <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                    <LuCheck className="w-4 h-4 text-[#10231D]" />
+                    <span>What Is Included & What Is Excluded</span>
+                  </h4>
+                  <span className="text-[11px] text-[#6B8077]">1 item per line</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] text-[10px] font-bold flex items-center justify-center">✓</span>
+                      <span>What Is Included:</span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      placeholder={"Wall tiles descaling and grouting scrub\nWC pot, washbasin, and vanity sanitisation\nTaps, showerheads, and chrome fittings polishing\nMirror and glass partition streak-free wipe\nFloor scrub and drain trap clearing"}
+                      value={serviceForm.inclusions || ''}
+                      onChange={(e) => setServiceForm({ ...serviceForm, inclusions: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                    />
+                    <p className="text-[10px] text-[#6B8077] mt-1">Enter each included feature or task on a separate line.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] text-[10px] font-bold flex items-center justify-center">✕</span>
+                      <span>What Is Excluded:</span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      placeholder={"Inside locked private storage without supervisor\nShifting of exceptionally heavy architectural stonework\nRepainting or repairing water-seepage cracks"}
+                      value={serviceForm.exclusions || ''}
+                      onChange={(e) => setServiceForm({ ...serviceForm, exclusions: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                    />
+                    <p className="text-[10px] text-[#6B8077] mt-1">Enter excluded items or limitations on a separate line.</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
                 <button
                   type="button"
@@ -3551,6 +3618,49 @@ export default function AdminDashboard() {
                         disabled={uploadingNewServiceImage}
                       />
                     </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
+              <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                    <LuCheck className="w-4 h-4 text-[#10231D]" />
+                    <span>What Is Included & What Is Excluded</span>
+                  </h4>
+                  <span className="text-[11px] text-[#6B8077]">1 item per line</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] text-[10px] font-bold flex items-center justify-center">✓</span>
+                      <span>What Is Included:</span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      placeholder={"Wall tiles descaling and grouting scrub\nWC pot, washbasin, and vanity sanitisation\nTaps, showerheads, and chrome fittings polishing\nMirror and glass partition streak-free wipe\nFloor scrub and drain trap clearing"}
+                      value={newServiceForm.inclusions || ''}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, inclusions: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                    />
+                    <p className="text-[10px] text-[#6B8077] mt-1">Enter each included feature or task on a separate line.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] text-[10px] font-bold flex items-center justify-center">✕</span>
+                      <span>What Is Excluded:</span>
+                    </label>
+                    <textarea
+                      rows={5}
+                      placeholder={"Inside locked private storage without supervisor\nShifting of exceptionally heavy architectural stonework\nRepainting or repairing water-seepage cracks"}
+                      value={newServiceForm.exclusions || ''}
+                      onChange={(e) => setNewServiceForm({ ...newServiceForm, exclusions: e.target.value })}
+                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                    />
+                    <p className="text-[10px] text-[#6B8077] mt-1">Enter excluded items or limitations on a separate line.</p>
                   </div>
                 </div>
               </div>

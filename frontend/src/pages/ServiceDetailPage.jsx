@@ -12,6 +12,7 @@ import {
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
+import { getServiceIcon } from '../utils/iconHelper';
 
 // Helper to compute exact variant pricing for any service and variant key
 function getVariantPricingInfo(service, optKey, groupKey) {
@@ -156,8 +157,11 @@ export default function ServiceDetailPage() {
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
                 {service.categoryName}
               </span>
-              <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] leading-tight mt-1">
-                {service.title}
+              <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] leading-tight mt-1 flex items-center gap-3">
+                <span className="p-2 sm:p-2.5 rounded-2xl bg-[#ECE5D8] text-[#E9A23B] shrink-0 inline-flex shadow-xs border border-[#E2D9C8]">
+                  {getServiceIcon(service.icon, 'w-6 h-6 sm:w-8 sm:h-8')}
+                </span>
+                <span>{service.title}</span>
               </h1>
               <div className="flex items-center gap-4 mt-2 text-xs text-[#6B8077]">
                 <span className="flex items-center gap-1">
@@ -254,12 +258,16 @@ export default function ServiceDetailPage() {
               <span>What Is Included</span>
             </h3>
             <ul className="space-y-2.5 text-xs text-[#3D524A]">
-              {(service.inclusions || []).map((inc, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <LuCheck className="w-4 h-4 text-[#10231D] shrink-0 mt-0.5" />
-                  <span>{inc}</span>
-                </li>
-              ))}
+              {service.inclusions && service.inclusions.length > 0 ? (
+                service.inclusions.map((inc, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <LuCheck className="w-4 h-4 text-[#10231D] shrink-0 mt-0.5" />
+                    <span>{inc}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-xs text-[#6B8077] italic">Full surface sanitisation, deep grime removal, and professional equipment detailing included.</li>
+              )}
             </ul>
           </div>
 
@@ -272,16 +280,16 @@ export default function ServiceDetailPage() {
               <span>What Is Excluded</span>
             </h3>
             <ul className="space-y-2.5 text-xs text-[#3D524A]">
-              {(service.exclusions || [
-                'Inside locked private storage without supervisor presence',
-                'Shifting of exceptionally heavy architectural stonework',
-                'Repainting or repairing water-seepage wall cracks'
-              ]).map((exc, i) => (
-                <li key={i} className="flex items-start gap-2.5">
-                  <LuX className="w-4 h-4 text-[#C2512D] shrink-0 mt-0.5" />
-                  <span>{exc}</span>
-                </li>
-              ))}
+              {service.exclusions && service.exclusions.length > 0 ? (
+                service.exclusions.map((exc, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <LuX className="w-4 h-4 text-[#C2512D] shrink-0 mt-0.5" />
+                    <span>{exc}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-xs text-[#6B8077] italic">No major exclusions noted. Standard household safety guidelines apply.</li>
+              )}
             </ul>
           </div>
         </div>

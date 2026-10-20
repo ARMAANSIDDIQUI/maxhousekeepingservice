@@ -263,6 +263,16 @@ function processVariantsPayload(payload) {
   }
 }
 
+function sanitizeStringList(val) {
+  if (Array.isArray(val)) {
+    return val.map(s => String(s).trim()).filter(Boolean);
+  }
+  if (typeof val === 'string') {
+    return val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+  return undefined;
+}
+
 /**
  * Update Service Dual-Pricing & Details
  * PUT /api/v1/admin/services/:id
@@ -274,6 +284,13 @@ export async function updateService(req, res, next) {
 
     // Process dynamic variants if provided
     processVariantsPayload(updates);
+
+    if (updates.inclusions !== undefined) {
+      updates.inclusions = sanitizeStringList(updates.inclusions) || [];
+    }
+    if (updates.exclusions !== undefined) {
+      updates.exclusions = sanitizeStringList(updates.exclusions) || [];
+    }
 
     // Recalculate discountPct if shown price (mrp) or offered price (price) updated
     if (updates.mrp && updates.price) {
@@ -315,6 +332,13 @@ export async function createService(req, res, next) {
 
     // Process dynamic variants if provided
     processVariantsPayload(serviceData);
+
+    if (serviceData.inclusions !== undefined) {
+      serviceData.inclusions = sanitizeStringList(serviceData.inclusions) || [];
+    }
+    if (serviceData.exclusions !== undefined) {
+      serviceData.exclusions = sanitizeStringList(serviceData.exclusions) || [];
+    }
 
     if (!serviceData.slug && serviceData.title) {
       serviceData.slug = serviceData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
