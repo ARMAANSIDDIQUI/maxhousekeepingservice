@@ -107,8 +107,8 @@ app.use('/assets', express.static(path.join(workspaceRoot, 'docs', 'extracted', 
 app.use('/media', express.static(path.join(process.cwd(), 'docs', 'generated-media')));
 app.use('/assets', express.static(path.join(process.cwd(), 'docs', 'extracted', 'assets')));
 
-// Health Check
-app.get('/api/v1/health', (req, res) => {
+// Health Check & Root API Status
+app.get(['/api', '/api/health', '/api/v1/health'], (req, res) => {
   res.status(200).json({
     status: 'online',
     timestamp: new Date().toISOString(),
