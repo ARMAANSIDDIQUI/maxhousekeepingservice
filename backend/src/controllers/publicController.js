@@ -44,6 +44,12 @@ export async function getPublicSettings(req, res, next) {
     const publicSettings = settings.toObject ? settings.toObject() : { ...settings };
     delete publicSettings.razorpayKeySecret; // Never leak secret key
 
+    // Expose public Google Client ID for OAuth
+    publicSettings.googleClientId =
+      process.env.GOOGLE_CLIENT_ID ||
+      process.env.VITE_GOOGLE_CLIENT_ID ||
+      '672677706855-2gii7cnf1qim21jllnl8ffvjid61b3eh.apps.googleusercontent.com';
+
     // If keyId is not set in DB, fallback to process.env.RAZORPAY_KEY_ID if defined
     if (!publicSettings.razorpayKeyId && process.env.RAZORPAY_KEY_ID) {
       publicSettings.razorpayKeyId = process.env.RAZORPAY_KEY_ID;

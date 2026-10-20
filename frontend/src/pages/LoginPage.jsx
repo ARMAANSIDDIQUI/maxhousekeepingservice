@@ -272,8 +272,10 @@ export default function LoginPage() {
     }
   };
 
-  // Google OAuth Client ID from Environment
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  // Google OAuth Client ID from Environment with verified fallback
+  const googleClientId =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    '672677706855-2gii7cnf1qim21jllnl8ffvjid61b3eh.apps.googleusercontent.com';
   const [googleStatus, setGoogleStatus] = useState('loading'); // 'loading' | 'ready' | 'blocked'
   const googleButtonRef = React.useRef(null);
 

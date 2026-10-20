@@ -414,7 +414,10 @@ export async function googleLogin(req, res, next) {
       }
       const googleUser = await googleRes.json();
 
-      const expectedClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      const expectedClientId =
+        process.env.GOOGLE_CLIENT_ID ||
+        process.env.VITE_GOOGLE_CLIENT_ID ||
+        '672677706855-2gii7cnf1qim21jllnl8ffvjid61b3eh.apps.googleusercontent.com';
       if (expectedClientId && googleUser.aud !== expectedClientId) {
         return res.status(401).json({
           success: false,
