@@ -12,6 +12,7 @@ import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 import MobileBar from './components/common/MobileBar';
 import ScrollToTopButton from './components/common/ScrollToTopButton';
+import PWAInstallModal from './components/common/PWAInstallModal';
 
 import HomePage from './pages/HomePage';
 import ServicesPage from './pages/ServicesPage';
@@ -109,6 +110,9 @@ export default function App() {
 
                     {/* Editorial Footer */}
                     <Footer />
+
+                    {/* Once-per-day PWA App Download Modal Pop Up on site load & explicit clicks */}
+                    <PWAInstallModal />
                   </div>
                 </PWAProvider>
               </BookingProvider>

@@ -4,7 +4,6 @@ import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck, LuDownload, LuCheck 
 import { apiRequest } from '../../api';
 import { useBooking } from '../../context/BookingContext';
 import { usePWA } from '../../context/PWAContext';
-import PWAInstallModal from './PWAInstallModal';
 
 export default function Footer() {
   const { selectedCity, setSelectedCity, cities: contextCities, settings: contextSettings } = useBooking();
@@ -262,9 +261,6 @@ export default function Footer() {
             <Link to="/login" className="hover:text-[#F4EFE6]">Login Page</Link>
           </div>
         </div>
-
-        {/* PWA Install Guide Modal for iOS & Desktop fallback */}
-        <PWAInstallModal />
       </div>
     </footer>
   );
