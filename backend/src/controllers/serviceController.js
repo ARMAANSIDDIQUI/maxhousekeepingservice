@@ -11,10 +11,29 @@ export async function getServices(req, res, next) {
     const query = { isActive: true };
 
     if (category) {
-      // Find category by slug if not object id
-      const catDoc = await Category.findOne({ slug: category });
+      // Find category by slug, alias, or service slug fallback
+      let catDoc = await Category.findOne({ slug: category });
+      if (!catDoc) {
+        const aliasMap = {
+          'kitchen-deep-cleaning': 'kitchen-cleaning',
+          'bathroom-deep-cleaning': 'bathroom-cleaning',
+          'full-home-deep-cleaning': 'home-deep-cleaning',
+          'sofa-cleaning': 'sofa-carpet-cleaning',
+          'carpet-cleaning': 'sofa-carpet-cleaning'
+        };
+        const mapped = aliasMap[category];
+        if (mapped) {
+          catDoc = await Category.findOne({ slug: mapped });
+        }
+      }
+
       if (catDoc) {
         query.category = catDoc._id;
+      } else {
+        const svc = await Service.findOne({ slug: category });
+        if (svc && svc.category) {
+          query.category = svc.category;
+        }
       }
     }
 

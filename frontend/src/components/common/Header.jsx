@@ -84,61 +84,62 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#F4EFE6]/95 backdrop-blur-md border-b border-[#E2D9C8]">
-        {/* Top Announcement Bar */}
-        <div className="bg-[#10231D] text-[#F4EFE6] px-4 py-1.5 text-xs font-medium flex items-center justify-between">
-          <div className="container mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="inline-block w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
-              <span>Direct Booking Hotline:</span>
-              <a
-                href={`tel:${(settings?.primaryPhone || settings?.phone || '9897766002').replace(/[^0-9+]/g, '')}`}
-                className="font-semibold text-[#E9A23B] hover:underline flex items-center gap-1"
-              >
-                <LuPhone className="w-3.5 h-3.5" /> {settings?.primaryPhone || settings?.phone || '98977 66002'}
-              </a>
-              {(settings?.secondaryPhone || settings?.alternatePhone) && (
-                <>
-                  <span className="hidden sm:inline text-[#E2D9C8]/40">|</span>
-                  <a
-                    href={`tel:${(settings.secondaryPhone || settings.alternatePhone).replace(/[^0-9+]/g, '')}`}
-                    className="hidden sm:inline hover:underline text-[#E2D9C8]/80"
-                  >
-                    {settings.secondaryPhone || settings.alternatePhone}
-                  </a>
-                </>
-              )}
-            </div>
+      {/* Top Announcement Bar (Static at top of page, scrolls naturally away) */}
+      <div className="bg-[#10231D] text-[#F4EFE6] px-3 sm:px-4 py-1.5 text-xs font-medium border-b border-[#2C4A3E]">
+        <div className="container mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-3 truncate">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse shrink-0" />
+            <span className="hidden sm:inline">Direct Booking Hotline:</span>
+            <span className="sm:hidden text-[11px]">Hotline:</span>
+            <a
+              href={`tel:${(settings?.primaryPhone || settings?.phone || '9897766002').replace(/[^0-9+]/g, '')}`}
+              className="font-semibold text-[#E9A23B] hover:underline flex items-center gap-1 text-[11px] sm:text-xs shrink-0"
+            >
+              <LuPhone className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> {settings?.primaryPhone || settings?.phone || '98977 66002'}
+            </a>
+            {(settings?.secondaryPhone || settings?.alternatePhone) && (
+              <>
+                <span className="hidden sm:inline text-[#E2D9C8]/40">|</span>
+                <a
+                  href={`tel:${(settings.secondaryPhone || settings.alternatePhone).replace(/[^0-9+]/g, '')}`}
+                  className="hidden sm:inline hover:underline text-[#E2D9C8]/80 text-xs"
+                >
+                  {settings.secondaryPhone || settings.alternatePhone}
+                </a>
+              </>
+            )}
+          </div>
 
-            <div className="flex items-center gap-4 text-[11px] text-[#E2D9C8]/70">
-              <span className="hidden md:inline">{settings?.workingHours || '8:00 AM – 8:00 PM (Monday – Sunday)'}</span>
-              {/* City Quick Selector */}
-              <button
-                type="button"
-                onClick={() => setIsCityModalOpen(true)}
-                className="flex items-center gap-1 text-[#E9A23B] hover:text-[#D48E28] font-semibold transition-colors cursor-pointer"
-              >
-                <LuMapPin className="w-3.5 h-3.5" />
-                <span>{(cities && cities.length > 0 && selectedCity?.name) ? selectedCity.name : 'Select City'}</span>
-                <LuChevronDown className="w-3 h-3" />
-              </button>
-            </div>
+          <div className="flex items-center gap-2 sm:gap-4 text-[11px] text-[#E2D9C8]/70 shrink-0">
+            <span className="hidden md:inline">{settings?.workingHours || '8:00 AM – 8:00 PM (Monday – Sunday)'}</span>
+            {/* City Quick Selector */}
+            <button
+              type="button"
+              onClick={() => setIsCityModalOpen(true)}
+              className="flex items-center gap-1 text-[#E9A23B] hover:text-[#D48E28] font-semibold transition-colors cursor-pointer text-[11px] sm:text-xs"
+            >
+              <LuMapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>{(cities && cities.length > 0 && selectedCity?.name) ? selectedCity.name : 'Select City'}</span>
+              <LuChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Main Navbar */}
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+      {/* Main Sticky Navbar - Sticks cleanly to top: 0 with zero jitter or clipping */}
+      <header className="sticky top-0 z-40 bg-[#F4EFE6] border-b border-[#E2D9C8] shadow-xs">
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2">
           {/* Brand Logo & Name */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to="/" className="flex items-center gap-2 sm:gap-3 group shrink min-w-0">
             <img
               src="/logo.png"
               alt="Max House Keeping Service"
-              className="w-10 h-10 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-sm group-hover:scale-105 transition-transform shrink-0"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            <div className="flex flex-col">
-              <span className="font-display font-black text-lg sm:text-xl tracking-tight text-[#10231D] leading-none group-hover:text-[#E9A23B] transition-colors">
-                Max <span className="text-[#E9A23B]">House</span> Keeping Service
+            <div className="flex flex-col min-w-0">
+              <span className="font-display font-black text-sm sm:text-base md:text-xl tracking-tight text-[#10231D] leading-tight group-hover:text-[#E9A23B] transition-colors truncate whitespace-nowrap">
+                Max <span className="text-[#E9A23B]">House</span> Keeping
               </span>
             </div>
           </Link>
@@ -242,7 +243,7 @@ export default function Header() {
           </nav>
 
           {/* Right Actions: City, Login / Profile, Book Now */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* City Selector Pill */}
             <button
               type="button"
@@ -256,17 +257,19 @@ export default function Header() {
 
             {/* User Profile or Log In link */}
             {user ? (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 p-1 pl-2 pr-3 rounded-full border border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
+                  title={user.name || 'Account'}
+                  aria-label="User Account Menu"
+                  className="flex items-center p-0.5 md:p-1 md:pl-2 md:pr-3 md:gap-2 rounded-full border border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] transition-colors cursor-pointer"
                 >
                   <UserAvatar user={user} size="sm" />
-                  <span className="text-xs font-semibold text-[#10231D] max-w-[90px] truncate">
+                  <span className="hidden md:inline-block text-xs font-semibold text-[#10231D] max-w-[90px] truncate">
                     {user.name}
                   </span>
-                  <LuChevronDown className="w-3 h-3 text-[#3D524A]" />
+                  <LuChevronDown className="hidden md:inline-block w-3 h-3 text-[#3D524A]" />
                 </button>
 
                 {isUserMenuOpen && (
@@ -328,12 +331,12 @@ export default function Header() {
             {/* Book Now Primary Button */}
             <Link
               to="/book"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] shadow-sm transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] shadow-sm transition-all shrink-0"
             >
-              <LuCalendar className="w-4 h-4" />
+              <LuCalendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span>Book now</span>
               {items.length > 0 && (
-                <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] flex items-center justify-center font-bold">
+                <span className="w-4.5 h-4.5 sm:w-5 sm:h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] flex items-center justify-center font-bold">
                   {items.length}
                 </span>
               )}
@@ -343,9 +346,9 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-[#10231D] hover:bg-[#ECE5D8]"
+              className="md:hidden p-1.5 sm:p-2 rounded-lg text-[#10231D] hover:bg-[#ECE5D8] shrink-0"
             >
-              {isMobileMenuOpen ? <LuX className="w-6 h-6" /> : <LuMenu className="w-6 h-6" />}
+              {isMobileMenuOpen ? <LuX className="w-5 h-5 sm:w-6 sm:h-6" /> : <LuMenu className="w-5 h-5 sm:w-6 sm:h-6" />}
             </button>
           </div>
         </div>

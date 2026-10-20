@@ -22,7 +22,12 @@ export default function RoomMap({ services = [] }) {
   }, [services]);
 
   const findService = (slugMatch, catMatch) => {
-    return liveServices.find(s => s.slug === slugMatch || s.categorySlug === catMatch) || null;
+    return liveServices.find(s =>
+      s.slug === slugMatch ||
+      s.category?.slug === catMatch ||
+      s.categorySlug === catMatch ||
+      s.category === catMatch
+    ) || null;
   };
 
   const livingSvc = findService('sofa-carpet-cleaning', 'sofa-carpet-cleaning');
@@ -33,6 +38,7 @@ export default function RoomMap({ services = [] }) {
   const rooms = {
     living: {
       name: 'Living Room',
+      categorySlug: 'sofa-carpet-cleaning',
       service: livingSvc?.title || 'Sofa & Carpet Cleaning',
       slug: livingSvc?.slug || 'sofa-carpet-cleaning',
       priceText: livingSvc ? `From ₹${livingSvc.price.toLocaleString('en-IN')}` : 'From ₹299 / seat',
@@ -40,6 +46,7 @@ export default function RoomMap({ services = [] }) {
     },
     kitchen: {
       name: 'Kitchen & Chimney',
+      categorySlug: 'kitchen-cleaning',
       service: kitchenSvc?.title || 'Kitchen Deep Cleaning',
       slug: kitchenSvc?.slug || 'kitchen-deep-cleaning',
       priceText: kitchenSvc ? `From ₹${kitchenSvc.price.toLocaleString('en-IN')}` : 'From ₹1,499',
@@ -47,6 +54,7 @@ export default function RoomMap({ services = [] }) {
     },
     bathroom: {
       name: 'Bathroom & Washroom',
+      categorySlug: 'bathroom-cleaning',
       service: bathroomSvc?.title || 'Bathroom Deep Cleaning',
       slug: bathroomSvc?.slug || 'bathroom-deep-cleaning',
       priceText: bathroomSvc ? `From ₹${bathroomSvc.price.toLocaleString('en-IN')}` : 'From ₹799',
@@ -54,6 +62,7 @@ export default function RoomMap({ services = [] }) {
     },
     bedroom: {
       name: 'Master Bedroom',
+      categorySlug: 'home-deep-cleaning',
       service: bedroomSvc?.title || 'Full Home Deep Cleaning',
       slug: bedroomSvc?.slug || 'full-home-deep-cleaning',
       priceText: bedroomSvc ? `From ₹${bedroomSvc.price.toLocaleString('en-IN')}` : 'From ₹3,499 (1 BHK)',
@@ -217,7 +226,7 @@ export default function RoomMap({ services = [] }) {
             </div>
 
             <Link
-              to={`/services?category=${current.slug}`}
+              to={`/services?category=${current.categorySlug}`}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-sm transition-colors shadow"
             >
               <span>View {current.name} Packages</span>

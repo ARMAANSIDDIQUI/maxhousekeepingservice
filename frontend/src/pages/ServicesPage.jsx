@@ -8,7 +8,15 @@ import CustomSelect from '../components/common/CustomSelect';
 export default function ServicesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const selectedCategory = searchParams.get('category') || '';
+  const rawCategory = searchParams.get('category') || '';
+  const categoryAliases = {
+    'kitchen-deep-cleaning': 'kitchen-cleaning',
+    'bathroom-deep-cleaning': 'bathroom-cleaning',
+    'full-home-deep-cleaning': 'home-deep-cleaning',
+    'sofa-cleaning': 'sofa-carpet-cleaning',
+    'carpet-cleaning': 'sofa-carpet-cleaning'
+  };
+  const selectedCategory = categoryAliases[rawCategory] || rawCategory;
   
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);

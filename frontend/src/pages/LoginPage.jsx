@@ -343,22 +343,55 @@ export default function LoginPage() {
 
   // Render official Google button when container is mounted and Google is ready
   React.useEffect(() => {
-    if (googleStatus === 'ready' && window.google?.accounts?.id && googleButtonRef.current) {
+    if (googleStatus !== 'ready' || !window.google?.accounts?.id || !googleButtonRef.current) {
+      return;
+    }
+
+    let lastWidth = 0;
+
+    const renderBtn = () => {
+      const el = googleButtonRef.current;
+      if (!el || !window.google?.accounts?.id) return;
+      const rect = el.getBoundingClientRect();
+      const raw = Math.floor(rect.width || el.clientWidth || 0);
+      const available = raw > 50 ? raw : Math.min(384, Math.max(200, window.innerWidth - 64));
+      // Google Identity Services renderButton supports width between 200px and 400px
+      const targetWidth = Math.min(400, Math.max(200, available));
+
+      if (Math.abs(targetWidth - lastWidth) < 10 && el.children.length > 0) {
+        return;
+      }
+
       try {
-        googleButtonRef.current.innerHTML = '';
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
+        el.innerHTML = '';
+        window.google.accounts.id.renderButton(el, {
           theme: 'outline',
           size: 'large',
           type: 'standard',
           text: 'continue_with',
           shape: 'rectangular',
           logo_alignment: 'left',
-          width: 384
+          width: targetWidth
         });
+        lastWidth = targetWidth;
       } catch (err) {
         console.warn('Google renderButton error:', err);
       }
+    };
+
+    renderBtn();
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined' && googleButtonRef.current) {
+      ro = new ResizeObserver(() => {
+        renderBtn();
+      });
+      ro.observe(googleButtonRef.current);
     }
+
+    return () => {
+      if (ro) ro.disconnect();
+    };
   }, [googleStatus, mode, signupStep]);
 
   // Google OAuth button handler
@@ -387,7 +420,7 @@ export default function LoginPage() {
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-[#ECE5D8] p-8 rounded-3xl border-2 border-[#10231D] shadow-2xl">
+      <div className="w-full max-w-md bg-[#ECE5D8] px-5 py-7 sm:p-8 rounded-2xl sm:rounded-3xl border-2 border-[#10231D] shadow-2xl">
         {/* Header */}
         <div className="text-center mb-6">
           <img
@@ -934,11 +967,15 @@ export default function LoginPage() {
               </span>
             </div>
 
-            <div className="w-full">
-              {/* Native Google Sign-In button container (Full 384px card width with rounded corners) */}
+            <div className="w-full flex justify-center">
+              {/* Native Google Sign-In button container */}
               <div
                 ref={googleButtonRef}
-                className={googleStatus === 'ready' ? 'w-full flex justify-center [&>div]:!w-full [&_iframe]:!w-full [&_iframe]:!rounded-xl shadow-xs' : 'hidden'}
+                className={
+                  googleStatus === 'ready'
+                    ? 'w-full flex justify-center items-center overflow-hidden [&_.S9gUrf-YoZ4jf]:!w-full [&_.S9gUrf-YoZ4jf]:!flex [&_.S9gUrf-YoZ4jf]:!justify-center [&_.S9gUrf-YoZ4jf>div]:!w-full [&_.S9gUrf-YoZ4jf>div]:!flex [&_.S9gUrf-YoZ4jf>div]:!justify-center [&_iframe]:!max-w-full [&_iframe]:!rounded-xl min-h-[44px]'
+                    : 'hidden'
+                }
               />
 
               {/* High-End Custom Styled Google Button (Shown when loading, blocked, or as fallback) */}
