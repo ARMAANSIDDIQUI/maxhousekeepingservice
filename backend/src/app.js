@@ -36,7 +36,12 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'))) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      (origin && origin.endsWith('.vercel.app')) ||
+      (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'))
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy: Origin not allowed'));

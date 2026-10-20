@@ -7,6 +7,11 @@ const BRAND_BG = '#F4EFE6';
 const SUPPORT_PHONE = '+91 98977 66002';
 const SUPPORT_EMAIL = 'vikasmax321@gmail.com';
 
+function getFrontendUrl(path = '') {
+  const base = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'http://localhost:5173';
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 /**
  * Standard Email Shell Template with Brand Styling
  */
@@ -121,7 +126,7 @@ export async function sendBookingConfirmationEmail({ booking, customerEmail }) {
     </p>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/track/${booking.bookingCode}" class="btn">
+      <a href="${getFrontendUrl(`/track/${booking.bookingCode}`)}" class="btn">
         Track Your Booking Live
       </a>
     </div>
@@ -206,7 +211,7 @@ export async function sendAdminNewBookingNotification({ booking }) {
     </table>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin" class="btn">
+      <a href="${getFrontendUrl('/admin')}" class="btn">
         Open Admin Panel to Assign Crew
       </a>
     </div>
@@ -290,7 +295,7 @@ export async function sendBookingStatusUpdateEmail({ booking, previousStatus, ne
     </div>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/track/${booking.bookingCode}" class="btn">
+      <a href="${getFrontendUrl(`/track/${booking.bookingCode}`)}" class="btn">
         View Booking Live Status
       </a>
     </div>
@@ -419,7 +424,7 @@ export async function sendContactNotificationToAdmin({ contact }) {
     </table>
 
     <div style="text-align: center; margin-top: 24px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin" class="btn">
+      <a href="${getFrontendUrl('/admin')}" class="btn">
         View in Admin Dashboard
       </a>
     </div>
@@ -487,7 +492,7 @@ export async function sendWelcomeEmail(user) {
     </p>
 
     <div style="text-align: center; margin-top: 28px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="btn">
+      <a href="${getFrontendUrl('/')}" class="btn">
         Explore Services & Book Now
       </a>
     </div>
