@@ -104,8 +104,6 @@ export default function BookingPage() {
   const [acceptOnlinePayments, setAcceptOnlinePayments] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState(null);
   const [paymentChoice, setPaymentChoice] = useState('cash_on_service'); // 'cash_on_service' | 'online_before'
-  const [testPaymentModalOpen, setTestPaymentModalOpen] = useState(false);
-  const [pendingPaymentOrder, setPendingPaymentOrder] = useState(null);
 
   // Fetch Public Settings on Mount
   useEffect(() => {
@@ -346,12 +344,8 @@ export default function BookingPage() {
         throw new Error(orderRes.message || 'Could not initiate online payment order.');
       }
 
-      // If in sandbox test mode or Razorpay script not loaded, open interactive test approval modal
-      if (orderRes.isMock || !window.Razorpay) {
-        setPendingPaymentOrder(orderRes);
-        setTestPaymentModalOpen(true);
-        setIsSubmitting(false);
-        return;
+      if (!window.Razorpay) {
+        throw new Error('Payment gateway SDK (Razorpay) is still loading. Please check your network or choose Cash on Service.');
       }
 
       // Live Razorpay Gateway Checkout
@@ -1153,71 +1147,6 @@ export default function BookingPage() {
           </div>
         </Modal>
 
-        {/* Modal: Test / Sandbox Mode Payment Simulator */}
-        <Modal
-          isOpen={testPaymentModalOpen}
-          onClose={() => {
-            setTestPaymentModalOpen(false);
-            setPendingPaymentOrder(null);
-          }}
-          title="Simulate Online Payment (Sandbox Mode)"
-          subtitle="Test gateway enabled without live banking debits"
-          maxWidth="max-w-md"
-        >
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Order Reference:</span>
-                <span className="font-mono font-bold text-[#10231D]">{pendingPaymentOrder?.orderId}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Payable Amount:</span>
-                <span className="font-mono font-bold text-base text-[#10231D]">
-                  ₹{(pendingPaymentOrder?.amount ? pendingPaymentOrder.amount / 100 : quote?.totals?.total || 0).toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Customer Name:</span>
-                <span className="font-bold text-[#10231D]">{customer.name}</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-[#3D524A] leading-relaxed">
-              This sandbox order simulates instant payment completion via UPI/Card. Click <strong>"Approve Test Payment"</strong> to complete this reservation.
-            </p>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  setTestPaymentModalOpen(false);
-                  const verifiedDetails = {
-                    transactionId: `mock_pay_${Date.now()}`,
-                    orderId: pendingPaymentOrder?.orderId || `order_${Date.now()}`,
-                    signature: 'mock_verified_signature',
-                    method: 'upi',
-                    amount: quote?.totals?.total || 0,
-                    paidAt: new Date()
-                  };
-                  await executeBookingCreation(verifiedDetails);
-                }}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-              >
-                Approve Test Payment (₹{(quote?.totals?.total || 0).toLocaleString('en-IN')})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTestPaymentModalOpen(false);
-                  setPendingPaymentOrder(null);
-                }}
-                className="px-4 py-3 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </Modal>
       </div>
     </div>
   );
