@@ -53,7 +53,6 @@ export default function CustomerDashboard() {
 
   // Online Payment State for Unpaid Bookings
   const [payingBookingId, setPayingBookingId] = useState(null);
-  const [dashboardTestPaymentOrder, setDashboardTestPaymentOrder] = useState(null);
 
   // Address Management State
   const [isAddAddressModalOpen, setIsAddAddressModalOpen] = useState(false);
@@ -498,11 +497,8 @@ export default function CustomerDashboard() {
         throw new Error(orderRes.message || 'Could not initiate online payment order.');
       }
 
-      // If in sandbox test mode or Razorpay script not loaded, open interactive test approval modal
-      if (orderRes.isMock || !window.Razorpay) {
-        setDashboardTestPaymentOrder({ orderRes, booking });
-        setPayingBookingId(null);
-        return;
+      if (!window.Razorpay) {
+        throw new Error('Payment gateway SDK (Razorpay) is still loading. Please check your network or try again.');
       }
 
       // Live Razorpay Gateway Checkout
@@ -583,7 +579,6 @@ export default function CustomerDashboard() {
       toast.error(err.message || 'Payment verification failed.');
     } finally {
       setPayingBookingId(null);
-      setDashboardTestPaymentOrder(null);
     }
   };
 
@@ -2277,73 +2272,6 @@ export default function CustomerDashboard() {
           </Modal>
         )}
 
-        {/* Modal: Test / Sandbox Mode Payment Simulator for Customer Dashboard */}
-        <Modal
-          isOpen={Boolean(dashboardTestPaymentOrder)}
-          onClose={() => {
-            setDashboardTestPaymentOrder(null);
-            setPayingBookingId(null);
-          }}
-          title="Simulate Online Payment (Sandbox Mode)"
-          subtitle="Test gateway enabled without live banking debits"
-          maxWidth="max-w-md"
-        >
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Booking Code:</span>
-                <span className="font-mono font-bold text-[#10231D]">
-                  {dashboardTestPaymentOrder?.booking?.bookingCode}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Order Reference:</span>
-                <span className="font-mono font-bold text-[#10231D]">
-                  {dashboardTestPaymentOrder?.orderRes?.orderId}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#6B8077]">Payable Amount:</span>
-                <span className="font-mono font-bold text-base text-[#10231D]">
-                  ₹{Number(dashboardTestPaymentOrder?.booking?.totals?.total || dashboardTestPaymentOrder?.booking?.total || 0).toLocaleString('en-IN')}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-[#3D524A] leading-relaxed">
-              This sandbox order simulates instant payment completion via UPI/Card. Click <strong>"Approve Test Payment"</strong> to mark this reservation as Paid.
-            </p>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  const bookingCode = dashboardTestPaymentOrder?.booking?.bookingCode;
-                  const orderId = dashboardTestPaymentOrder?.orderRes?.orderId || `order_${Date.now()}`;
-                  await verifyBookingPayment(bookingCode, {
-                    razorpay_order_id: orderId,
-                    razorpay_payment_id: `txn_mock_${Date.now()}`,
-                    razorpay_signature: 'mock_verified',
-                    method: 'upi'
-                  });
-                }}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-              >
-                Approve Test Payment (₹{Number(dashboardTestPaymentOrder?.booking?.totals?.total || dashboardTestPaymentOrder?.booking?.total || 0).toLocaleString('en-IN')})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDashboardTestPaymentOrder(null);
-                  setPayingBookingId(null);
-                }}
-                className="px-4 py-3 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </Modal>
 
         {/* Action Confirmation & Prompt Modal */}
         {confirmModalConfig && (

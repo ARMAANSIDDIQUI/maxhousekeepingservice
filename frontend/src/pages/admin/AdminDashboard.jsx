@@ -90,8 +90,7 @@ export default function AdminDashboard() {
     acceptOnlinePayments: false,
     paymentGatewayProvider: 'razorpay',
     razorpayKeyId: '',
-    razorpayKeySecret: '',
-    paymentTestMode: true
+    razorpayKeySecret: ''
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
