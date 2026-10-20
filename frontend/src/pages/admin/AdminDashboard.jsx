@@ -949,6 +949,18 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#F4EFE6] flex items-center justify-center p-8 text-center font-mono text-xs text-[#6B8077]">
+        VERIFYING ADMIN PRIVILEGES...
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <div className="bg-[#F4EFE6] min-h-screen">
       {/* Secondary Sticky Bar for Small Devices (Tablets & Phones) */}

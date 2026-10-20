@@ -656,6 +656,18 @@ export default function CustomerDashboard() {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-[#F4EFE6] flex items-center justify-center p-8 text-center font-mono text-xs text-[#6B8077]">
+        VERIFYING SESSION...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
       <div className="container mx-auto px-4 max-w-5xl">
