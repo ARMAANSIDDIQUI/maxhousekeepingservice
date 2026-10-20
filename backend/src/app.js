@@ -22,10 +22,26 @@ import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
-// Security Headers
+import mongoose from 'mongoose';
+import connectDB from './config/db.js';
+
+// Security Headers (allow popups for Google Sign-In)
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
+
+// Automatic database connection middleware for serverless runtimes
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.warn('[DB Connection Notice] Auto-connect attempt:', err.message);
+    }
+  }
+  next();
+});
 
 // CORS Configuration (Strict in production, permissive in local dev)
 const allowedOrigins = [

@@ -278,6 +278,7 @@ export default function LoginPage() {
     '672677706855-2gii7cnf1qim21jllnl8ffvjid61b3eh.apps.googleusercontent.com';
   const [googleStatus, setGoogleStatus] = useState('loading'); // 'loading' | 'ready' | 'blocked'
   const googleButtonRef = React.useRef(null);
+  const googleInitializedRef = React.useRef(false);
 
   // Initialize Google Identity Services with polling and fallback detection
   React.useEffect(() => {
@@ -293,6 +294,10 @@ export default function LoginPage() {
     const checkAndInit = () => {
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
         if (intervalId) clearInterval(intervalId);
+        if (googleInitializedRef.current) {
+          setGoogleStatus('ready');
+          return true;
+        }
         try {
           window.google.accounts.id.initialize({
             client_id: googleClientId,
@@ -307,6 +312,7 @@ export default function LoginPage() {
               }
             }
           });
+          googleInitializedRef.current = true;
           setGoogleStatus('ready');
         } catch (err) {
           console.warn('Google Identity initialization error:', err);
