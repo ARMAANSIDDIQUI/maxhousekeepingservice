@@ -914,8 +914,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Divider & Google OAuth (hidden in forgot password mode or step 2) */}
-        {mode !== 'forgot' && signupStep === 1 && (
+        {/* Divider & Google OAuth (hidden in forgot password mode, step 2, or if Google Client ID is not configured) */}
+        {mode !== 'forgot' && signupStep === 1 && Boolean(googleClientId) && (
           <>
             <div className="relative my-6 text-center">
               <div className="absolute inset-0 flex items-center">
