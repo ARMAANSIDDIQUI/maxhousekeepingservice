@@ -20,13 +20,21 @@ export function AuthProvider({ children }) {
   // Restore user session on initial mount
   useEffect(() => {
     async function checkAuth() {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      if (!token) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const data = await apiRequest('/auth/me');
         if (data.success && data.user) {
           setUser(cleanUser(data.user));
         }
       } catch {
-        // User not logged in, keep null
+        // User token expired or invalid, reset state
+        localStorage.removeItem('token');
         setUser(null);
       } finally {
         setIsLoading(false);

@@ -45,6 +45,9 @@ app.use(async (req, res, next) => {
 
 // CORS Configuration (Strict in production, permissive in local dev)
 const allowedOrigins = [
+  'https://www.maxhousekeepingservice.com',
+  'https://maxhousekeepingservice.com',
+  'https://maxhousesingservice.vercel.app',
   process.env.FRONTEND_URL,
   'http://localhost:5173',
   'http://127.0.0.1:5173'
@@ -56,6 +59,7 @@ app.use(cors({
       !origin ||
       allowedOrigins.includes(origin) ||
       (origin && origin.endsWith('.vercel.app')) ||
+      (origin && (origin.endsWith('maxhousekeepingservice.com') || origin.endsWith('maxhousesingservice.vercel.app'))) ||
       (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'))
     ) {
       callback(null, true);

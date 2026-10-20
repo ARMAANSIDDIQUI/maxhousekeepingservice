@@ -8,7 +8,7 @@ const SUPPORT_PHONE = '+91 98977 66002';
 const SUPPORT_EMAIL = 'vikasmax321@gmail.com';
 
 function getFrontendUrl(path = '') {
-  const base = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'http://localhost:5173';
+  const base = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'https://maxhousesingservice.vercel.app';
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
