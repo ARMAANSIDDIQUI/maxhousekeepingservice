@@ -108,8 +108,6 @@ export default function AdminDashboard() {
     email: 'contactmaxhousekeepingservice@gmail.com',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
-    gstEnabled: false,
-    gstPercentage: 18,
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
     acceptOnlinePayments: false,
     paymentGatewayProvider: 'razorpay',
@@ -4413,48 +4411,11 @@ export default function AdminDashboard() {
                 <span>Business & Operational Settings</span>
               </h3>
               <p className="text-xs text-[#6B8077] mt-0.5">
-                Manage GST billing percentage and online payment gateway options.
+                Manage online payment gateway options and customer transactions.
               </p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
-
-              {/* GST & Invoicing Settings */}
-              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
-                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
-                  <LuDollarSign className="w-4 h-4 text-[#E9A23B]" />
-                  <span>GST Billing & Invoicing</span>
-                </h4>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="gstEnabled"
-                    checked={Boolean(settingsForm.gstEnabled)}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, gstEnabled: e.target.checked })}
-                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4"
-                  />
-                  <label htmlFor="gstEnabled" className="text-xs font-bold text-[#10231D] cursor-pointer">
-                    Enable GST on Customer Bookings
-                  </label>
-                </div>
-
-                {settingsForm.gstEnabled && (
-                  <div className="w-48">
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      GST Percentage (%):
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={28}
-                      value={settingsForm.gstPercentage || 18}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, gstPercentage: Number(e.target.value) })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
-                    />
-                  </div>
-                )}
-              </div>
 
               {/* Online Payment Settings */}
               <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
