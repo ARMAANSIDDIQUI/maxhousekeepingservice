@@ -24,6 +24,26 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+:root {
+  --color-paper: #F4EFE6;
+  --color-paper-subtle: #ECE5D8;
+  --color-paper-deep: #E2D9C8;
+
+  --color-ink: #10231D;
+  --color-ink-muted: #3D524A;
+  --color-ink-faint: #6B8077;
+
+  --color-brass: #E9A23B;
+  --color-brass-hover: #D48E28;
+  --color-brass-light: #FBF1E2;
+
+  --color-lather: #DDEBE4;
+  --color-lather-deep: #BED6CC;
+
+  --color-rust: #C2512D;
+  --color-rust-faint: #F9ECE8;
+}
+
 /* Base Editorial Styling */
 html {
   font-family: var(--font-sans);
@@ -46,36 +66,120 @@ html.lenis, html.lenis body {
 }
 
 /* ========================================================
-   GLOBAL THEME-BASED SCROLLBARS
-   Warm paper track, deep ink thumb with brass hover
+   GLOBAL THEME-BASED SIDE SCROLLBARS
+   Warm paper track, deep forest ink thumb with brass hover glow
    ======================================================== */
+
+/* Firefox standard specification */
+html,
+body,
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-ink-muted) var(--color-paper-subtle);
+  scrollbar-color: var(--color-ink-muted, #3D524A) var(--color-paper-subtle, #ECE5D8);
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Chromium, Edge, Safari, Brave root & side scrollbars */
+::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-paper-subtle);
-  border-radius: 4px;
+::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: var(--color-paper-subtle, #ECE5D8);
+  border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-ink-muted);
-  border-radius: 4px;
-  border: 2px solid var(--color-paper-subtle);
+::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-ink-muted, #3D524A);
+  border-radius: 9999px;
+  border: 2px solid var(--color-paper-subtle, #ECE5D8);
+  background-clip: padding-box;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-brass);
+::-webkit-scrollbar-thumb:hover,
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-brass, #E9A23B);
+  border-color: var(--color-paper-subtle, #ECE5D8);
 }
 
-::-webkit-scrollbar-corner {
+::-webkit-scrollbar-thumb:active,
+html::-webkit-scrollbar-thumb:active,
+body::-webkit-scrollbar-thumb:active,
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-brass-hover, #D48E28);
+  border-color: var(--color-paper-subtle, #ECE5D8);
+}
+
+::-webkit-scrollbar-corner,
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner,
+*::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Theme-specific scrollbars for dark containers (e.g. Admin drawer, dark panels) */
+.dark-scrollbar,
+[data-theme="dark"],
+.bg-\[\#10231D\],
+.bg-\[\#0A1713\],
+.bg-\[\#181511\] {
+  scrollbar-width: thin;
+  scrollbar-color: #E9A23B #10231D;
+}
+
+.dark-scrollbar::-webkit-scrollbar-track,
+.bg-\[\#10231D\]::-webkit-scrollbar-track,
+.bg-\[\#0A1713\]::-webkit-scrollbar-track,
+.bg-\[\#181511\]::-webkit-scrollbar-track {
+  background: #10231D;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb,
+.bg-\[\#10231D\]::-webkit-scrollbar-thumb,
+.bg-\[\#0A1713\]::-webkit-scrollbar-thumb,
+.bg-\[\#181511\]::-webkit-scrollbar-thumb {
+  background-color: #2C4A3E;
+  border: 2px solid #10231D;
+  border-radius: 9999px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover,
+.bg-\[\#10231D\]::-webkit-scrollbar-thumb:hover,
+.bg-\[\#0A1713\]::-webkit-scrollbar-thumb:hover,
+.bg-\[\#181511\]::-webkit-scrollbar-thumb:hover {
+  background-color: #E9A23B;
+}
+
+/* Slim scrollbar for dropdowns and popover menus */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-faint, #6B8077) transparent;
+}
+.slim-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.slim-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.slim-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-ink-faint, #6B8077);
+  border-radius: 9999px;
+}
+.slim-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-brass, #E9A23B);
 }
 
 /* ========================================================
