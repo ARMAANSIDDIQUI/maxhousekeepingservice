@@ -12,7 +12,7 @@ const settingsSchema = new mongoose.Schema({
   whatsappNumber: { type: String, default: '+91 98977 66002' },
   email: { type: String, default: 'vikasmax321@gmail.com' },
   supportEmail: { type: String, default: 'vikasmax321@gmail.com' },
-  address: { type: String, default: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001' },
+  address: { type: String, default: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001' },
   workingHours: { type: String, default: '8:00 AM – 8:00 PM (Monday – Sunday)' },
   heroStats: [{
     label: String,

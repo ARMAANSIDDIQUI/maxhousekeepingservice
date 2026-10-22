@@ -30,7 +30,7 @@ async function syncSettings() {
     whatsappNumber: '+91 98977 66002',
     email: 'vikasmax321@gmail.com',
     supportEmail: 'vikasmax321@gmail.com',
-    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+    address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes'
   };

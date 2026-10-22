@@ -101,7 +101,7 @@ export default function AdminDashboard() {
     alternatePhone: '+91 82105 23309',
     whatsappNumber: '+91 98977 66002',
     email: 'vikasmax321@gmail.com',
-    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+    address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     gstEnabled: false,
     gstPercentage: 18,
@@ -2832,133 +2832,11 @@ export default function AdminDashboard() {
                 <span>Business & Operational Settings</span>
               </h3>
               <p className="text-xs text-[#6B8077] mt-0.5">
-                Manage live customer service hotline numbers, head office address, business operating hours, and GST invoice settings.
+                Manage GST billing percentage and online payment gateway options.
               </p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
-              {/* Identity & Contact Details */}
-              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
-                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
-                  <LuPhone className="w-4 h-4 text-[#E9A23B]" />
-                  <span>Brand Identity & Contact Numbers</span>
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Business Brand Name:
-                    </label>
-                    <input
-                      type="text"
-                      value={settingsForm.brandName || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, brandName: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Support Email:
-                    </label>
-                    <input
-                      type="email"
-                      value={settingsForm.email || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, email: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Primary Phone (Hotline):
-                    </label>
-                    <input
-                      type="text"
-                      value={settingsForm.phone || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
-                      placeholder="+91 98977 66002"
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Alternate Phone:
-                    </label>
-                    <input
-                      type="text"
-                      value={settingsForm.alternatePhone || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, alternatePhone: e.target.value })}
-                      placeholder="+91 82105 23309"
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      WhatsApp Dispatch Number:
-                    </label>
-                    <input
-                      type="text"
-                      value={settingsForm.whatsappNumber || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
-                      placeholder="+91 98977 66002"
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Working Hours / Operating Window:
-                    </label>
-                    <input
-                      type="text"
-                      value={settingsForm.workingHours || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, workingHours: e.target.value })}
-                      placeholder="Mon–Sun · 10:00 AM – 6:00 PM"
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Address & Marketing Copy */}
-              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
-                <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
-                  <LuMapPin className="w-4 h-4 text-[#E9A23B]" />
-                  <span>Headquarters & Trust Marketing</span>
-                </h4>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Operating Headquarters Address:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={settingsForm.address || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
-                    placeholder="e.g. Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001"
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Customer Rating Claim:
-                  </label>
-                  <input
-                    type="text"
-                    value={settingsForm.ratingClaim || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, ratingClaim: e.target.value })}
-                    placeholder="e.g. Rated 4.9/5 by 10,000+ happy homes"
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  />
-                </div>
-              </div>
 
               {/* GST & Invoicing Settings */}
               <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
