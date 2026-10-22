@@ -1549,11 +1549,6 @@ export default function AdminDashboard() {
                     <p className={`text-xs font-bold truncate ${isChecked ? 'text-[#10231D]' : 'text-[#6B8077]'}`}>
                       {c.name}
                     </p>
-                    {c.slug === 'moradabad' && (
-                      <span className="text-[9px] font-black uppercase text-[#E9A23B] bg-[#10231D] px-1.5 py-0.5 rounded-sm inline-block">
-                        HQ
-                      </span>
-                    )}
                   </div>
                 </label>
               );
@@ -3227,7 +3222,7 @@ export default function AdminDashboard() {
                   className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
                 >
                   <option value="all">All Service Cities</option>
-                  <option value="moradabad">Moradabad (HQ)</option>
+                  <option value="moradabad">Moradabad</option>
                   {cities.filter(c => c.slug !== 'moradabad').map(c => (
                     <option key={c._id || c.slug} value={c.slug || c.name.toLowerCase()}>{c.name}</option>
                   ))}

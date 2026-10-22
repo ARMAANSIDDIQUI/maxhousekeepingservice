@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar } from 'react-icons/lu';
+import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar, LuMapPin, LuRotateCcw } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
@@ -27,11 +27,50 @@ export default function ServicesPage() {
   const [sortBy, setSortBy] = useState('recommended');
   const [loading, setLoading] = useState(false);
 
-  const { addItem } = useBooking();
+  const { addItem, selectedCity, setSelectedCity, cities: contextCities } = useBooking();
+  const [citiesList, setCitiesList] = useState(contextCities || []);
+
+  // Fetch cities if not yet loaded in context
+  useEffect(() => {
+    if (contextCities && contextCities.length > 0) {
+      setCitiesList(contextCities);
+      return;
+    }
+    async function fetchCities() {
+      try {
+        const res = await apiRequest('/locations/cities');
+        if (res && res.cities && res.cities.length > 0) {
+          setCitiesList(res.cities);
+        }
+      } catch (err) {
+        console.warn('Failed to load cities in ServicesPage:', err);
+      }
+    }
+    fetchCities();
+  }, [contextCities]);
+
+  // Read city from searchParams or selectedCity or default 'all'
+  const urlCity = searchParams.get('city');
+  const activeCitySlug = (urlCity || selectedCity?.slug || 'all').toLowerCase();
+
+  const handleCityChange = (citySlug) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (!citySlug || citySlug === 'all') {
+      nextParams.delete('city');
+    } else {
+      nextParams.set('city', citySlug);
+      const matched = citiesList.find(c => (c.slug || c.name.toLowerCase()).trim() === citySlug);
+      if (matched) {
+        setSelectedCity(matched);
+      }
+    }
+    setSearchParams(nextParams);
+  };
 
   useEffect(() => {
     async function loadData() {
       try {
+        setLoading(true);
         const [catsRes, srvsRes] = await Promise.allSettled([
           apiRequest('/categories'),
           apiRequest(`/services${selectedCategory ? `?category=${selectedCategory}` : ''}`)
@@ -58,23 +97,123 @@ export default function ServicesPage() {
     loadData();
   }, [selectedCategory]);
 
-  const filteredServices = React.useMemo(() => {
+  // Check if a service is available in the currently selected city
+  const isAvailableInCity = (s, citySlug) => {
+    if (!citySlug || citySlug === 'all' || citySlug === 'moradabad') {
+      return true;
+    }
+    // Moradabad-only services are strictly excluded from other cities
+    if (s.moradabadOnly === true) {
+      return false;
+    }
+    const allowed = Array.isArray(s.cityAvailability) && s.cityAvailability.length > 0
+      ? s.cityAvailability.map(c => (typeof c === 'string' ? c : c?.slug || '').toLowerCase())
+      : ['moradabad'];
+
+    if (allowed.includes(citySlug)) {
+      return true;
+    }
+    // Check if cityRates has an explicit entry
+    if (s.hasCitySpecificRates && Array.isArray(s.cityRates)) {
+      if (s.cityRates.some(cr => (cr.citySlug || '').toLowerCase() === citySlug)) return true;
+    }
+    // Doorstep mobile van specialized cleaning keywords
+    const titleLow = (s.title || '').toLowerCase();
+    const slugLow = (s.slug || '').toLowerCase();
+    return (
+      slugLow.includes('sofa') || slugLow.includes('carpet') || slugLow.includes('chair') ||
+      slugLow.includes('pool') || slugLow.includes('swimming') ||
+      titleLow.includes('sofa') || titleLow.includes('carpet') || titleLow.includes('chair') ||
+      titleLow.includes('pool') || titleLow.includes('swimming')
+    );
+  };
+
+  // Helper to calculate exact city-dependent rate & unit label
+  const getServiceDisplayPricing = (service, citySlug) => {
+    if (service.pricingType === 'unit') {
+      const isMbd = !citySlug || citySlug === 'moradabad' || citySlug === 'all';
+      let rate = isMbd ? (service.unitRateMoradabad ?? service.price) : (service.unitRateOther ?? service.price);
+      if (!isMbd && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
+        const matched = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+        if (matched && typeof matched.rate === 'number') {
+          rate = matched.rate;
+        }
+      }
+      const unit = service.unitLabel || (service.pricingUnit === 'litre' ? 'Litre' : 'Sq. Ft.');
+      const mrp = service.mrp || 0;
+      const savings = mrp > rate ? mrp - rate : 0;
+      const discountPct = mrp > rate ? Math.round(((mrp - rate) / mrp) * 100) : 0;
+      return {
+        isUnit: true,
+        price: rate,
+        mrp,
+        unitLabel: unit,
+        savings,
+        discountPct,
+        displayPrice: `₹${rate}`,
+        displayUnit: `/${unit}`
+      };
+    }
+
+    let price = service.price || 0;
+    let mrp = service.mrp || 0;
+    if (citySlug && citySlug !== 'moradabad' && citySlug !== 'all' && Array.isArray(service.cityOverrides)) {
+      const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === citySlug && o.isActive !== false);
+      if (override) {
+        if (override.priceOverride) price = override.priceOverride;
+        if (override.mrpOverride) mrp = override.mrpOverride;
+        else if (override.multiplier) {
+          price = Math.round(price * override.multiplier);
+        }
+      }
+    }
+    const savings = mrp > price ? mrp - price : 0;
+    const discountPct = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+    return {
+      isUnit: false,
+      price,
+      mrp,
+      unitLabel: null,
+      savings,
+      discountPct,
+      displayPrice: `₹${price.toLocaleString('en-IN')}`,
+      displayUnit: ''
+    };
+  };
+
+  const filteredServices = useMemo(() => {
     return services
       .filter(s => {
+        // 1. City / Location filter
+        if (!isAvailableInCity(s, activeCitySlug)) {
+          return false;
+        }
+
+        // 2. Search query filter
         if (!search.trim()) return true;
         const q = search.toLowerCase();
         return (
           s.title?.toLowerCase().includes(q) ||
           s.description?.toLowerCase().includes(q) ||
-          s.categoryName?.toLowerCase().includes(q)
+          s.shortDescription?.toLowerCase().includes(q) ||
+          s.categoryName?.toLowerCase().includes(q) ||
+          (Array.isArray(s.tags) && s.tags.some(t => t.toLowerCase().includes(q)))
         );
       })
       .sort((a, b) => {
-        if (sortBy === 'price-low') return (a.price || 0) - (b.price || 0);
-        if (sortBy === 'price-high') return (b.price || 0) - (a.price || 0);
+        const pricingA = getServiceDisplayPricing(a, activeCitySlug).price;
+        const pricingB = getServiceDisplayPricing(b, activeCitySlug).price;
+        if (sortBy === 'price-low') return pricingA - pricingB;
+        if (sortBy === 'price-high') return pricingB - pricingA;
         return (a.sortOrder || 0) - (b.sortOrder || 0);
       });
-  }, [services, search, sortBy]);
+  }, [services, search, sortBy, activeCitySlug]);
+
+  // Determine current active city object for labeling
+  const activeCityObj = useMemo(() => {
+    if (!activeCitySlug || activeCitySlug === 'all') return null;
+    return citiesList.find(c => (c.slug || c.name.toLowerCase()).trim() === activeCitySlug) || { name: activeCitySlug, slug: activeCitySlug };
+  }, [activeCitySlug, citiesList]);
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
@@ -84,7 +223,7 @@ export default function ServicesPage() {
       />
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-10">
+        <div className="text-center max-w-2xl mx-auto mb-8">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
             CURATED PROFESSIONAL DIRECTORY
           </span>
@@ -96,25 +235,55 @@ export default function ServicesPage() {
           </p>
         </div>
 
+        {/* Location Notice Banner */}
+        {activeCityObj && activeCitySlug !== 'all' && (
+          <div className="mb-6 p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-[#E9A23B]/20 text-[#B87013] shrink-0">
+                <LuMapPin className="w-5 h-5 text-[#B87013]" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-[#10231D]">
+                  Location: <span className="text-[#C2512D]">{activeCityObj.name}</span>
+                </p>
+                <p className="text-[11px] text-[#3D524A] mt-0.5">
+                  {activeCitySlug === 'moradabad'
+                    ? 'All 25+ home, commercial, kitchen, water tank, and deep cleaning services are available in Moradabad.'
+                    : `Specialized doorstep sofa dry cleaning, carpet deep cleaning (₹30/sq ft), chair dry cleaning, floor scrubbing, and swimming pool cleaning (₹0.10/L) are available in ${activeCityObj.name}.`}
+                </p>
+              </div>
+            </div>
+            {activeCitySlug !== 'moradabad' && (
+              <button
+                type="button"
+                onClick={() => handleCityChange('moradabad')}
+                className="px-3.5 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#1C3B31] text-[#F4EFE6] text-xs font-bold whitespace-nowrap transition-colors shrink-0"
+              >
+                Switch to Moradabad
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Filters and Search Bar */}
-        <div className="bg-[#ECE5D8] p-4 sm:p-5 rounded-2xl border border-[#E2D9C8] mb-10 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="bg-[#ECE5D8] p-4 sm:p-5 rounded-2xl border border-[#E2D9C8] mb-10 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
             {/* Search Input */}
-            <div className="relative w-full sm:w-96">
+            <div className="relative flex-1 max-w-lg">
               <LuSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
               <input
                 type="text"
-                placeholder="Search sofa, kitchen, 2 BHK, bathroom..."
+                placeholder="Search sofa, carpet, swimming pool, kitchen, 2 BHK..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none placeholder:text-[#6B8077]/70"
               />
             </div>
 
             {/* Sort Selector */}
-            <div className="w-full sm:w-auto flex items-center gap-2 justify-end min-w-[200px]">
-              <span className="text-xs font-semibold text-[#3D524A] shrink-0">Sort by:</span>
-              <div className="w-44">
+            <div className="flex items-center gap-2 justify-end">
+              <span className="text-xs font-semibold text-[#3D524A] shrink-0">Sort:</span>
+              <div className="w-40">
                 <CustomSelect
                   value={sortBy}
                   onChange={(val) => setSortBy(val)}
@@ -129,14 +298,59 @@ export default function ServicesPage() {
             </div>
           </div>
 
+          {/* Quick Location Filter Pills */}
+          <div className="pt-2 border-t border-[#E2D9C8]/70">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <span className="text-[11px] font-mono font-bold uppercase text-[#6B8077] shrink-0 flex items-center gap-1 mr-1">
+                <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" /> Location:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCityChange('all')}
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                  activeCitySlug === 'all'
+                    ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                    : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
+                }`}
+              >
+                All Locations
+              </button>
+              {citiesList.map((c) => {
+                const slug = (c.slug || c.name.toLowerCase()).trim();
+                const isSelected = activeCitySlug === slug;
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => handleCityChange(slug)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                      isSelected
+                        ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                        : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Category Filter Pills */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2 border-t border-[#E2D9C8]/70">
+            <span className="text-[11px] font-mono font-bold uppercase text-[#6B8077] shrink-0 mr-1">
+              Category:
+            </span>
             <button
               type="button"
-              onClick={() => setSearchParams({})}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('category');
+                setSearchParams(next);
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
                 !selectedCategory
-                  ? 'bg-[#10231D] text-[#F4EFE6]'
+                  ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
                   : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
               }`}
             >
@@ -146,14 +360,18 @@ export default function ServicesPage() {
               <button
                 key={c.slug}
                 type="button"
-                onClick={() => setSearchParams({ category: c.slug })}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.set('category', c.slug);
+                  setSearchParams(next);
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
                   selectedCategory === c.slug
-                    ? 'bg-[#10231D] text-[#F4EFE6]'
+                    ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
                     : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
                 }`}
               >
-                <span className={selectedCategory === c.slug ? 'text-[#E9A23B]' : 'text-[#6B8077]'}>
+                <span className={selectedCategory === c.slug ? 'text-[#10231D]' : 'text-[#6B8077]'}>
                   {getServiceIcon(c.iconKey || c.slug, 'w-3.5 h-3.5')}
                 </span>
                 <span>{c.name}</span>
@@ -168,15 +386,39 @@ export default function ServicesPage() {
             LOADING CATALOG PACKAGES...
           </div>
         ) : filteredServices.length === 0 ? (
-          <div className="py-20 text-center">
+          <div className="py-20 text-center bg-[#ECE5D8]/50 rounded-2xl border border-[#E2D9C8] p-8 max-w-xl mx-auto">
+            <LuMapPin className="w-10 h-10 text-[#6B8077] mx-auto mb-3" />
             <p className="font-display font-bold text-xl text-[#10231D]">No services found</p>
-            <p className="text-xs text-[#6B8077] mt-1">Try searching for a different keyword or category.</p>
+            <p className="text-xs text-[#6B8077] mt-1">
+              {activeCityObj
+                ? `No cleaning services found matching your criteria in ${activeCityObj.name}.`
+                : 'Try searching for a different keyword or category.'}
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              {activeCitySlug !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => handleCityChange('all')}
+                  className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#1C3B31] transition-colors"
+                >
+                  View All Locations
+                </button>
+              )}
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="px-4 py-2 rounded-xl bg-[#F4EFE6] text-[#10231D] border border-[#E2D9C8] text-xs font-bold hover:bg-[#E2D9C8] transition-colors"
+                >
+                  Clear Search
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredServices.map((service) => {
-              const savings = (service.mrp || service.price) - service.price;
-              const discountPct = service.mrp ? Math.round(((service.mrp - service.price) / service.mrp) * 100) : 0;
+              const pricing = getServiceDisplayPricing(service, activeCitySlug);
 
               return (
                 <div
@@ -201,15 +443,35 @@ export default function ServicesPage() {
                       aspectRatio="h-48"
                       categorySlug={service.categorySlug}
                     />
+                    
+                    {/* Top Badges */}
                     <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10 pointer-events-none">
-                      {discountPct > 0 && (
+                      {pricing.discountPct > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-black shadow-xs">
-                          {discountPct}% OFF
+                          {pricing.discountPct}% OFF
                         </span>
                       )}
                     </div>
+
+                    <div className="absolute top-3 left-3 flex flex-col gap-1 z-10 pointer-events-none">
+                      {service.moradabadOnly ? (
+                        <span className="px-2 py-0.5 rounded-md bg-[#10231D]/80 text-[#F4EFE6] text-[10px] font-bold backdrop-blur-xs shadow-xs">
+                          Moradabad Only
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-[#1D6043]/90 text-white text-[10px] font-bold backdrop-blur-xs shadow-xs">
+                          All Cities Available
+                        </span>
+                      )}
+                      {pricing.isUnit && (
+                        <span className="px-2 py-0.5 rounded-md bg-[#E9A23B] text-[#10231D] text-[10px] font-black shadow-xs">
+                          Per {pricing.unitLabel}
+                        </span>
+                      )}
+                    </div>
+
                     <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-mono font-semibold z-10 pointer-events-none">
-                      <span>{service.categoryName} · {service.duration || '1 hr'}</span>
+                      <span>{service.categoryName || 'Cleaning'} · {service.duration || '1 hr'}</span>
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1 text-[#E9A23B] font-bold text-[11px]">
                         Details <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                       </span>
@@ -231,19 +493,29 @@ export default function ServicesPage() {
 
                       {/* Pricing Box */}
                       <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] group-hover:border-[#E9A23B]/40 mb-4 transition-colors">
-                        <div className="flex items-baseline gap-2.5">
+                        <div className="flex items-baseline gap-2">
                           <span className="font-display font-black text-2xl text-[#10231D] tnum">
-                            ₹{service.price.toLocaleString('en-IN')}
+                            {pricing.displayPrice}
                           </span>
-                          {service.mrp > service.price && (
-                            <span className="text-sm text-[#6B8077] line-through tnum">
-                              ₹{service.mrp.toLocaleString('en-IN')}
+                          {pricing.displayUnit && (
+                            <span className="text-xs font-bold text-[#6B8077] uppercase tracking-wide">
+                              {pricing.displayUnit}
+                            </span>
+                          )}
+                          {pricing.mrp > pricing.price && (
+                            <span className="text-sm text-[#6B8077] line-through tnum ml-auto">
+                              ₹{pricing.mrp.toLocaleString('en-IN')}
                             </span>
                           )}
                         </div>
-                        {savings > 0 && (
+                        {pricing.savings > 0 && (
                           <p className="text-[11px] text-[#C2512D] font-bold mt-1">
-                            Save ₹{savings.toLocaleString('en-IN')} ({discountPct}% discount)
+                            Save ₹{pricing.savings.toLocaleString('en-IN')} ({pricing.discountPct}% discount)
+                          </p>
+                        )}
+                        {pricing.isUnit && (
+                          <p className="text-[10px] text-[#6B8077] font-medium mt-1">
+                            Dynamic calculation based on exact {pricing.unitLabel} required.
                           </p>
                         )}
                       </div>
@@ -267,11 +539,16 @@ export default function ServicesPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          addItem(service, {}, 1);
+                          if (service.pricingType === 'unit') {
+                            const cParam = activeCitySlug !== 'all' ? `&city=${activeCitySlug}` : '';
+                            navigate(`/book?service=${service.slug}${cParam}`);
+                          } else {
+                            addItem(service, {}, 1);
+                          }
                         }}
                         className="w-full py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] active:scale-[0.98] text-[#10231D] font-black text-xs transition-all shadow-sm hover:shadow-md text-center flex items-center justify-center gap-2"
                       >
-                        <span>Add to Booking</span>
+                        <span>{service.pricingType === 'unit' ? 'Configure & Book' : 'Add to Booking'}</span>
                         <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                       </button>
                     </div>

@@ -29,6 +29,8 @@ async function updateServices() {
       };
     });
 
+    const allCitySlugs = activeCities.map(c => (c.slug || c.name.toLowerCase()).trim());
+
     const poolRes = await Service.updateOne(
       { slug: 'swimming-pool-cleaning' },
       {
@@ -43,6 +45,8 @@ async function updateServices() {
           mrp: 0.08,
           hasCitySpecificRates: true,
           cityRates: poolCityRates,
+          moradabadOnly: false,
+          cityAvailability: allCitySlugs,
           shortDescription: 'Professional swimming pool cleaning: ₹0.05/L in Moradabad, ₹0.10/L in other cities.',
           description: 'Professional swimming pool cleaning and water clarity management. Pricing: Rs. 0.05 per litre Moradabad only, other city Rs. 0.10 per litre. Algae brushing, submersible vacuuming, sand filter backwash, and chlorine shock balancing.',
           variants: [],
@@ -68,6 +72,8 @@ async function updateServices() {
           price: 30,
           mrp: 40,
           hasCitySpecificRates: false,
+          moradabadOnly: false,
+          cityAvailability: allCitySlugs,
           shortDescription: 'Professional carpet deep cleaning at ₹30 per square foot.',
           description: 'Carpet cleaning services: Rs. 30 per square feet. High-temperature hot water extraction and specialized foam shampooing removes dirt, dust mites, spill stains, and odors from woollen, Persian, and synthetic rugs.',
           variants: [],
@@ -92,6 +98,8 @@ async function updateServices() {
           price: 10,
           mrp: 15,
           hasCitySpecificRates: true,
+          moradabadOnly: false,
+          cityAvailability: allCitySlugs,
           variants: [],
           optionGroups: [],
           matrix: []

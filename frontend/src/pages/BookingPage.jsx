@@ -31,6 +31,51 @@ import { apiRequest, FALLBACK_SERVICES } from '../api';
 import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 
+// Central Dynamic Helper: Check if a service is available in the target city
+export function isServiceAvailableInCity(service, citySlug) {
+  if (!service) return false;
+  const targetCity = (citySlug || 'moradabad').toLowerCase().trim();
+
+  // Moradabad is the central hub where all services are available
+  if (targetCity === 'moradabad') {
+    return true;
+  }
+
+  // Moradabad-only services are strictly excluded from other cities
+  if (service.moradabadOnly === true) {
+    return false;
+  }
+
+  // 1. Check dynamic cityAvailability or allowedCitySlugs array from MongoDB
+  const rawAvailability = service.cityAvailability || service.allowedCitySlugs;
+  if (Array.isArray(rawAvailability) && rawAvailability.length > 0) {
+    const slugs = rawAvailability.map(c => (typeof c === 'string' ? c : c?.slug || '').toLowerCase().trim());
+    if (slugs.includes(targetCity)) {
+      return true;
+    }
+  }
+
+  // 2. Check if service has rates configured for this specific city
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
+    const hasCityRate = service.cityRates.some(cr => (cr.citySlug || '').toLowerCase().trim() === targetCity);
+    if (hasCityRate) {
+      return true;
+    }
+  }
+
+  // 3. Fallback for specialized doorstep cleaning services
+  const slug = (service.slug || '').toLowerCase();
+  const title = (service.title || '').toLowerCase();
+  const isSpecialty = (
+    slug.includes('sofa') || slug.includes('carpet') || slug.includes('chair') ||
+    slug.includes('pool') || slug.includes('swimming') || slug.includes('floor') ||
+    title.includes('sofa') || title.includes('carpet') || title.includes('chair') ||
+    title.includes('pool') || title.includes('swimming') || title.includes('floor')
+  );
+
+  return isSpecialty;
+}
+
 // Helper to calculate exact variant unit price and MRP
 function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad', selections = {}) {
   if (!service) return { price: 0, mrp: 0 };
@@ -537,20 +582,12 @@ export default function BookingPage() {
     const citySlug = (selectedCity?.slug || (selectedCity?.name ? selectedCity.name.toLowerCase() : 'moradabad')).toLowerCase();
     if (citySlug !== 'moradabad') {
       const unsupportedItem = items.find(it => {
-        const svc = it.service;
-        if (!svc) return false;
-        const allowed = Array.isArray(svc.cityAvailability) && svc.cityAvailability.length > 0
-          ? svc.cityAvailability.map(c => c.toLowerCase())
-          : ['moradabad'];
-        const isAllowed = allowed.includes(citySlug) || (
-          svc.slug?.includes('sofa') || svc.slug?.includes('carpet') || svc.slug?.includes('chair') ||
-          svc.title?.toLowerCase().includes('sofa') || svc.title?.toLowerCase().includes('carpet') || svc.title?.toLowerCase().includes('chair')
-        );
-        return !isAllowed;
+        const liveSvc = allServices.find(s => s._id === it.service?._id || s.slug === it.service?.slug) || it.service;
+        return !isServiceAvailableInCity(liveSvc, citySlug);
       });
 
       if (unsupportedItem) {
-        toast.error(`"${unsupportedItem.service.title}" is only available in Moradabad. Please remove it or switch your city to Moradabad.`);
+        toast.error(`"${unsupportedItem.service?.title || 'This service'}" is only available in Moradabad. Please remove it or switch your city to Moradabad.`);
         return;
       }
     }
@@ -704,19 +741,9 @@ export default function BookingPage() {
   const isMoradabadSelected = currentCitySlug === 'moradabad';
 
   const filteredCatalog = allServices.filter(s => {
-    // 1. City availability filter
+    // 1. Dynamic city availability filter
     if (!isMoradabadSelected) {
-      const allowed = Array.isArray(s.cityAvailability) && s.cityAvailability.length > 0
-        ? s.cityAvailability.map(c => c.toLowerCase())
-        : ['moradabad'];
-      
-      const isDirectlyAllowed = allowed.includes(currentCitySlug);
-      const isKeywordAllowed = (
-        s.slug?.includes('sofa') || s.slug?.includes('carpet') || s.slug?.includes('chair') ||
-        s.title?.toLowerCase().includes('sofa') || s.title?.toLowerCase().includes('carpet') || s.title?.toLowerCase().includes('chair')
-      );
-
-      if (!isDirectlyAllowed && !isKeywordAllowed) {
+      if (!isServiceAvailableInCity(s, currentCitySlug)) {
         return false;
       }
     }
@@ -833,13 +860,6 @@ export default function BookingPage() {
                   >
                     <LuMapPin className={`w-3.5 h-3.5 ${isSelected ? 'text-[#E9A23B]' : 'text-[#6B8077]'}`} />
                     <span>{cName}</span>
-                    {cSlug === 'moradabad' && (
-                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${
-                        isSelected ? 'bg-[#E9A23B] text-[#10231D]' : 'bg-[#10231D] text-[#E9A23B]'
-                      }`}>
-                        HQ
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -863,7 +883,7 @@ export default function BookingPage() {
                   <LuTruck className="w-3 h-3 stroke-[2.5]" />
                 </span>
                 <span>
-                  <strong>{selectedCity?.name} Service Zone:</strong> Specialized Sofa Dry Cleaning, Carpet Cleaning, and Chair Dry Cleaning are available with doorstep mobile equipment vans. (Full home cleaning is available in Moradabad).
+                  <strong>{selectedCity?.name} Service Zone:</strong> Specialized Sofa Dry Cleaning, Carpet Cleaning, Chair Dry Cleaning, Floor Scrubbing, and Swimming Pool Cleaning are available with doorstep mobile equipment vans. (Full home cleaning is available in Moradabad).
                 </span>
               </div>
               <button
@@ -924,7 +944,9 @@ export default function BookingPage() {
               ) : (
                 <div className="space-y-4">
                   {items.map((item, idx) => {
-                    const svc = item.service;
+                    const rawSvc = item.service || {};
+                    // Match live service document from catalog for fresh city availability and rates
+                    const svc = allServices.find(s => s._id === rawSvc._id || s.slug === rawSvc.slug) || rawSvc;
                     const isUnitService = svc.pricingType === 'unit' && (!svc.matrix || svc.matrix.length === 0);
                     const primaryOptionGroup = svc.optionGroups?.[0];
                     const hasVariants = !isUnitService && ((svc.matrix && svc.matrix.length > 0) || (primaryOptionGroup && primaryOptionGroup.options?.length > 1));
@@ -946,12 +968,8 @@ export default function BookingPage() {
                       };
                     }) : [];
 
-                    // City coverage check
-                    const isAllowedInCity = isMoradabadSelected || (
-                      svc.allowedCitySlugs && Array.isArray(svc.allowedCitySlugs) && svc.allowedCitySlugs.length > 0
-                        ? svc.allowedCitySlugs.includes(currentCitySlug)
-                        : /sofa|carpet|chair/i.test(`${svc.slug || ''} ${svc.title || ''}`)
-                    );
+                    // Dynamic city coverage check
+                    const isAllowedInCity = isServiceAvailableInCity(svc, currentCitySlug);
 
                     return (
                       <div
