@@ -1,17 +1,17 @@
 import mongoose from 'mongoose';
 
 const settingsSchema = new mongoose.Schema({
-  brandName: { type: String, default: 'Max House Keeping Service' },
-  businessName: { type: String, default: 'Max House Keeping Service' },
+  brandName: { type: String, default: 'Max Housekeeping Service' },
+  businessName: { type: String, default: 'Max Housekeeping Service' },
   tagline: { type: String, default: 'A spotless home, without lifting a finger.' },
   heroCopy: { type: String, default: 'Book trained, background-verified cleaning professionals for your home or office.' },
   phone: { type: String, default: '+91 98977 66002' },
   primaryPhone: { type: String, default: '+91 98977 66002' },
-  alternatePhone: { type: String, default: '+91 82105 23309' },
-  secondaryPhone: { type: String, default: '+91 82105 23309' },
+  alternatePhone: { type: String, default: '' },
+  secondaryPhone: { type: String, default: '' },
   whatsappNumber: { type: String, default: '+91 98977 66002' },
-  email: { type: String, default: 'vikasmax321@gmail.com' },
-  supportEmail: { type: String, default: 'vikasmax321@gmail.com' },
+  email: { type: String, default: 'contactmaxhousekeepingservice@gmail.com' },
+  supportEmail: { type: String, default: 'contactmaxhousekeepingservice@gmail.com' },
   address: { type: String, default: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001' },
   workingHours: { type: String, default: '8:00 AM – 8:00 PM (Monday – Sunday)' },
   heroStats: [{

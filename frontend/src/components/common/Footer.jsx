@@ -11,10 +11,10 @@ export default function Footer() {
   const [cities, setCities] = useState(Array.isArray(contextCities) ? contextCities : []);
 
   const settings = contextSettings || {
-    brandName: 'Max House Keeping Service',
+    brandName: 'Max Housekeeping Service',
     phone: '+91 98977 66002',
-    alternatePhone: '+91 82105 23309',
-    email: 'vikasmax321@gmail.com',
+    alternatePhone: '',
+    email: 'contactmaxhousekeepingservice@gmail.com',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'
   };
@@ -94,16 +94,16 @@ export default function Footer() {
             <div className="flex items-center gap-3 mb-4">
               <img
                 src="/logo.png"
-                alt="Max House Keeping Service"
+                alt="Max Housekeeping Service"
                 className="w-10 h-10 object-contain drop-shadow"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
               <div>
                 <h4 className="font-display font-black text-lg text-[#F4EFE6] leading-none">
-                  MAX HOUSEKEEPING
+                  MAX HOUSEKEEPING SERVICE
                 </h4>
                 <p className="text-[10px] uppercase tracking-widest text-[#E9A23B] mt-0.5">
-                  SERVICE · WESTERN UP
+                  WESTERN UP
                 </p>
               </div>
             </div>
@@ -238,7 +238,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#DDEBE4]/60 gap-4">
           <p>
-            &copy; {new Date().getFullYear()} {settings.brandName || 'Max House Keeping Service'}. All rights reserved.
+            &copy; {new Date().getFullYear()} {settings.brandName || 'Max Housekeeping Service'}. All rights reserved.
           </p>
           <div className="flex items-center gap-5 sm:gap-6 flex-wrap justify-center">
             {!isInstalled ? (

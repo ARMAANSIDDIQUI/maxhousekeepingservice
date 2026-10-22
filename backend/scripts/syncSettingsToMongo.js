@@ -19,17 +19,17 @@ async function syncSettings() {
   console.log('Connected to MongoDB Atlas successfully.');
 
   const updateData = {
-    brandName: 'Max House Keeping Service',
-    businessName: 'Max House Keeping Service',
+    brandName: 'Max Housekeeping Service',
+    businessName: 'Max Housekeeping Service',
     tagline: 'A spotless home, without lifting a finger.',
     heroCopy: 'Book trained, background-verified cleaning professionals for your home or office.',
     phone: '+91 98977 66002',
     primaryPhone: '+91 98977 66002',
-    alternatePhone: '+91 82105 23309',
-    secondaryPhone: '+91 82105 23309',
+    alternatePhone: '',
+    secondaryPhone: '',
     whatsappNumber: '+91 98977 66002',
-    email: 'vikasmax321@gmail.com',
-    supportEmail: 'vikasmax321@gmail.com',
+    email: 'contactmaxhousekeepingservice@gmail.com',
+    supportEmail: 'contactmaxhousekeepingservice@gmail.com',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes'

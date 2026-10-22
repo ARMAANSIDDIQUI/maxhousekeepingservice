@@ -28,10 +28,10 @@ export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const settings = contextSettings || {
-    brandName: 'Max House Keeping Service',
+    brandName: 'Max Housekeeping Service',
     phone: '+91 98977 66002',
-    alternatePhone: '+91 82105 23309',
-    email: 'vikasmax321@gmail.com',
+    alternatePhone: '',
+    email: 'contactmaxhousekeepingservice@gmail.com',
     whatsappNumber: '+91 98977 66002',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'

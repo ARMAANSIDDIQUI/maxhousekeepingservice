@@ -1,11 +1,11 @@
 import { getEmailTransporter } from '../config/email.js';
 
-const BRAND_NAME = 'Max House Keeping Service';
+const BRAND_NAME = 'Max Housekeeping Service';
 const BRAND_COLOR = '#E9A23B';
 const BRAND_DARK = '#10231D';
 const BRAND_BG = '#F4EFE6';
 const SUPPORT_PHONE = '+91 98977 66002';
-const SUPPORT_EMAIL = 'vikasmax321@gmail.com';
+const SUPPORT_EMAIL = 'contactmaxhousekeepingservice@gmail.com';
 
 function getFrontendUrl(path = '') {
   const base = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : 'https://maxhousesingservice.vercel.app';

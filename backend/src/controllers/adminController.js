@@ -472,7 +472,7 @@ export async function createService(req, res, next) {
     }
 
     if (!serviceData.description) {
-      serviceData.description = serviceData.shortDescription || `${serviceData.title} by Max House Keeping Service.`;
+      serviceData.description = serviceData.shortDescription || `${serviceData.title} by Max Housekeeping Service.`;
     }
 
     const service = await Service.create(serviceData);
@@ -552,15 +552,15 @@ export async function getSettings(req, res, next) {
     let settings = await Settings.findOne();
     if (!settings) {
       settings = await Settings.create({
-        brandName: 'Max House Keeping Service',
-        businessName: 'Max House Keeping Service',
+        brandName: 'Max Housekeeping Service',
+        businessName: 'Max Housekeeping Service',
         phone: '+91 98977 66002',
         primaryPhone: '+91 98977 66002',
-        alternatePhone: '+91 82105 23309',
-        secondaryPhone: '+91 82105 23309',
+        alternatePhone: '',
+        secondaryPhone: '',
         whatsappNumber: '+91 98977 66002',
-        email: 'vikasmax321@gmail.com',
-        supportEmail: 'vikasmax321@gmail.com',
+        email: 'contactmaxhousekeepingservice@gmail.com',
+        supportEmail: 'contactmaxhousekeepingservice@gmail.com',
         address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
         workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)'
       });

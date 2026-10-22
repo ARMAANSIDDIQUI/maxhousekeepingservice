@@ -505,7 +505,7 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <img
             src="/logo.png"
-            alt="Max House Keeping Service"
+            alt="Max Housekeeping Service"
             className="w-14 h-14 object-contain mx-auto mb-3"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />

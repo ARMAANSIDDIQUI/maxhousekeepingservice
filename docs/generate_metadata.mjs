@@ -133,16 +133,16 @@ fs.writeFileSync(path.join(docsDir, 'testimonials.json'), JSON.stringify(testimo
 
 // 5. Settings
 const settings = {
-  brandName: "Max House Keeping Service",
+  brandName: "Max Housekeeping Service",
   tagline: "A spotless home, without lifting a finger.",
   heroCopy: "Book trained, background-verified cleaning professionals for your home or office. Deep cleaning, sofa, bathroom, kitchen, AC & pest control — all in one place.",
   phone: "+91 98977 66002",
   phoneRaw: "9897766002",
-  alternatePhone: "+91 82105 23309",
-  alternatePhoneRaw: "8210523309",
+  alternatePhone: "",
+  alternatePhoneRaw: "",
   whatsappNumber: "+91 98977 66002",
   whatsappRaw: "919897766002",
-  email: "vikasmax321@gmail.com",
+  email: "contactmaxhousekeepingservice@gmail.com",
   address: "Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001",
   workingHours: "Mon–Sun · 10:00 AM – 6:00 PM",
   heroStats: [
@@ -191,7 +191,7 @@ const pages = {
     subtitle: "Questions, custom quotes or bulk bookings — our team is here to help.",
     reachDirectlySubtitle: "Prefer to talk? Call or message us — we usually respond within a few hours.",
     phone: "+91 98977 66002",
-    email: "vikasmax321@gmail.com",
+    email: "contactmaxhousekeepingservice@gmail.com",
     serviceAreas: "Moradabad · Amroha · Rampur · Gajraula · Sambhal · Chandausi · Noorpur · Dhampur · Bijnor",
     workingHours: "Mon–Sun · 10:00 AM – 6:00 PM"
   }

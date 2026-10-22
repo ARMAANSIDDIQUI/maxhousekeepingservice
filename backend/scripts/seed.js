@@ -685,11 +685,11 @@ async function seedDatabase() {
 
     // 6. Seed Business Settings
     await Settings.create({
-      businessName: 'Max House Keeping Service',
+      businessName: 'Max Housekeeping Service',
       tagline: 'Housekeeping & Commercial Cleaning Experts',
       primaryPhone: '9897766002',
-      secondaryPhone: '8210523309',
-      supportEmail: 'contact@maxhousekeepingservice.com',
+      secondaryPhone: '',
+      supportEmail: 'contactmaxhousekeepingservice@gmail.com',
       headquarters: {
         address: 'Moradabad, Uttar Pradesh, India',
         city: 'Moradabad',

@@ -84,7 +84,7 @@ export const sendOTPVerificationEmail = async ({ toEmail, otpCode, userName, pur
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; background-color: #F4EFE6; border-radius: 16px; color: #10231D;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="margin: 0; font-size: 24px; font-weight: 800; color: #10231D;">Max House Keeping Service</h2>
+        <h2 style="margin: 0; font-size: 24px; font-weight: 800; color: #10231D;">Max Housekeeping Service</h2>
         <p style="margin: 4px 0 0; font-size: 14px; color: #3D524A;">Professional Cleaning Across Western Uttar Pradesh</p>
       </div>
       <div style="background-color: #FFFFFF; border-radius: 12px; padding: 28px; box-shadow: 0 4px 12px rgba(16, 35, 29, 0.05); text-align: center;">
@@ -110,7 +110,7 @@ export const sendOTPVerificationEmail = async ({ toEmail, otpCode, userName, pur
   }
 
   try {
-    const sender = process.env.EMAIL_FROM || (process.env.EMAIL_USER ? `"Max Housekeeping Service" <${process.env.EMAIL_USER}>` : '"Max Housekeeping Service" <vikasmax321@gmail.com>');
+    const sender = process.env.EMAIL_FROM || (process.env.EMAIL_USER ? `"Max Housekeeping Service" <${process.env.EMAIL_USER}>` : '"Max Housekeeping Service" <contactmaxhousekeepingservice@gmail.com>');
     const info = await mailer.sendMail({
       from: sender,
       to: toEmail,

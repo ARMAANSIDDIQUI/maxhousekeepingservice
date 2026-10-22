@@ -133,13 +133,13 @@ export default function Header() {
           <Link to="/" className="flex items-center gap-2 sm:gap-3 group shrink min-w-0">
             <img
               src="/logo.png"
-              alt="Max House Keeping Service"
+              alt="Max Housekeeping Service"
               className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-sm group-hover:scale-105 transition-transform shrink-0"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
             <div className="flex flex-col min-w-0">
               <span className="font-display font-black text-sm sm:text-base md:text-xl tracking-tight text-[#10231D] leading-tight group-hover:text-[#E9A23B] transition-colors truncate whitespace-nowrap">
-                Max <span className="text-[#E9A23B]">House</span> Keeping
+                Max <span className="text-[#E9A23B]">Housekeeping</span> Service
               </span>
             </div>
           </Link>

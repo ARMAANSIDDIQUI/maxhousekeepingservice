@@ -100,12 +100,12 @@ export default function AdminDashboard() {
   const [savingCoupon, setSavingCoupon] = useState(false);
 
   const [settingsForm, setSettingsForm] = useState({
-    brandName: 'Max House Keeping Service',
+    brandName: 'Max Housekeeping Service',
     tagline: 'A spotless home, without lifting a finger.',
     phone: '+91 98977 66002',
-    alternatePhone: '+91 82105 23309',
+    alternatePhone: '',
     whatsappNumber: '+91 98977 66002',
-    email: 'vikasmax321@gmail.com',
+    email: 'contactmaxhousekeepingservice@gmail.com',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     gstEnabled: false,
@@ -191,6 +191,9 @@ export default function AdminDashboard() {
 
   // Booking Details Modal State
   const [viewBookingDetails, setViewBookingDetails] = useState(null);
+
+  // Inquiry / Contact Message Details Modal State
+  const [viewInquiryDetails, setViewInquiryDetails] = useState(null);
 
   // Extra Filter States for Admin Sections
   const [bookingCityFilter, setBookingCityFilter] = useState('all');
@@ -1939,7 +1942,7 @@ export default function AdminDashboard() {
         duration: newServiceForm.duration || '1.5 hrs',
         icon: newServiceForm.icon || 'Sparkles',
         shortDescription: newServiceForm.shortDescription,
-        description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max House Keeping Service.`,
+        description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max Housekeeping Service.`,
         variantGroupLabel: newServiceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: newServiceForm.variantGroupKey || 'size',
         variants: isUnit ? [] : (newServiceForm.variants || []),
@@ -2384,9 +2387,18 @@ export default function AdminDashboard() {
         setContactMessages(prev =>
           prev.map(m => m._id === id ? { ...m, status } : m)
         );
+        setViewInquiryDetails(prev => prev && prev._id === id ? { ...prev, status } : prev);
       }
     } catch (err) {
       toast.error('Failed to update message status.');
+    }
+  };
+
+  // Open Inquiry Details Modal (marks unread as read automatically)
+  const handleOpenInquiryDetails = (msg) => {
+    setViewInquiryDetails(msg);
+    if (msg.status === 'unread') {
+      handleUpdateMessageStatus(msg._id, 'read');
     }
   };
 
@@ -3697,14 +3709,59 @@ export default function AdminDashboard() {
         ======================================================== */}
         {activeTab === 'messages' && (
           <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
               <div>
-                <h3 className="font-display font-bold text-xl text-[#10231D]">
-                  Customer Contact Inquiries ({contactMessages.length})
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Customer Contact Inquiries</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#E9A23B] text-[#10231D]">
+                    {contactMessages.length} Total
+                  </span>
+                  {unreadMessagesCount > 0 && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500 text-white animate-pulse">
+                      {unreadMessagesCount} Unread
+                    </span>
+                  )}
                 </h3>
                 <p className="text-xs text-[#6B8077] mt-0.5">
                   Submissions from the Contact Page. Emails are automatically dispatched to admin and confirmation sent to customer.
                 </p>
+              </div>
+
+              {/* Inquiry Search & Status Filters */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative min-w-[200px]">
+                  <LuSearch className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={messageSearch}
+                    onChange={(e) => setMessageSearch(e.target.value)}
+                    placeholder="Search sender, phone, text..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  />
+                  {messageSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setMessageSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D]"
+                    >
+                      <LuX className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-32">
+                  <CustomSelect
+                    size="sm"
+                    value={messageStatusFilter}
+                    onChange={(val) => setMessageStatusFilter(val)}
+                    options={[
+                      { value: 'all', label: 'All Status' },
+                      { value: 'unread', label: 'Unread' },
+                      { value: 'read', label: 'Read' },
+                      { value: 'replied', label: 'Replied' }
+                    ]}
+                  />
+                </div>
               </div>
             </div>
 
@@ -3712,6 +3769,18 @@ export default function AdminDashboard() {
               <div className="py-12 text-center text-[#6B8077]">
                 <LuInbox className="w-10 h-10 mx-auto mb-2 opacity-50" />
                 <p className="text-xs font-semibold">No contact inquiries yet.</p>
+              </div>
+            ) : filteredMessagesList.length === 0 ? (
+              <div className="py-12 text-center text-[#6B8077]">
+                <LuSearch className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-xs font-semibold">No contact inquiries match your search.</p>
+                <button
+                  type="button"
+                  onClick={() => { setMessageSearch(''); setMessageStatusFilter('all'); }}
+                  className="mt-2 text-xs text-[#E9A23B] font-bold hover:underline"
+                >
+                  Reset filters
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -3723,11 +3792,11 @@ export default function AdminDashboard() {
                       <th className="py-3 px-3">Phone & Email</th>
                       <th className="py-3 px-3">Subject & Inquiry</th>
                       <th className="py-3 px-3">Status</th>
-                      <th className="py-3 px-3 text-right">Delete</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2D9C8]/60">
-                    {contactMessages.map((msg) => (
+                    {filteredMessagesList.map((msg) => (
                       <tr key={msg._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3 font-mono text-[#6B8077]">
                           {new Date(msg.createdAt).toLocaleDateString('en-IN', {
@@ -3736,7 +3805,14 @@ export default function AdminDashboard() {
                           })}
                         </td>
                         <td className="py-3 px-3 font-bold text-[#10231D]">
-                          {msg.name}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenInquiryDetails(msg)}
+                            className="text-left font-bold text-[#10231D] hover:text-[#E9A23B] transition-colors cursor-pointer"
+                            title="Click to view inquiry details"
+                          >
+                            {msg.name}
+                          </button>
                         </td>
                         <td className="py-3 px-3">
                           <a
@@ -3775,13 +3851,25 @@ export default function AdminDashboard() {
                           />
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(msg._id)}
-                            className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1]"
-                          >
-                            <LuTrash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenInquiryDetails(msg)}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs whitespace-nowrap"
+                              title="View Inquiry Details"
+                            >
+                              <LuEye className="w-3.5 h-3.5 text-[#E9A23B]" />
+                              <span>View Detail</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMessage(msg._id)}
+                              className="p-1.5 rounded-lg bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1] transition-colors cursor-pointer"
+                              title="Delete Inquiry"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -5688,6 +5776,176 @@ export default function AdminDashboard() {
                 >
                   Close Details
                 </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Customer Contact Inquiry Detail Modal */}
+        {viewInquiryDetails && (
+          <Modal
+            isOpen={Boolean(viewInquiryDetails)}
+            onClose={() => setViewInquiryDetails(null)}
+            title="Customer Contact Inquiry"
+            subtitle={`Submitted on ${new Date(viewInquiryDetails.createdAt).toLocaleString('en-IN', {
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            })}`}
+            maxWidth="max-w-xl"
+          >
+            <div className="space-y-4 text-xs text-[#10231D]">
+              {/* Header Status & Sender Banner */}
+              <div className="p-4 rounded-2xl bg-[#10231D] text-[#F4EFE6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-display text-base font-bold text-[#F4EFE6]">
+                      {viewInquiryDetails.name}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
+                      viewInquiryDetails.status === 'replied' ? 'bg-emerald-500 text-white' :
+                      viewInquiryDetails.status === 'read' ? 'bg-sky-600 text-white' :
+                      'bg-[#E9A23B] text-[#10231D]'
+                    }`}>
+                      {viewInquiryDetails.status || 'unread'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#A3B8B0] font-mono">
+                    ID: {viewInquiryDetails._id}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[#A3B8B0]">Status:</span>
+                  <div className="w-32">
+                    <CustomSelect
+                      size="sm"
+                      value={viewInquiryDetails.status || 'unread'}
+                      onChange={(val) => {
+                        handleUpdateMessageStatus(viewInquiryDetails._id, val);
+                        setViewInquiryDetails(prev => prev ? ({ ...prev, status: val }) : null);
+                      }}
+                      options={[
+                        { value: 'unread', label: 'Unread' },
+                        { value: 'read', label: 'Read' },
+                        { value: 'replied', label: 'Replied' }
+                      ]}
+                      placeholder="Status..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sender Contact Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Phone */}
+                <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                  <span className="text-[10px] font-mono text-[#6B8077] uppercase tracking-wider block mb-1">
+                    Phone Number
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <a
+                      href={`tel:${viewInquiryDetails.phone}`}
+                      className="font-bold text-sm text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
+                    >
+                      <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{viewInquiryDetails.phone || 'Not provided'}</span>
+                    </a>
+                    {viewInquiryDetails.phone && (
+                      <a
+                        href={`https://wa.me/${viewInquiryDetails.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2 py-1 rounded-lg bg-[#25D366] text-white text-[10px] font-bold hover:brightness-105 transition-all shadow-xs"
+                      >
+                        WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                  <span className="text-[10px] font-mono text-[#6B8077] uppercase tracking-wider block mb-1">
+                    Email Address
+                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    {viewInquiryDetails.email ? (
+                      <a
+                        href={`mailto:${viewInquiryDetails.email}?subject=Re: ${encodeURIComponent(viewInquiryDetails.subject || 'Inquiry - Max Housekeeping Service')}`}
+                        className="font-bold text-sm text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors truncate"
+                      >
+                        <LuMail className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
+                        <span className="truncate">{viewInquiryDetails.email}</span>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-[#6B8077] italic">No email provided</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Subject */}
+              <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase tracking-wider block mb-1">
+                  Subject / Topic
+                </span>
+                <p className="font-bold text-sm text-[#10231D]">
+                  {viewInquiryDetails.subject || 'General Inquiry'}
+                </p>
+              </div>
+
+              {/* Message Content */}
+              <div className="p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-1.5">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase tracking-wider block">
+                  Customer Message
+                </span>
+                <div className="p-3.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-[#10231D] font-sans text-xs leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto">
+                  {viewInquiryDetails.message}
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="pt-2 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = viewInquiryDetails._id;
+                    setViewInquiryDetails(null);
+                    handleDeleteMessage(id);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-[#F9ECE8] hover:bg-[#F2D7D1] text-[#C2512D] border border-[#F2D7D1] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer w-full sm:w-auto justify-center"
+                >
+                  <LuTrash2 className="w-3.5 h-3.5" />
+                  <span>Delete Inquiry</span>
+                </button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {viewInquiryDetails.phone && (
+                    <a
+                      href={`tel:${viewInquiryDetails.phone}`}
+                      className="px-3.5 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-[#10231D] font-bold text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>Call Customer</span>
+                    </a>
+                  )}
+                  {viewInquiryDetails.email && (
+                    <a
+                      href={`mailto:${viewInquiryDetails.email}?subject=Re: ${encodeURIComponent(viewInquiryDetails.subject || 'Inquiry - Max Housekeeping Service')}`}
+                      className="px-3.5 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] border border-[#E2D9C8] text-[#10231D] font-bold text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <LuMail className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>Email Reply</span>
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setViewInquiryDetails(null)}
+                    className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </Modal>
