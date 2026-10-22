@@ -36,7 +36,7 @@ const settingsSchema = new mongoose.Schema({
   acceptOnlinePayments: { type: Boolean, default: false }, // Default: false (Cash on Service)
   paymentGatewayProvider: { type: String, default: 'razorpay' },
   razorpayKeyId: { type: String, default: '' },
-  razorpayKeySecret: { type: String, default: '' },
+  razorpayKeySecret: { type: String, default: '', select: false },
   paymentTestMode: { type: Boolean, default: true }
 }, {
   timestamps: true

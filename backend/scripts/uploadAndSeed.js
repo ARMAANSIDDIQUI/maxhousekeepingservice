@@ -887,25 +887,26 @@ async function uploadAndSeed() {
     // 8. Admin User & Sample Customer
     // ----------------------------------------------------
     console.log('\n--- 8. Processing Users ---');
-    let admin = await User.findOne({ email: 'admin@maxhousekeepingservice.com' });
+    let admin = await User.findOne({ email: 'admin@dummy.com' });
     if (!admin) {
       admin = new User({
         name: 'Max Housekeeping Admin',
         phone: '9897766002',
-        email: 'admin@maxhousekeepingservice.com',
-        passwordHash: 'AdminPassword2026!',
+        email: 'admin@dummy.com',
+        passwordHash: 'Admin@123456',
         role: 'admin',
         authProvider: 'local',
         emailVerified: true,
         avatarUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=MH&backgroundColor=10231D&textColor=E9A23B&radius=50'
       });
       await admin.save();
-      console.log('✓ Created admin user: admin@maxhousekeepingservice.com');
+      console.log('✓ Created admin user: admin@dummy.com');
     } else {
       admin.role = 'admin';
+      admin.passwordHash = 'Admin@123456';
       admin.emailVerified = true;
       await admin.save();
-      console.log('✓ Verified admin user exists and has role admin: admin@maxhousekeepingservice.com');
+      console.log('✓ Verified admin user exists and has role admin: admin@dummy.com');
     }
 
     let customer = await User.findOne({ email: 'customer@example.com' });

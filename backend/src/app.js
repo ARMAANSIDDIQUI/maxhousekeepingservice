@@ -25,10 +25,17 @@ const app = express();
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 
-// Security Headers (allow popups for Google Sign-In)
+// Hardened Security Headers (allow popups for Google Sign-In & strict browser protection)
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  xContentTypeOptions: true,
+  xDnsPrefetchControl: { allow: false },
+  xDownloadOptions: true,
+  xFrameOptions: { action: 'sameorigin' },
+  xPermittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  xXssProtection: true,
+  hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false
 }));
 
 // Automatic database connection middleware for serverless runtimes
@@ -75,7 +82,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(compression());
-app.use(mongoSanitize());
+app.use(mongoSanitize({ replaceWith: '_' }));
 app.use(hpp());
 
 // General API rate limiter (180 requests per minute)

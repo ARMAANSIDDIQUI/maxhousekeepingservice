@@ -737,8 +737,8 @@ async function seedDatabase() {
     const adminUser = new User({
       name: 'Max Housekeeping Admin',
       phone: '9897766002',
-      email: 'admin@maxhousekeepingservice.com',
-      passwordHash: 'AdminPassword2026!',
+      email: 'admin@dummy.com',
+      passwordHash: 'Admin@123456',
       role: 'admin',
       authProvider: 'local',
       emailVerified: true,

@@ -864,6 +864,18 @@ export const adminAPI = {
     });
     return res;
   },
+  uploadMultipleImages: async (files, folder = 'max-housekeeping/services') => {
+    const formData = new FormData();
+    const fileArray = Array.isArray(files) ? files : Array.from(files);
+    fileArray.forEach(file => formData.append('images', file));
+    formData.append('folder', folder);
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await api.post('/admin/upload-multiple', formData, {
+      headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+    });
+    return res;
+  },
   deleteImage: (publicId) => apiRequest(`/admin/upload/${encodeURIComponent(publicId)}`, { method: 'DELETE' }),
   // Testimonials management
   getTestimonials: () => apiRequest('/admin/testimonials', { method: 'GET' }),

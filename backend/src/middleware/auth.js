@@ -24,10 +24,10 @@ export async function verifyAuth(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'max_housekeeping_super_secret_jwt_key_2026');
     const user = await User.findById(decoded.id).select('-passwordHash -otpSecret');
 
-    if (!user) {
+    if (!user || user.isActive === false) {
       return res.status(401).json({
         success: false,
-        message: 'Account not found or session expired.'
+        message: 'Account not found, deactivated, or session expired.'
       });
     }
 
@@ -36,8 +36,7 @@ export async function verifyAuth(req, res, next) {
   } catch (error) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid or expired session token.',
-      error: error.message
+      message: 'Invalid or expired session token. Please log in again.'
     });
   }
 }
@@ -58,7 +57,7 @@ export async function optionalAuth(req, res, next) {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'max_housekeeping_super_secret_jwt_key_2026');
       const user = await User.findById(decoded.id).select('-passwordHash -otpSecret');
-      if (user) {
+      if (user && user.isActive !== false) {
         req.user = user;
       }
     }
@@ -74,7 +73,7 @@ export async function optionalAuth(req, res, next) {
  */
 export function roleGuard(...roles) {
   return (req, res, next) => {
-    if (!req.user) {
+    if (!req.user || req.user.isActive === false) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required.'

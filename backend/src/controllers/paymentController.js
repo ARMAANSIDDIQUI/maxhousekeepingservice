@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Booking from '../models/Booking.js';
 import Settings from '../models/Settings.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
+import { isAuthorizedForBooking } from './bookingController.js';
 
 /**
  * Create Payment Order (Razorpay / Gateway)
@@ -18,12 +19,22 @@ export async function createPaymentOrder(req, res, next) {
       });
     }
 
-    const settings = await Settings.findOne();
+    const settings = await Settings.findOne().select('+razorpayKeySecret');
     if (!settings?.acceptOnlinePayments) {
       return res.status(400).json({
         success: false,
         message: 'Online payments are currently disabled by administration. Please choose Cash on Service.'
       });
+    }
+
+    if (bookingCode) {
+      const existingBooking = await Booking.findOne({ bookingCode: bookingCode.trim() });
+      if (existingBooking && !isAuthorizedForBooking(existingBooking, req.user)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You are not authorized to create payment for this reservation.'
+        });
+      }
     }
 
     const keyId = settings?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || '';
@@ -107,7 +118,7 @@ export async function verifyPayment(req, res, next) {
       });
     }
 
-    const booking = await Booking.findOne({ bookingCode });
+    const booking = await Booking.findOne({ bookingCode: String(bookingCode).trim() });
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -115,7 +126,14 @@ export async function verifyPayment(req, res, next) {
       });
     }
 
-    const settings = await Settings.findOne();
+    if (!isAuthorizedForBooking(booking, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not authorized to verify payment for this reservation.'
+      });
+    }
+
+    const settings = await Settings.findOne().select('+razorpayKeySecret');
     const keySecret = settings?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     // Verify cryptographic signature with Razorpay secret
@@ -138,7 +156,10 @@ export async function verifyPayment(req, res, next) {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
-    if (generatedSignature !== razorpay_signature) {
+    const expectedBuffer = Buffer.from(generatedSignature, 'utf8');
+    const signatureBuffer = Buffer.from(String(razorpay_signature).trim(), 'utf8');
+
+    if (expectedBuffer.length !== signatureBuffer.length || !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature. Verification failed.'

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import OtpVerification from '../models/OtpVerification.js';
@@ -81,7 +82,7 @@ export async function sendSignupOtp(req, res, next) {
       });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await OtpVerification.findOneAndUpdate(
@@ -239,12 +240,12 @@ export async function login(req, res, next) {
         { email: cleanIdentifier },
         { phone: identifier.trim() }
       ]
-    });
+    }).select('+passwordHash');
 
-    if (!user) {
+    if (!user || user.isActive === false) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials. No account found with these details.'
+        message: 'Invalid credentials. No active account found with these details.'
       });
     }
 
@@ -278,10 +279,17 @@ export async function requestOtp(req, res, next) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit numeric OTP
+    const otp = crypto.randomInt(100000, 1000000).toString(); // 6-digit numeric OTP
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    let user = await User.findOne({ email: cleanEmail });
+    let user = await User.findOne({ email: cleanEmail }).select('+otpSecret');
+
+    if (user && user.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: 'This account has been deactivated. Please contact support.'
+      });
+    }
 
     if (!user) {
       // Create user placeholder for OTP signup
@@ -289,7 +297,7 @@ export async function requestOtp(req, res, next) {
       user = new User({
         name: cleanEmail.split('@')[0],
         email: cleanEmail,
-        phone: `otp_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // temporary until phone set
+        phone: `otp_${Date.now()}_${crypto.randomInt(100, 1000)}`, // temporary until phone set
         role: 'customer',
         authProvider: 'local',
         avatarUrl: defaultAvatar
@@ -331,9 +339,9 @@ export async function verifyOtp(req, res, next) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne({ email: cleanEmail }).select('+otpSecret');
 
-    if (!user || !user.otpSecret || !user.otpSecret.code) {
+    if (!user || user.isActive === false || !user.otpSecret || !user.otpSecret.code) {
       return res.status(400).json({
         success: false,
         message: 'No pending verification found. Please request a new code.'
@@ -747,16 +755,17 @@ export async function forgotPassword(req, res, next) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne({ email: cleanEmail }).select('+otpSecret');
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account registered with this email address.'
+    if (!user || user.isActive === false) {
+      // Prevent user enumeration attacks
+      return res.status(200).json({
+        success: true,
+        message: `If an account exists with this email address, a 6-digit verification code has been sent.`
       });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     user.otpSecret = {
@@ -800,9 +809,9 @@ export async function resetPassword(req, res, next) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: cleanEmail });
+    const user = await User.findOne({ email: cleanEmail }).select('+otpSecret +passwordHash');
 
-    if (!user || !user.otpSecret || !user.otpSecret.code) {
+    if (!user || user.isActive === false || !user.otpSecret || !user.otpSecret.code) {
       return res.status(400).json({
         success: false,
         message: 'No active password reset request found. Please request a new code.'
@@ -862,8 +871,8 @@ export async function changePassword(req, res, next) {
       });
     }
 
-    const user = await User.findById(req.user._id);
-    if (!user) {
+    const user = await User.findById(req.user._id).select('+passwordHash');
+    if (!user || user.isActive === false) {
       return res.status(404).json({
         success: false,
         message: 'User account not found.'

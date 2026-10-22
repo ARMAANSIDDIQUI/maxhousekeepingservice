@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Booking from '../models/Booking.js';
 import Service from '../models/Service.js';
@@ -41,7 +42,7 @@ export async function generateUniqueBookingCode() {
 
   // Fallback in case of collision with legacy records
   if (!isUnique) {
-    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const randomSuffix = crypto.randomInt(100000, 1000000);
     code = `MH-${year}-${Date.now().toString().slice(-4)}${randomSuffix.toString().slice(-2)}`;
   }
 
@@ -273,7 +274,7 @@ export async function createBooking(req, res, next) {
       user: req.user ? req.user._id : undefined,
       customer: {
         name: customer.name.trim(),
-        phone: customer.phone.trim(),
+        phone: cleanPhone,
         email: customer.email ? customer.email.trim() : undefined
       },
       items: itemSnapshots,
@@ -434,13 +435,24 @@ export async function getMyBookings(req, res, next) {
   }
 }
 
-// Helper to verify user permissions on a booking
-function isAuthorizedForBooking(booking, user) {
-  if (!user) return false;
+// Helper to verify user permissions on a booking (prevents IDOR and empty string matches)
+export function isAuthorizedForBooking(booking, user) {
+  if (!user || user.isActive === false) return false;
   if (user.role === 'admin') return true;
   if (booking.user && booking.user.toString() === user._id.toString()) return true;
-  if (booking.customer?.phone && user.phone && booking.customer.phone === user.phone) return true;
-  if (booking.customer?.email && user.email && booking.customer.email.toLowerCase() === user.email.toLowerCase()) return true;
+
+  const userPhone = user.phone ? String(user.phone).trim() : '';
+  const bookingPhone = booking.customer?.phone ? String(booking.customer.phone).trim() : '';
+  if (userPhone && bookingPhone && (bookingPhone === userPhone || bookingPhone.endsWith(userPhone) || userPhone.endsWith(bookingPhone))) {
+    return true;
+  }
+
+  const userEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+  const bookingEmail = booking.customer?.email ? String(booking.customer.email).trim().toLowerCase() : '';
+  if (userEmail && bookingEmail && bookingEmail === userEmail) {
+    return true;
+  }
+
   return false;
 }
 

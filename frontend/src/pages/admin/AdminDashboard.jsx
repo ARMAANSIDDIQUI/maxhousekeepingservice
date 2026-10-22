@@ -44,6 +44,7 @@ import Modal from '../../components/common/Modal';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import CustomSelect from '../../components/common/CustomSelect';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
+import ServiceCarousel from '../../components/common/ServiceCarousel';
 
 const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
   value: ic.key,
@@ -124,6 +125,7 @@ export default function AdminDashboard() {
     description: '',
     categories: [],
     imageUrl: '',
+    images: [],
     variantGroupLabel: 'Apartment / House Size',
     variantGroupKey: 'size',
     variants: [],
@@ -132,6 +134,7 @@ export default function AdminDashboard() {
   });
   const [savingNewService, setSavingNewService] = useState(false);
   const [uploadingNewServiceImage, setUploadingNewServiceImage] = useState(false);
+  const [uploadingMultiple, setUploadingMultiple] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Edit Service Dual-Pricing Modal State
@@ -146,6 +149,7 @@ export default function AdminDashboard() {
     duration: '',
     matrix: [],
     imageUrl: '',
+    images: [],
     inclusions: '',
     exclusions: ''
   });
@@ -211,6 +215,7 @@ export default function AdminDashboard() {
       shortDescription: '',
       description: '',
       imageUrl: '',
+      images: [],
       variantGroupLabel: 'Apartment / House Size',
       variantGroupKey: 'size',
       variants: [],
@@ -381,6 +386,185 @@ export default function AdminDashboard() {
     );
   };
 
+  // Multi-Image Upload & Gallery Management
+  const handleMultipleImagesUpload = async (e, isEdit = false) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingMultiple(true);
+    try {
+      const res = await adminAPI.uploadMultipleImages(files, 'max-housekeeping/services');
+      if (res && res.images && res.images.length > 0) {
+        const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+        updateFn(prev => {
+          const existing = prev.images && prev.images.length > 0 
+            ? prev.images 
+            : (prev.imageUrl ? [{ url: prev.imageUrl, alt: prev.title || 'Service Photo' }] : []);
+          const combined = [...existing, ...res.images];
+          return {
+            ...prev,
+            images: combined,
+            imageUrl: combined[0]?.url || prev.imageUrl
+          };
+        });
+        toast.success(`Successfully uploaded ${res.images.length} photos to Cloudinary!`);
+      } else {
+        toast.error('Upload completed, but no image data was returned.');
+      }
+    } catch (err) {
+      console.error('[Multi-Image Upload Error]', err);
+      toast.error(err.message || 'Failed to upload multiple images.');
+    } finally {
+      setUploadingMultiple(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = (index, isEdit = false) => {
+    const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+    updateFn(prev => {
+      const existing = prev.images && prev.images.length > 0
+        ? [...prev.images]
+        : (prev.imageUrl ? [{ url: prev.imageUrl }] : []);
+      existing.splice(index, 1);
+      return {
+        ...prev,
+        images: existing,
+        imageUrl: existing[0]?.url || ''
+      };
+    });
+  };
+
+  const handleSetCoverImage = (index, isEdit = false) => {
+    if (index === 0) return;
+    const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+    updateFn(prev => {
+      const existing = prev.images && prev.images.length > 0
+        ? [...prev.images]
+        : (prev.imageUrl ? [{ url: prev.imageUrl }] : []);
+      const [target] = existing.splice(index, 1);
+      existing.unshift(target);
+      return {
+        ...prev,
+        images: existing,
+        imageUrl: existing[0]?.url || ''
+      };
+    });
+    toast.success('Selected image set as primary cover photo.');
+  };
+
+  const renderImageUploadSection = (isEdit = false) => {
+    const form = isEdit ? serviceForm : newServiceForm;
+    const images = form.images && form.images.length > 0
+      ? form.images
+      : (form.imageUrl ? [{ url: form.imageUrl, alt: `${form.title || 'Service'} Photo` }] : []);
+
+    return (
+      <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#E2D9C8]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuImage className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                  Service Photos & Gallery ({images.length})
+                </h4>
+                {images.length > 0 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E9A23B]/20 border border-[#E9A23B]/40 text-[#10231D]">
+                    Multi-Image Carousel Active
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Upload multiple high-resolution photos. The first image serves as the main cover photo.
+              </p>
+            </div>
+          </div>
+          <div>
+            <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors shrink-0 shadow-xs">
+              <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span>{uploadingMultiple ? 'Uploading Photos...' : 'Upload Photos (Cloudinary)'}</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleMultipleImagesUpload(e, isEdit)}
+                className="hidden"
+                disabled={uploadingMultiple}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Thumbnail Preview Grid */}
+        {images.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+            {images.map((img, idx) => (
+              <div
+                key={idx}
+                className={`relative rounded-xl overflow-hidden border-2 group bg-white shadow-xs transition-all ${
+                  idx === 0
+                    ? 'border-[#E9A23B] ring-2 ring-[#E9A23B]/30'
+                    : 'border-[#E2D9C8] hover:border-[#10231D]'
+                }`}
+              >
+                <div className="aspect-4/3 w-full bg-[#ECE5D8] overflow-hidden">
+                  <img
+                    src={img.url}
+                    alt={img.alt || `Photo ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                {/* Cover badge / Set as cover button */}
+                {idx === 0 ? (
+                  <div className="absolute top-1.5 left-1.5 bg-[#E9A23B] text-[#10231D] text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                    <LuStar className="w-3 h-3 fill-current" />
+                    <span>COVER</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSetCoverImage(idx, isEdit)}
+                    className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-[#10231D]/90 hover:bg-[#10231D] text-[#F4EFE6] text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs"
+                    title="Set this photo as main cover"
+                  >
+                    Set as Cover
+                  </button>
+                )}
+
+                {/* Remove button */}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(idx, isEdit)}
+                  className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-xs transition-colors"
+                  title="Remove photo"
+                >
+                  <LuX className="w-3 h-3 stroke-[2.5]" />
+                </button>
+
+                <div className="p-1.5 bg-white text-[10px] font-bold text-[#6B8077] truncate text-center border-t border-[#ECE5D8]">
+                  {idx === 0 ? '★ Primary Cover' : `Gallery Photo #${idx + 1}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-7 border-2 border-dashed border-[#E2D9C8] rounded-xl flex flex-col items-center justify-center text-center p-4">
+            <div className="w-10 h-10 rounded-full bg-white border border-[#E2D9C8] flex items-center justify-center text-[#6B8077] mb-2 shadow-2xs">
+              <LuImage className="w-5 h-5 text-[#93A59E]" />
+            </div>
+            <p className="text-xs font-bold text-[#10231D]">No photos uploaded yet</p>
+            <p className="text-[11px] text-[#6B8077] max-w-xs mt-0.5">
+              Click the button above to upload multiple photos. Images will show in a carousel on cards and service details.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Load All Admin Data
   const loadAdminData = async () => {
     setLoading(true);
@@ -516,6 +700,20 @@ export default function AdminDashboard() {
       }));
     }
 
+    let initialImages = [];
+    if (Array.isArray(service.images) && service.images.length > 0) {
+      initialImages = service.images.map(img => typeof img === 'string' ? { url: img, alt: service.title } : img);
+    } else {
+      if (service.media?.hero?.url) {
+        initialImages.push(service.media.hero);
+      }
+      if (Array.isArray(service.media?.gallery)) {
+        service.media.gallery.forEach(g => {
+          if (g?.url) initialImages.push(g);
+        });
+      }
+    }
+
     setServiceForm({
       title: service.title,
       slug: service.slug || '',
@@ -529,7 +727,8 @@ export default function AdminDashboard() {
       variantGroupLabel: groupLabel,
       variantGroupKey: groupKey,
       variants,
-      imageUrl: service.media?.hero?.url || '',
+      imageUrl: initialImages[0]?.url || service.media?.hero?.url || '',
+      images: initialImages,
       inclusions: Array.isArray(service.inclusions) ? service.inclusions.join('\n') : (service.inclusions || ''),
       exclusions: Array.isArray(service.exclusions) ? service.exclusions.join('\n') : (service.exclusions || '')
     });
@@ -593,12 +792,21 @@ export default function AdminDashboard() {
         exclusions: parseList(serviceForm.exclusions)
       };
 
-      if (serviceForm.imageUrl) {
+      const formImages = serviceForm.images && serviceForm.images.length > 0
+        ? serviceForm.images
+        : (serviceForm.imageUrl ? [{ url: serviceForm.imageUrl, alt: `${serviceForm.title} deep cleaning` }] : []);
+
+      payload.images = formImages;
+      if (formImages.length > 0) {
         payload.media = {
           hero: {
-            url: serviceForm.imageUrl,
-            alt: `${serviceForm.title} deep cleaning`
-          }
+            url: formImages[0].url,
+            alt: formImages[0].alt || `${serviceForm.title} deep cleaning`
+          },
+          gallery: formImages.slice(1).map(img => ({
+            url: img.url,
+            alt: img.alt || `${serviceForm.title} gallery`
+          }))
         };
       }
 
@@ -682,12 +890,21 @@ export default function AdminDashboard() {
         inclusions: parseList(newServiceForm.inclusions),
         exclusions: parseList(newServiceForm.exclusions)
       };
-      if (newServiceForm.imageUrl) {
+      const formImages = newServiceForm.images && newServiceForm.images.length > 0
+        ? newServiceForm.images
+        : (newServiceForm.imageUrl ? [{ url: newServiceForm.imageUrl, alt: `${newServiceForm.title} service photo` }] : []);
+
+      payload.images = formImages;
+      if (formImages.length > 0) {
         payload.media = {
           hero: {
-            url: newServiceForm.imageUrl,
-            alt: `${newServiceForm.title} service photo`
-          }
+            url: formImages[0].url,
+            alt: formImages[0].alt || `${newServiceForm.title} service photo`
+          },
+          gallery: formImages.slice(1).map(img => ({
+            url: img.url,
+            alt: img.alt || `${newServiceForm.title} gallery`
+          }))
         };
       }
       const res = await adminAPI.createService(payload);
@@ -706,6 +923,7 @@ export default function AdminDashboard() {
           shortDescription: '',
           description: '',
           imageUrl: '',
+          images: [],
           variantGroupLabel: 'Apartment / House Size',
           variantGroupKey: 'size',
           variants: [],
@@ -1772,16 +1990,10 @@ export default function AdminDashboard() {
                     className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] flex flex-col justify-between shadow-xs"
                   >
                     <div>
-                      {/* Media Image Preview */}
-                      {svc.media?.hero?.url && (
-                        <div className="h-32 rounded-xl overflow-hidden mb-3 bg-[#ECE5D8]">
-                          <img
-                            src={svc.media.hero.url}
-                            alt={svc.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
+                      {/* Media Image Preview / Interactive Carousel */}
+                      <div className="mb-3">
+                        <ServiceCarousel service={svc} mode="card" className="h-36 rounded-xl overflow-hidden bg-[#ECE5D8]" />
+                      </div>
 
                       <div className="flex justify-between items-start mb-2 gap-2">
                         <div className="flex flex-wrap gap-1">
@@ -2857,51 +3069,8 @@ export default function AdminDashboard() {
               {/* Category & Service Classification Section (Primary Dropdown + Multi-Select Cards) */}
               {renderCategorySelectionSection(true)}
 
-              {/* Cloudinary Service Image Upload */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Cover Photo (Cloudinary Upload):
-                </label>
-                <div className="flex items-center gap-3">
-                  {serviceForm.imageUrl ? (
-                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#E2D9C8] shrink-0 bg-[#ECE5D8]">
-                      <img
-                        src={serviceForm.imageUrl}
-                        alt="Service Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setServiceForm(prev => ({ ...prev, imageUrl: '' }))}
-                        className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
-                      >
-                        <LuX className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-[#E2D9C8] flex items-center justify-center text-[#6B8077] shrink-0">
-                      <LuImage className="w-6 h-6" />
-                    </div>
-                  )}
-
-                  <div className="flex-1">
-                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors">
-                      <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
-                      <span>{uploadingServiceImage ? 'Uploading...' : 'Upload Image to Cloudinary'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleServiceImageUpload}
-                        className="hidden"
-                        disabled={uploadingServiceImage}
-                      />
-                    </label>
-                    <p className="text-[10px] text-[#6B8077] mt-1">
-                      JPEG, PNG, WebP or AVIF. High-res photo for service details page.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* Cloudinary Service Multi-Image Gallery Upload */}
+              {renderImageUploadSection(true)}
 
               {/* Service Icon (Select-Only) */}
               <div>
@@ -4110,48 +4279,8 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Service Cover Photo */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Cover Photo:
-                </label>
-                <div className="flex items-center gap-3">
-                  {newServiceForm.imageUrl ? (
-                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#E2D9C8] shrink-0 bg-[#ECE5D8]">
-                      <img
-                        src={newServiceForm.imageUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setNewServiceForm(prev => ({ ...prev, imageUrl: '' }))}
-                        className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
-                      >
-                        <LuX className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-[#E2D9C8] flex items-center justify-center text-[#6B8077] shrink-0">
-                      <LuImage className="w-6 h-6" />
-                    </div>
-                  )}
-
-                  <div className="flex-1">
-                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors">
-                      <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
-                      <span>{uploadingNewServiceImage ? 'Uploading...' : 'Upload Image'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleNewServiceImageUpload}
-                        className="hidden"
-                        disabled={uploadingNewServiceImage}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
+              {/* Cloudinary Service Multi-Image Gallery Upload */}
+              {renderImageUploadSection(false)}
 
               {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
               <div className="pt-4 border-t border-[#E2D9C8] space-y-4">

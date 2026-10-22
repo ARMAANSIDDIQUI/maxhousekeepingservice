@@ -1,6 +1,13 @@
 import cloudinary, { deleteCloudinaryAsset } from '../config/cloudinary.js';
 import { Media } from '../models/Supporting.js';
 
+function sanitizeFolder(folder, defaultFolder = 'max-housekeeping/uploads') {
+  if (!folder || typeof folder !== 'string') return defaultFolder;
+  const clean = folder.trim().replace(/[^a-zA-Z0-9_\-\/]/g, '').replace(/\.{2,}/g, '');
+  if (!clean) return defaultFolder;
+  return clean.startsWith('max-housekeeping') ? clean : `max-housekeeping/${clean.replace(/^\/+/, '')}`;
+}
+
 /**
  * Upload single image to Cloudinary
  * POST /api/v1/admin/upload
@@ -14,7 +21,7 @@ export async function uploadImage(req, res, next) {
       });
     }
 
-    const folder = req.body.folder || 'max-housekeeping/uploads';
+    const folder = sanitizeFolder(req.body.folder, 'max-housekeeping/uploads');
     const hasCloudinaryKeys = Boolean(
       process.env.CLOUDINARY_CLOUD_NAME &&
       process.env.CLOUDINARY_API_KEY &&
@@ -116,7 +123,94 @@ export async function deleteImage(req, res, next) {
   }
 }
 
+/**
+ * Upload multiple images to Cloudinary
+ * POST /api/v1/admin/upload-multiple
+ */
+export async function uploadMultipleImages(req, res, next) {
+  try {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No image files were provided.'
+      });
+    }
+
+    const folder = sanitizeFolder(req.body.folder, 'max-housekeeping/services');
+    const hasCloudinaryKeys = Boolean(
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+    );
+
+    const uploaded = [];
+
+    for (const file of files) {
+      if (hasCloudinaryKeys) {
+        const uploadPromise = new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder,
+              resource_type: 'image',
+              transformation: [{ quality: 'auto', fetch_format: 'auto' }]
+            },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+          stream.end(file.buffer);
+        });
+
+        const result = await uploadPromise;
+        try {
+          await Media.create({
+            publicId: result.public_id,
+            url: result.secure_url,
+            resourceType: 'image',
+            width: result.width,
+            height: result.height,
+            bytes: result.bytes,
+            alt: file.originalname,
+            folder,
+            createdBy: req.user?._id
+          });
+        } catch (dbErr) {
+          // ignore duplicate media log
+        }
+
+        uploaded.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          width: result.width,
+          height: result.height,
+          alt: file.originalname
+        });
+      } else {
+        const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        const mockPublicId = `local_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        uploaded.push({
+          url: base64,
+          publicId: mockPublicId,
+          alt: file.originalname
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${uploaded.length} image(s) uploaded successfully`,
+      count: uploaded.length,
+      images: uploaded
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   uploadImage,
+  uploadMultipleImages,
   deleteImage
 };

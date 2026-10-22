@@ -5,6 +5,7 @@ import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
 import { getServiceIcon } from '../utils/iconHelper';
+import ServiceCarousel from '../components/common/ServiceCarousel';
 
 export default function ServicesPage() {
   const navigate = useNavigate();
@@ -186,23 +187,23 @@ export default function ServicesPage() {
                   }}
                   className="group rounded-2xl border border-[#E2D9C8] hover:border-[#E9A23B] bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-[#E9A23B]/60"
                 >
-                  {/* Photo Banner */}
+                  {/* Photo Banner with Interactive Carousel */}
                   <div className="h-48 overflow-hidden relative">
-                    <img
-                      src={service.media?.hero?.url || `/media/categories/${service.categorySlug || 'home-deep-cleaning'}.jpg`}
-                      alt={service.title}
-                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
-                      onError={(e) => { e.currentTarget.src = '/media/site/hero-clean-home.jpg'; }}
+                    <ServiceCarousel
+                      service={service}
+                      title={service.title}
+                      mode="card"
+                      aspectRatio="h-48"
+                      categorySlug={service.categorySlug}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#10231D]/80 via-[#10231D]/20 to-transparent" />
-                    <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                    <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10 pointer-events-none">
                       {discountPct > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-black shadow-xs">
                           {discountPct}% OFF
                         </span>
                       )}
                     </div>
-                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-mono font-semibold">
+                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white text-xs font-mono font-semibold z-10 pointer-events-none">
                       <span>{service.categoryName} · {service.duration || '1 hr'}</span>
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1 text-[#E9A23B] font-bold text-[11px]">
                         Details <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />

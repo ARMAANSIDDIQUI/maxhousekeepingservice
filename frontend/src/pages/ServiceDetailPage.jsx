@@ -13,6 +13,7 @@ import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
 import { getServiceIcon } from '../utils/iconHelper';
+import ServiceCarousel from '../components/common/ServiceCarousel';
 
 // Helper to compute exact variant pricing for any service and variant key
 function getVariantPricingInfo(service, optKey, groupKey) {
@@ -141,13 +142,13 @@ export default function ServiceDetailPage() {
 
         {/* Top Hero Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-14">
-          {/* Service Image / Worker Action */}
-          <div className="lg:col-span-6 rounded-2xl overflow-hidden border-2 border-[#10231D] shadow-xl bg-[#ECE5D8]">
-            <img
-              src={service.media?.hero?.url || `/media/categories/${service.categorySlug || 'home-deep-cleaning'}.jpg`}
-              alt={service.title}
-              className="w-full h-80 sm:h-96 object-cover"
-              onError={(e) => { e.currentTarget.src = '/media/site/hero-clean-home.jpg'; }}
+          {/* Service Image / Worker Action Carousel */}
+          <div className="lg:col-span-6">
+            <ServiceCarousel
+              service={service}
+              title={service.title}
+              mode="detail"
+              categorySlug={service.categorySlug}
             />
           </div>
 

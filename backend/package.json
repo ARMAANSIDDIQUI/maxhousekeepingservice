@@ -12,7 +12,8 @@
     "seed:all": "node scripts/upload-media.js && node scripts/seed.js",
     "seed:reset": "node scripts/seed.js --reset",
     "make-admin": "node scripts/makeAdmin.js",
-    "test:pricing": "node scripts/testPricing.js"
+    "test:pricing": "node scripts/testPricing.js",
+    "generate-hash": "node scripts/generateHashOrSecret.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -340,6 +340,21 @@ export async function updateService(req, res, next) {
       await resolveCategoriesPayload(updates);
     }
 
+    // Normalize images and sync media structure
+    if (updates.images !== undefined && Array.isArray(updates.images)) {
+      updates.images = updates.images.map(img => {
+        if (typeof img === 'string') return { url: img, alt: updates.title || '' };
+        return { url: img.url, publicId: img.publicId, alt: img.alt || updates.title || '' };
+      }).filter(img => Boolean(img.url));
+
+      if (updates.images.length > 0) {
+        updates.media = {
+          hero: updates.images[0],
+          gallery: updates.images.slice(1)
+        };
+      }
+    }
+
     // Recalculate discountPct if shown price (mrp) or offered price (price) updated
     if (updates.mrp && updates.price) {
       const mrp = Number(updates.mrp);
@@ -400,6 +415,21 @@ export async function createService(req, res, next) {
 
     // Resolve multi-category selection
     await resolveCategoriesPayload(serviceData);
+
+    // Normalize images and sync media structure
+    if (serviceData.images !== undefined && Array.isArray(serviceData.images)) {
+      serviceData.images = serviceData.images.map(img => {
+        if (typeof img === 'string') return { url: img, alt: serviceData.title || '' };
+        return { url: img.url, publicId: img.publicId, alt: img.alt || serviceData.title || '' };
+      }).filter(img => Boolean(img.url));
+
+      if (serviceData.images.length > 0) {
+        serviceData.media = {
+          hero: serviceData.images[0],
+          gallery: serviceData.images.slice(1)
+        };
+      }
+    }
 
     if (!serviceData.description) {
       serviceData.description = serviceData.shortDescription || `${serviceData.title} by Max House Keeping Service.`;
@@ -772,6 +802,14 @@ export async function updateUserRole(req, res, next) {
 
     if (!['customer', 'admin', 'cleaner'].includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role specified.' });
+    }
+
+    // Prevent self-demotion of the current administrator
+    if (req.user && req.user._id.toString() === id && role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot remove admin privileges from your own account.'
+      });
     }
 
     const user = await User.findByIdAndUpdate(

@@ -13,10 +13,13 @@ const fileFilter = (req, file, cb) => {
     'image/avif'
   ];
 
-  if (allowedMimes.includes(file.mimetype)) {
+  const ext = (file.originalname || '').split('.').pop().toLowerCase();
+  const allowedExtensions = ['jpeg', 'jpg', 'png', 'webp', 'gif', 'avif'];
+
+  if (allowedMimes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files (JPEG, PNG, WebP, GIF, AVIF) are allowed.'), false);
+    cb(new Error('Only image files (JPEG, PNG, WebP, GIF, AVIF) with valid extensions are allowed.'), false);
   }
 };
 

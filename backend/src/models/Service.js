@@ -73,6 +73,7 @@ const serviceSchema = new mongoose.Schema({
     hero: { publicId: String, url: String, alt: String },
     gallery: [{ publicId: String, url: String, alt: String }]
   },
+  images: [{ publicId: String, url: String, alt: String }],
   sampleBeforeAfter: {
     beforeUrl: String,
     afterUrl: String,
@@ -93,13 +94,27 @@ const serviceSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Compute discountPct hook
+// Compute discountPct & sync media/images hook
 serviceSchema.pre('save', function (next) {
   if (this.mrp && this.price && this.mrp > this.price) {
     this.discountPct = Math.round(((this.mrp - this.price) / this.mrp) * 100);
   } else {
     this.discountPct = 0;
   }
+
+  // Ensure media and images fields stay in sync
+  if (Array.isArray(this.images) && this.images.length > 0) {
+    if (!this.media) this.media = {};
+    if (!this.media.hero || !this.media.hero.url) {
+      this.media.hero = this.images[0];
+    }
+    if (!this.media.gallery || this.media.gallery.length === 0) {
+      this.media.gallery = this.images.slice(1);
+    }
+  } else if (this.media?.hero?.url) {
+    this.images = [this.media.hero, ...(this.media.gallery || [])];
+  }
+
   next();
 });
 

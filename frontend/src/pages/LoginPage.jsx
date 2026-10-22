@@ -360,11 +360,12 @@ export default function LoginPage() {
     const renderBtn = () => {
       const el = googleButtonRef.current;
       if (!el || !window.google?.accounts?.id) return;
+      const parentRect = el.parentElement?.getBoundingClientRect();
       const rect = el.getBoundingClientRect();
-      const raw = Math.floor(rect.width || el.clientWidth || 0);
-      const available = raw > 50 ? raw : Math.min(384, Math.max(200, window.innerWidth - 64));
+      const raw = Math.floor(rect.width || parentRect?.width || el.clientWidth || 0);
+      const available = raw > 100 ? raw : Math.min(384, Math.max(250, window.innerWidth - 64));
       // Google Identity Services renderButton supports width between 200px and 400px
-      const targetWidth = Math.min(400, Math.max(200, available));
+      const targetWidth = Math.min(384, Math.max(250, available));
 
       if (Math.abs(targetWidth - lastWidth) < 10 && el.children.length > 0) {
         return;
@@ -372,6 +373,10 @@ export default function LoginPage() {
 
       try {
         el.innerHTML = '';
+        el.style.display = 'flex';
+        el.style.justifyContent = 'center';
+        el.style.alignItems = 'center';
+        el.style.width = '100%';
         window.google.accounts.id.renderButton(el, {
           theme: 'outline',
           size: 'large',
@@ -526,7 +531,7 @@ export default function LoginPage() {
                 <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                 <input
                   type="text"
-                  placeholder="admin@maxhousekeepingservice.com or mobile"
+                  placeholder="admin@dummy.com or mobile"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
@@ -987,13 +992,13 @@ export default function LoginPage() {
               </span>
             </div>
 
-            <div className="w-full flex justify-center">
+            <div className="w-full flex justify-center items-center">
               {/* Native Google Sign-In button container */}
               <div
                 ref={googleButtonRef}
                 className={
                   googleStatus === 'ready'
-                    ? 'w-full flex justify-center items-center overflow-hidden [&_.S9gUrf-YoZ4jf]:!w-full [&_.S9gUrf-YoZ4jf]:!flex [&_.S9gUrf-YoZ4jf]:!justify-center [&_.S9gUrf-YoZ4jf>div]:!w-full [&_.S9gUrf-YoZ4jf>div]:!flex [&_.S9gUrf-YoZ4jf>div]:!justify-center [&_iframe]:!max-w-full [&_iframe]:!rounded-xl min-h-[44px]'
+                    ? 'w-full flex justify-center items-center min-h-[44px] [&_iframe]:!mx-auto [&_iframe]:!block [&_iframe]:!rounded-xl'
                     : 'hidden'
                 }
               />

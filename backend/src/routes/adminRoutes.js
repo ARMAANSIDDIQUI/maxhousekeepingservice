@@ -33,7 +33,7 @@ import {
   updateUserRole,
   deleteUser
 } from '../controllers/adminController.js';
-import { uploadImage, deleteImage } from '../controllers/uploadController.js';
+import { uploadImage, uploadMultipleImages, deleteImage } from '../controllers/uploadController.js';
 import { upload } from '../middleware/upload.js';
 import { verifyAuth, roleGuard } from '../middleware/auth.js';
 
@@ -75,6 +75,7 @@ router.delete('/users/:id', deleteUser);
 
 // Cloudinary Image Uploads (Services, Testimonials, Brands, Media)
 router.post('/upload', upload.single('image'), uploadImage);
+router.post('/upload-multiple', upload.array('images', 15), uploadMultipleImages);
 router.delete('/upload/:publicId', deleteImage);
 
 // Testimonials Management (Form uploads & Table Management)

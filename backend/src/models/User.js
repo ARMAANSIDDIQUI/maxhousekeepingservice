@@ -19,11 +19,12 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   phone: { type: String, trim: true, default: '' },
   email: { type: String, trim: true, lowercase: true, sparse: true, index: true },
-  passwordHash: { type: String },
+  passwordHash: { type: String, select: false },
   role: { type: String, enum: ['customer', 'cleaner', 'admin'], default: 'customer', index: true },
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   avatarUrl: { type: String, default: '' },
   emailVerified: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: true, index: true },
   otpSecret: {
     code: { type: String },
     expiresAt: { type: Date },
