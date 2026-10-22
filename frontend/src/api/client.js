@@ -736,13 +736,19 @@ export function getFallbackResponse(url, options = {}) {
 
 import { getCache, setCache, clearCacheByPrefix } from '../utils/cache.js';
 
+// Proactively clear any legacy stale cached business settings from localStorage
+try {
+  clearCacheByPrefix('/public/settings');
+  clearCacheByPrefix('/settings');
+} catch {}
+
 // Unified apiRequest helper powered by Axios with automatic graceful fallbacks and memory+localStorage caching
 export async function apiRequest(endpoint, options = {}) {
   const method = (options.method || 'GET').toLowerCase();
   const rawUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const cacheKey = options.params ? `${rawUrl}_${JSON.stringify(options.params)}` : rawUrl;
 
-  const isPrivateEndpoint = rawUrl.startsWith('/auth') || rawUrl.startsWith('/admin') || rawUrl.includes('/bookings/my') || rawUrl.includes('/messages');
+  const isPrivateEndpoint = rawUrl.startsWith('/auth') || rawUrl.startsWith('/admin') || rawUrl.includes('/bookings/my') || rawUrl.includes('/messages') || rawUrl.includes('/settings');
   const canCache = method === 'get' && !options.noCache && !isPrivateEndpoint;
 
   // Check cache for public idempotent GET requests
@@ -779,6 +785,11 @@ export async function apiRequest(endpoint, options = {}) {
           clearCacheByPrefix('/admin/testimonials');
         }
         if (rawUrl.includes('/users')) clearCacheByPrefix('/admin/users');
+        if (rawUrl.includes('/settings')) {
+          clearCacheByPrefix('/public/settings');
+          clearCacheByPrefix('/settings');
+          clearCacheByPrefix('/admin/settings');
+        }
       }
       return response;
     }
@@ -936,8 +947,17 @@ export const adminAPI = {
   updateCoupon: (id, data) => apiRequest(`/admin/coupons/${id}`, { method: 'PUT', body: data }),
   deleteCoupon: (id) => apiRequest(`/admin/coupons/${id}`, { method: 'DELETE' }),
   // Site & Business Settings
-  getSettings: () => apiRequest('/admin/settings', { method: 'GET' }),
-  updateSettings: (data) => apiRequest('/admin/settings', { method: 'PUT', body: data })
+  getSettings: () => apiRequest('/admin/settings', { method: 'GET', noCache: true }),
+  updateSettings: async (data) => {
+    clearCacheByPrefix('/public/settings');
+    clearCacheByPrefix('/settings');
+    clearCacheByPrefix('/admin/settings');
+    const res = await apiRequest('/admin/settings', { method: 'PUT', body: data });
+    clearCacheByPrefix('/public/settings');
+    clearCacheByPrefix('/settings');
+    clearCacheByPrefix('/admin/settings');
+    return res;
+  }
 };
 
 // Export api Axios instance as default for direct use if desired

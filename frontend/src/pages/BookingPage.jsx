@@ -206,7 +206,8 @@ export default function BookingPage() {
     slot,
     setSlot,
     customer,
-    setCustomer
+    setCustomer,
+    settings: contextSettings
   } = useBooking();
 
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -361,25 +362,41 @@ export default function BookingPage() {
   });
 
   // Payment Gateway Settings & Dynamic Selection (Default: Cash on Service)
-  const [acceptOnlinePayments, setAcceptOnlinePayments] = useState(false);
-  const [paymentSettings, setPaymentSettings] = useState(null);
+  const [acceptOnlinePayments, setAcceptOnlinePayments] = useState(Boolean(contextSettings?.acceptOnlinePayments));
+  const [paymentSettings, setPaymentSettings] = useState(contextSettings || null);
   const [paymentChoice, setPaymentChoice] = useState('cash_on_service'); // 'cash_on_service' | 'online_before'
 
-  // Fetch Public Settings on Mount
+  // Sync state with contextSettings whenever updated in real-time
+  useEffect(() => {
+    if (contextSettings) {
+      const isOnline = Boolean(contextSettings.acceptOnlinePayments);
+      setAcceptOnlinePayments(isOnline);
+      setPaymentSettings(contextSettings);
+      if (!isOnline && paymentChoice === 'online_before') {
+        setPaymentChoice('cash_on_service');
+      }
+    }
+  }, [contextSettings, paymentChoice]);
+
+  // Fetch fresh Public Settings on Mount (always bypass cache to get live DB settings)
   useEffect(() => {
     async function loadPublicSettings() {
       try {
-        const res = await apiRequest('/public/settings');
-        if (res.success && res.settings) {
-          setAcceptOnlinePayments(Boolean(res.settings.acceptOnlinePayments));
+        const res = await apiRequest('/public/settings', { noCache: true });
+        if (res && res.success !== false && res.settings) {
+          const isOnline = Boolean(res.settings.acceptOnlinePayments);
+          setAcceptOnlinePayments(isOnline);
           setPaymentSettings(res.settings);
+          if (!isOnline && paymentChoice === 'online_before') {
+            setPaymentChoice('cash_on_service');
+          }
         }
       } catch (err) {
         console.warn('Failed loading public business settings:', err);
       }
     }
     loadPublicSettings();
-  }, []);
+  }, [paymentChoice]);
 
   // Pre-fill user data if logged in
   useEffect(() => {

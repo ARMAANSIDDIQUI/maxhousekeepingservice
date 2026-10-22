@@ -84,7 +84,7 @@ export function BookingProvider({ children }) {
 
   const refreshSettings = useCallback(async () => {
     try {
-      const res = await apiRequest('/public/settings');
+      const res = await apiRequest('/public/settings', { noCache: true });
       if (res && res.success !== false && res.settings) {
         setSettings(prev => ({
           ...prev,
