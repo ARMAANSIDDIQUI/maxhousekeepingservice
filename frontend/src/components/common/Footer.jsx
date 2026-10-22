@@ -65,9 +65,9 @@ export default function Footer() {
                   <span className="font-display font-bold text-base sm:text-lg text-[#F4EFE6]">
                     Get the Max Housekeeping App
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#E9A23B]/20 text-[#E9A23B] border border-[#E9A23B]/30">
+                  {/* <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#E9A23B]/20 text-[#E9A23B] border border-[#E9A23B]/30">
                     Fast PWA
-                  </span>
+                  </span> */}
                 </div>
                 <p className="text-xs text-[#DDEBE4]/80 mt-1 max-w-xl">
                   Install our lightweight app directly to your device home screen for 1-tap bookings, real-time cleaner tracking, and instant updates.
