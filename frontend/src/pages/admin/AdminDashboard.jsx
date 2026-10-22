@@ -28,11 +28,14 @@ import {
   LuSearch,
   LuRotateCcw,
   LuClock,
-  LuCreditCard
+  LuCreditCard,
+  LuLayers,
+  LuChevronDown
 } from 'react-icons/lu';
 import {
   apiRequest,
-  adminAPI
+  adminAPI,
+  FALLBACK_CATEGORIES
 } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -50,7 +53,7 @@ const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
 
 export default function AdminDashboard() {
   const { refreshSettings } = useBooking();
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'cities' | 'testimonials' | 'messages'
+  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'categories' | 'cities' | ...
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [bookingSearch, setBookingSearch] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
@@ -58,6 +61,21 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    slug: '',
+    tagline: '',
+    iconKey: 'PiHouseLine',
+    imageUrl: '',
+    sortOrder: 0,
+    isActive: true
+  });
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [uploadingCategoryImg, setUploadingCategoryImg] = useState(false);
   const [cities, setCities] = useState([]);
   const [users, setUsers] = useState([]);
   const [testimonials, setTestimonials] = useState([]);
@@ -104,6 +122,7 @@ export default function AdminDashboard() {
     icon: 'Sparkles',
     shortDescription: '',
     description: '',
+    categories: [],
     imageUrl: '',
     variantGroupLabel: 'Apartment / House Size',
     variantGroupKey: 'size',
@@ -120,6 +139,7 @@ export default function AdminDashboard() {
   const [serviceForm, setServiceForm] = useState({
     title: '',
     slug: '',
+    categories: [],
     icon: 'Sparkles',
     price: 0, // Offered Price
     mrp: 0,   // Shown Price (regular)
@@ -177,14 +197,199 @@ export default function AdminDashboard() {
     }
   }, [isAdmin, isAuthLoading]);
 
+  // Open Create Service Modal with First Category Pre-selected
+  const openCreateServiceModal = () => {
+    const defaultCatId = categories.length > 0 ? String(categories[0]._id) : '';
+    setNewServiceForm({
+      title: '',
+      slug: '',
+      categories: defaultCatId ? [defaultCatId] : [],
+      price: 499,
+      mrp: 699,
+      duration: '1.5 hrs',
+      icon: 'Sparkles',
+      shortDescription: '',
+      description: '',
+      imageUrl: '',
+      variantGroupLabel: 'Apartment / House Size',
+      variantGroupKey: 'size',
+      variants: [],
+      inclusions: '',
+      exclusions: ''
+    });
+    setCreateServiceModalOpen(true);
+  };
+
+  // Dedicated Category & Classification Section (Dropdown + Multi-Select Cards)
+  const renderCategorySelectionSection = (isEdit = false) => {
+    const form = isEdit ? serviceForm : newServiceForm;
+    const currentCats = (form.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
+    const primaryId = currentCats[0] || (categories[0] ? String(categories[0]._id) : '');
+
+    const handleSelectPrimary = (catId) => {
+      const targetId = String(catId);
+      if (!targetId) return;
+      const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+      updateFn(prev => {
+        const curr = (prev.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
+        const rest = curr.filter(id => id !== targetId);
+        return { ...prev, categories: [targetId, ...rest] };
+      });
+    };
+
+    const handleToggleSecondary = (catId) => {
+      const targetId = String(catId);
+      const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+      updateFn(prev => {
+        const curr = (prev.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
+        if (curr.includes(targetId)) {
+          if (curr.length <= 1) {
+            toast.error('Service must belong to at least one category.');
+            return prev;
+          }
+          return { ...prev, categories: curr.filter(id => id !== targetId) };
+        } else {
+          return { ...prev, categories: [...curr, targetId] };
+        }
+      });
+    };
+
+    return (
+      <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3.5 shadow-2xs">
+        {/* Section Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuLayers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                  Category & Service Classification
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#10231D]/10 text-[#10231D]">
+                  {currentCats.length} {currentCats.length === 1 ? 'Category' : 'Categories'} Selected
+                </span>
+              </div>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Assign primary category for catalog routing & optional secondary categories
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. Primary Category Select Dropdown */}
+        <div>
+          <label className="block text-xs font-bold text-[#10231D] mb-1.5">
+            Primary Category <span className="text-red-500">*</span> (Main Section in Navigation & Bookings):
+          </label>
+          <div className="relative">
+            <select
+              value={primaryId}
+              onChange={(e) => handleSelectPrimary(e.target.value)}
+              className="w-full p-2.5 pr-9 rounded-xl bg-white border border-[#E2D9C8] text-xs sm:text-sm font-bold text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none appearance-none cursor-pointer shadow-2xs"
+              required
+            >
+              <option value="">-- Choose Primary Category (Required) --</option>
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat._id}>
+                  {cat.name} {cat.slug ? `(/${cat.slug})` : ''}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#10231D]">
+              <LuChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#6B8077] mt-1">
+            This category is used as the service's primary URL and main listing tag.
+          </p>
+        </div>
+
+        {/* 2. Multi-Category Checkbox Grid */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-bold text-[#10231D]">
+              Assign Additional Categories (Multi-Category Display):
+            </label>
+            <span className="text-[10px] text-[#6B8077]">
+              Check all categories where this service should appear
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {categories.map((cat) => {
+              const catIdStr = String(cat._id);
+              const isSelected = currentCats.includes(catIdStr);
+              const isPrimary = primaryId === catIdStr;
+
+              return (
+                <div
+                  key={cat._id}
+                  onClick={() => {
+                    if (isPrimary) return;
+                    handleToggleSecondary(cat._id);
+                  }}
+                  className={`p-2.5 rounded-xl border text-xs transition-all flex items-center justify-between cursor-pointer select-none ${
+                    isPrimary
+                      ? 'bg-[#10231D] text-[#E9A23B] border-[#10231D] shadow-xs'
+                      : isSelected
+                      ? 'bg-white text-[#10231D] border-[#E9A23B] ring-1 ring-[#E9A23B]/30'
+                      : 'bg-[#F4EFE6]/80 text-[#3D524A] hover:bg-white border-[#E2D9C8]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 ${
+                        isSelected
+                          ? isPrimary
+                            ? 'bg-[#E9A23B] border-[#E9A23B] text-[#10231D]'
+                            : 'bg-[#10231D] border-[#10231D] text-white'
+                          : 'border-[#6B8077]/40 bg-white'
+                      }`}
+                    >
+                      {isSelected && <LuCheck className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <span className={`font-bold ${isPrimary ? 'text-[#E9A23B]' : isSelected ? 'text-[#10231D]' : 'text-[#3D524A]'}`}>
+                      {cat.name}
+                    </span>
+                  </div>
+
+                  {isPrimary ? (
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D]">
+                      ★ Primary
+                    </span>
+                  ) : isSelected ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPrimary(cat._id);
+                      }}
+                      className="text-[9px] font-bold text-[#6B8077] hover:text-[#10231D] hover:underline px-2 py-0.5 rounded bg-[#ECE5D8]"
+                      title="Set as Primary Category"
+                    >
+                      Make Primary
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Load All Admin Data
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [statsRes, bookingsRes, servicesRes, citiesRes, usersRes, testsRes, msgsRes, couponsRes, settingsRes] = await Promise.allSettled([
+      const [statsRes, bookingsRes, servicesRes, categoriesRes, citiesRes, usersRes, testsRes, msgsRes, couponsRes, settingsRes] = await Promise.allSettled([
         apiRequest('/admin/stats'),
         apiRequest('/admin/bookings?limit=50'),
         apiRequest('/admin/services'),
+        adminAPI.getCategories(),
         adminAPI.getCities(),
         adminAPI.getUsers(),
         adminAPI.getTestimonials(),
@@ -201,6 +406,9 @@ export default function AdminDashboard() {
       }
       if (servicesRes.status === 'fulfilled' && servicesRes.value?.services?.length > 0) {
         setServices(servicesRes.value.services);
+      }
+      if (categoriesRes.status === 'fulfilled' && Array.isArray(categoriesRes.value?.categories)) {
+        setCategories(categoriesRes.value.categories);
       }
       if (citiesRes.status === 'fulfilled' && Array.isArray(citiesRes.value?.cities)) {
         setCities(citiesRes.value.cities);
@@ -311,6 +519,9 @@ export default function AdminDashboard() {
     setServiceForm({
       title: service.title,
       slug: service.slug || '',
+      categories: service.categories && service.categories.length > 0
+        ? service.categories.map(c => (c && c._id ? String(c._id) : String(c)))
+        : (service.category ? [String(service.category._id || service.category)] : (categories.length > 0 ? [String(categories[0]._id)] : [])),
       icon: service.icon || 'Sparkles',
       price: service.price,
       mrp: service.mrp,
@@ -358,9 +569,19 @@ export default function AdminDashboard() {
         return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       };
 
+      let selectedCats = (serviceForm.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
+      if (selectedCats.length === 0 && categories.length > 0) {
+        selectedCats = [String(categories[0]._id)];
+      }
+      if (selectedCats.length === 0) {
+        toast.error('Please select at least one category for this service.');
+        return;
+      }
+
       const payload = {
         title: serviceForm.title,
         slug: serviceForm.slug,
+        categories: selectedCats,
         icon: serviceForm.icon,
         price: Number(serviceForm.price),
         mrp: Number(serviceForm.mrp),
@@ -435,9 +656,20 @@ export default function AdminDashboard() {
         return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       };
 
+      let selectedCats = (newServiceForm.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
+      if (selectedCats.length === 0 && categories.length > 0) {
+        selectedCats = [String(categories[0]._id)];
+      }
+      if (selectedCats.length === 0) {
+        toast.error('Please select at least one category for this service.');
+        setSavingNewService(false);
+        return;
+      }
+
       const payload = {
         title: newServiceForm.title.trim(),
         slug: newServiceForm.slug.trim() || newServiceForm.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+        categories: selectedCats,
         price: Number(newServiceForm.price),
         mrp: Number(newServiceForm.mrp),
         duration: newServiceForm.duration || '1.5 hrs',
@@ -466,6 +698,7 @@ export default function AdminDashboard() {
         setNewServiceForm({
           title: '',
           slug: '',
+          categories: [],
           price: 499,
           mrp: 699,
           duration: '1.5 hrs',
@@ -505,6 +738,130 @@ export default function AdminDashboard() {
       toast.error('Failed to upload service image.');
     } finally {
       setUploadingNewServiceImage(false);
+    }
+  };
+
+  // Category Form Handlers
+  const handleEditCategory = (cat) => {
+    setEditingCategory(cat);
+    setCategoryForm({
+      name: cat.name || '',
+      slug: cat.slug || '',
+      tagline: cat.tagline || '',
+      iconKey: cat.iconKey || 'PiHouseLine',
+      imageUrl: cat.image?.url || '',
+      sortOrder: cat.sortOrder ?? 0,
+      isActive: cat.isActive !== undefined ? cat.isActive : true
+    });
+    setCategoryModalOpen(true);
+  };
+
+  const handleCreateCategoryOpen = () => {
+    setEditingCategory(null);
+    setCategoryForm({
+      name: '',
+      slug: '',
+      tagline: '',
+      iconKey: 'PiHouseLine',
+      imageUrl: '',
+      sortOrder: categories.length + 1,
+      isActive: true
+    });
+    setCategoryModalOpen(true);
+  };
+
+  const handleCategoryImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCategoryImg(true);
+    try {
+      const res = await adminAPI.uploadImage(file, 'max-housekeeping/categories');
+      if (res && res.url) {
+        setCategoryForm(prev => ({ ...prev, imageUrl: res.url }));
+        toast.success('Category image uploaded successfully!');
+      } else {
+        toast.error('Upload completed, but URL not returned.');
+      }
+    } catch (err) {
+      toast.error('Failed to upload image.');
+    } finally {
+      setUploadingCategoryImg(false);
+    }
+  };
+
+  const handleSaveCategory = async (e) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) {
+      toast.error('Category name is required.');
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      const payload = {
+        name: categoryForm.name.trim(),
+        slug: categoryForm.slug.trim() || categoryForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+        tagline: categoryForm.tagline.trim(),
+        iconKey: categoryForm.iconKey,
+        image: categoryForm.imageUrl ? { url: categoryForm.imageUrl, alt: `${categoryForm.name} photo` } : undefined,
+        sortOrder: Number(categoryForm.sortOrder) || 0,
+        isActive: Boolean(categoryForm.isActive)
+      };
+
+      if (editingCategory) {
+        const res = await adminAPI.updateCategory(editingCategory._id, payload);
+        if (res.success && res.category) {
+          toast.success(`Category "${res.category.name}" updated successfully.`);
+          setCategories(prev => prev.map(c => c._id === res.category._id ? { ...res.category, serviceCount: c.serviceCount } : c));
+          setCategoryModalOpen(false);
+        }
+      } else {
+        const res = await adminAPI.createCategory(payload);
+        if (res.success && res.category) {
+          toast.success(`Category "${res.category.name}" created successfully.`);
+          setCategories(prev => [...prev, { ...res.category, serviceCount: 0 }]);
+          setCategoryModalOpen(false);
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to save category.');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = (id, name) => {
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Delete Category "${name}"`,
+      message: `Are you sure you want to delete category "${name}"? Services assigned solely to this category will be updated. This action cannot be undone.`,
+      confirmText: 'Delete Category',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteCategory(id);
+          if (res.success) {
+            toast.success(`Category "${name}" deleted.`);
+            setCategories(prev => prev.filter(c => c._id !== id));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete category.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  const handleToggleCategoryActive = async (cat) => {
+    try {
+      const newStatus = !cat.isActive;
+      const res = await adminAPI.updateCategory(cat._id, { isActive: newStatus });
+      if (res.success) {
+        toast.success(`Category is now ${newStatus ? 'Active' : 'Inactive'}.`);
+        setCategories(prev => prev.map(c => c._id === cat._id ? { ...c, isActive: newStatus } : c));
+      }
+    } catch (err) {
+      toast.error('Failed to toggle category status.');
     }
   };
 
@@ -925,9 +1282,20 @@ export default function AdminDashboard() {
 
   const unreadMessagesCount = contactMessages.filter(m => m.status === 'unread').length;
 
+  const filteredCategories = categories.filter(c => {
+    const q = categorySearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.slug?.toLowerCase().includes(q) ||
+      c.tagline?.toLowerCase().includes(q)
+    );
+  });
+
   const adminTabs = [
     { id: 'bookings', label: 'Bookings & Dispatch', icon: LuCalendar, count: bookings.length },
     { id: 'services', label: 'Services & Dual-Pricing', icon: LuSparkles, count: services.length },
+    { id: 'categories', label: 'Category Management', icon: LuLayers, count: categories.length },
     { id: 'cities', label: 'Cities & Regions', icon: LuMapPin, count: cities.length },
     { id: 'users', label: 'Users Database', icon: LuUsers, count: users.length },
     { id: 'testimonials', label: 'Testimonials', icon: LuStar, count: testimonials.length },
@@ -1385,7 +1753,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => setCreateServiceModalOpen(true)}
+                onClick={openCreateServiceModal}
                 className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
               >
                 <LuPlus className="w-4 h-4" />
@@ -1415,12 +1783,22 @@ export default function AdminDashboard() {
                         </div>
                       )}
 
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-mono uppercase text-[#E9A23B] font-bold">
-                          {svc.categoryName}
-                        </span>
+                      <div className="flex justify-between items-start mb-2 gap-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(svc.categories && svc.categories.length > 0
+                            ? svc.categories
+                            : (svc.categoryNames && svc.categoryNames.length > 0
+                              ? svc.categoryNames.map(n => ({ name: n }))
+                              : [{ name: svc.categoryName || 'Cleaning' }]
+                            )
+                          ).map((c, cIdx) => (
+                            <span key={cIdx} className="text-[10px] font-mono uppercase text-[#10231D] bg-[#E9A23B]/20 border border-[#E9A23B]/40 px-2 py-0.5 rounded-md font-bold">
+                              {c.name || c}
+                            </span>
+                          ))}
+                        </div>
                         {discountPct > 0 && (
-                          <span className="text-[11px] font-black text-[#C2512D] bg-[#F9ECE8] px-2 py-0.5 rounded-full">
+                          <span className="text-[11px] font-black text-[#C2512D] bg-[#F9ECE8] px-2 py-0.5 rounded-full shrink-0">
                             {discountPct}% OFF
                           </span>
                         )}
@@ -1485,6 +1863,141 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB: CATEGORY MANAGEMENT
+        ======================================================== */}
+        {activeTab === 'categories' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <div>
+                <h3 className="font-display font-bold text-xl text-[#10231D] flex items-center gap-2">
+                  <span>Category Management</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#E9A23B] text-[#10231D]">
+                    {categories.length} Categories
+                  </span>
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Organize services under multiple categories, configure URLs, descriptions, and hero banner photos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateCategoryOpen}
+                className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shadow-sm cursor-pointer"
+              >
+                <LuPlus className="w-4 h-4" />
+                <span>Add New Category</span>
+              </button>
+            </div>
+
+            {/* Filter Search */}
+            <div className="mb-6 max-w-sm">
+              <div className="relative">
+                <LuSearch className="w-4 h-4 text-[#6B8077] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search categories by name, slug or description..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-xs text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                />
+              </div>
+            </div>
+
+            {/* Categories Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredCategories.map((cat) => (
+                <div
+                  key={cat._id}
+                  className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] flex flex-col justify-between shadow-xs hover:border-[#E9A23B]/60 transition-all"
+                >
+                  <div>
+                    {/* Category Image or Icon Header */}
+                    <div className="h-36 rounded-xl overflow-hidden mb-3 bg-[#ECE5D8] relative border border-[#E2D9C8]">
+                      {cat.image?.url ? (
+                        <img
+                          src={cat.image.url}
+                          alt={cat.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-[#10231D]/5">
+                          <LuLayers className="w-12 h-12 text-[#E9A23B]/40" />
+                        </div>
+                      )}
+                      <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                        cat.isActive ? 'bg-emerald-500/90 text-white' : 'bg-gray-500/90 text-white'
+                      }`}>
+                        {cat.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                      <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[#10231D]/80 text-[#E9A23B] backdrop-blur-xs">
+                        Order #{cat.sortOrder ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="font-display font-bold text-base text-[#10231D]">
+                        {cat.name}
+                      </h4>
+                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#ECE5D8] text-[#10231D] shrink-0">
+                        {cat.serviceCount ?? 0} {cat.serviceCount === 1 ? 'service' : 'services'}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-[#E9A23B] font-semibold mb-2">
+                      /{cat.slug}
+                    </div>
+
+                    {cat.tagline && (
+                      <p className="text-xs text-[#6B8077] line-clamp-2 mb-3">
+                        {cat.tagline}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="pt-3 border-t border-[#E2D9C8] flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCategoryActive(cat)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        cat.isActive
+                          ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                      }`}
+                    >
+                      {cat.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEditCategory(cat)}
+                        className="p-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E9A23B] hover:text-[#10231D] text-[#10231D] transition-colors cursor-pointer"
+                        title="Edit Category"
+                      >
+                        <LuSquarePen className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat._id, cat.name)}
+                        className="p-1.5 rounded-lg bg-red-100 hover:bg-red-500 hover:text-white text-red-700 transition-colors cursor-pointer"
+                        title="Delete Category"
+                      >
+                        <LuTrash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {filteredCategories.length === 0 && (
+                <div className="col-span-full py-12 text-center text-xs text-[#6B8077]">
+                  No categories match your search.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2340,6 +2853,9 @@ export default function AdminDashboard() {
                   required
                 />
               </div>
+
+              {/* Category & Service Classification Section (Primary Dropdown + Multi-Select Cards) */}
+              {renderCategorySelectionSection(true)}
 
               {/* Cloudinary Service Image Upload */}
               <div>
@@ -3245,6 +3761,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Category & Service Classification Section (Primary Dropdown + Multi-Select Cards) */}
+              {renderCategorySelectionSection(false)}
+
               {/* Service Icon (Select-Only) */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
@@ -3824,6 +4343,157 @@ export default function AdminDashboard() {
                   className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
                 >
                   {savingCoupon ? 'Creating...' : 'Create Coupon'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* Category Modal (Create / Edit) */}
+        {categoryModalOpen && (
+          <Modal
+            isOpen={true}
+            onClose={() => setCategoryModalOpen(false)}
+            title={editingCategory ? `Edit Category: ${editingCategory.name}` : 'Create New Category'}
+            subtitle="Configure Category Name, URL Slug, Tagline, Display Order and Cover Image"
+            maxWidth="max-w-xl"
+          >
+            <form onSubmit={handleSaveCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Category Name:
+                </label>
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setCategoryForm(prev => ({
+                      ...prev,
+                      name,
+                      slug: editingCategory ? prev.slug : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  placeholder="e.g. Balcony & Terrace Cleaning"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    URL Slug:
+                  </label>
+                  <input
+                    type="text"
+                    value={categoryForm.slug}
+                    onChange={(e) => setCategoryForm(prev => ({ ...prev, slug: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    placeholder="e.g. balcony-cleaning"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Display Sort Order:
+                  </label>
+                  <input
+                    type="number"
+                    value={categoryForm.sortOrder}
+                    onChange={(e) => setCategoryForm(prev => ({ ...prev, sortOrder: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    min={0}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Tagline / Subtitle:
+                </label>
+                <input
+                  type="text"
+                  value={categoryForm.tagline}
+                  onChange={(e) => setCategoryForm(prev => ({ ...prev, tagline: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  placeholder="e.g. High-pressure wash and bird protection for open balconies."
+                />
+              </div>
+
+              {/* Category Photo */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Category Cover Photo (Cloudinary):
+                </label>
+                <div className="flex items-center gap-3">
+                  {categoryForm.imageUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#E2D9C8] shrink-0 bg-[#ECE5D8]">
+                      <img
+                        src={categoryForm.imageUrl}
+                        alt="Category Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCategoryForm(prev => ({ ...prev, imageUrl: '' }))}
+                        className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 cursor-pointer"
+                      >
+                        <LuX className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl border-2 border-dashed border-[#E2D9C8] flex items-center justify-center text-[#6B8077] shrink-0">
+                      <LuImage className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors">
+                      <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{uploadingCategoryImg ? 'Uploading...' : 'Upload Image to Cloudinary'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCategoryImageUpload}
+                        className="hidden"
+                        disabled={uploadingCategoryImg}
+                      />
+                    </label>
+                    <p className="text-[10px] text-[#6B8077] mt-1">
+                      High-resolution cover image for category card thumbnails.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="categoryActiveToggle"
+                  checked={categoryForm.isActive}
+                  onChange={(e) => setCategoryForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                  className="rounded accent-[#E9A23B] w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="categoryActiveToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
+                  Active and visible on public website & service filters
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setCategoryModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#10231D] hover:bg-[#ECE5D8] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCategory}
+                  className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  {savingCategory && <div className="w-3.5 h-3.5 border-2 border-[#10231D] border-t-transparent rounded-full animate-spin" />}
+                  <span>{editingCategory ? 'Save Changes' : 'Create Category'}</span>
                 </button>
               </div>
             </form>

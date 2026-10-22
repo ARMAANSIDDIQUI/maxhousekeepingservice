@@ -63,6 +63,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const {
+    user,
+    isLoading: isAuthLoading,
     login,
     sendSignupOtp,
     register,
@@ -77,6 +79,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // If already logged in, disable login page and redirect to home
+  React.useEffect(() => {
+    if (!isAuthLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, isAuthLoading, navigate]);
+
   React.useEffect(() => {
     document.title =
       mode === 'signin'
@@ -88,10 +97,9 @@ export default function LoginPage() {
 
   const handlePostLoginRedirect = (userRole) => {
     if (userRole === 'admin') {
-      navigate('/admin');
+      navigate('/admin', { replace: true });
     } else {
-      const from = location.state?.from || '/';
-      navigate(from);
+      navigate('/dashboard', { replace: true });
     }
   };
 
@@ -417,6 +425,18 @@ export default function LoginPage() {
       toast.warn('Google Sign-In is blocked by your browser ad-blocker (e.g. uBlock Origin, Brave Shields) or an offline connection. Please allow accounts.google.com, or sign in using Email OTP / Password above.');
     }
   };
+
+  if (!isAuthLoading && user) {
+    return (
+      <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">
+        <div className="text-center p-8 bg-[#ECE5D8] rounded-2xl border-2 border-[#10231D] shadow-xl max-w-sm">
+          <div className="w-10 h-10 border-4 border-[#E9A23B] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="font-display font-bold text-lg text-[#10231D] mb-1">Already Logged In</h2>
+          <p className="text-xs text-[#6B8077]">Redirecting to home page...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">

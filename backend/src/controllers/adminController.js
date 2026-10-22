@@ -189,6 +189,7 @@ export async function getAdminServices(req, res, next) {
   try {
     const services = await Service.find()
       .populate('category', 'name slug')
+      .populate('categories', 'name slug')
       .sort({ sortOrder: 1, createdAt: -1 });
 
     res.status(200).json({
@@ -199,6 +200,48 @@ export async function getAdminServices(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Helper to resolve multiple categories and preserve backwards-compatible primary category
+ */
+async function resolveCategoriesPayload(payload) {
+  let catIds = [];
+  if (Array.isArray(payload.categories) && payload.categories.length > 0) {
+    catIds = payload.categories.map(c => (c && c._id ? c._id : c)).filter(Boolean);
+  } else if (payload.category) {
+    const singleId = payload.category && payload.category._id ? payload.category._id : payload.category;
+    if (singleId) catIds = [singleId];
+  }
+
+  if (catIds.length > 0) {
+    const catDocs = await Category.find({ _id: { $in: catIds } });
+    if (catDocs.length > 0) {
+      const docMap = new Map(catDocs.map(c => [c._id.toString(), c]));
+      const orderedDocs = catIds.map(id => docMap.get(id.toString())).filter(Boolean);
+      const uniqueDocs = orderedDocs.length > 0 ? orderedDocs : catDocs;
+
+      payload.categories = uniqueDocs.map(c => c._id);
+      payload.categorySlugs = uniqueDocs.map(c => c.slug);
+      payload.categoryNames = uniqueDocs.map(c => c.name);
+      payload.category = uniqueDocs[0]._id;
+      payload.categorySlug = uniqueDocs[0].slug;
+      payload.categoryName = uniqueDocs[0].name;
+      return;
+    }
+  }
+
+  // Fallback to default category if none found
+  let defaultCat = await Category.findOne();
+  if (!defaultCat) {
+    defaultCat = await Category.create({ name: 'General Cleaning', slug: 'general-cleaning' });
+  }
+  payload.categories = [defaultCat._id];
+  payload.categorySlugs = [defaultCat.slug];
+  payload.categoryNames = [defaultCat.name];
+  payload.category = defaultCat._id;
+  payload.categorySlug = defaultCat.slug;
+  payload.categoryName = defaultCat.name;
 }
 
 /**
@@ -292,6 +335,11 @@ export async function updateService(req, res, next) {
       updates.exclusions = sanitizeStringList(updates.exclusions) || [];
     }
 
+    // Resolve multi-category selection if provided
+    if (updates.categories !== undefined || updates.category !== undefined) {
+      await resolveCategoriesPayload(updates);
+    }
+
     // Recalculate discountPct if shown price (mrp) or offered price (price) updated
     if (updates.mrp && updates.price) {
       const mrp = Number(updates.mrp);
@@ -306,7 +354,7 @@ export async function updateService(req, res, next) {
     const service = await Service.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true
-    }).populate('category', 'name slug');
+    }).populate('category', 'name slug').populate('categories', 'name slug');
 
     if (!service) {
       return res.status(404).json({ success: false, message: 'Service not found.' });
@@ -350,21 +398,8 @@ export async function createService(req, res, next) {
       serviceData.discountPct = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
     }
 
-    if (!serviceData.category) {
-      let defaultCat = await Category.findOne();
-      if (!defaultCat) {
-        defaultCat = await Category.create({ name: 'General Cleaning', slug: 'general-cleaning' });
-      }
-      serviceData.category = defaultCat._id;
-      serviceData.categoryName = defaultCat.name;
-      serviceData.categorySlug = defaultCat.slug;
-    } else {
-      const cat = await Category.findById(serviceData.category);
-      if (cat) {
-        serviceData.categoryName = cat.name;
-        serviceData.categorySlug = cat.slug;
-      }
-    }
+    // Resolve multi-category selection
+    await resolveCategoriesPayload(serviceData);
 
     if (!serviceData.description) {
       serviceData.description = serviceData.shortDescription || `${serviceData.title} by Max House Keeping Service.`;
@@ -789,6 +824,179 @@ export async function deleteUser(req, res, next) {
   }
 }
 
+/**
+ * Get all categories (Admin)
+ * GET /api/v1/admin/categories
+ */
+export async function getAdminCategories(req, res, next) {
+  try {
+    const categories = await Category.find().sort({ sortOrder: 1, createdAt: 1 });
+    
+    // Compute service count for each category
+    const counts = await Service.aggregate([
+      {
+        $project: {
+          allCats: {
+            $setUnion: [
+              { $cond: [{ $ifNull: ['$category', false] }, ['$category'], []] },
+              { $ifNull: ['$categories', []] }
+            ]
+          }
+        }
+      },
+      { $unwind: '$allCats' },
+      { $group: { _id: '$allCats', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    counts.forEach(c => {
+      countMap[c._id.toString()] = c.count;
+    });
+
+    const enriched = categories.map(cat => ({
+      ...cat.toObject(),
+      serviceCount: countMap[cat._id.toString()] || 0
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: enriched.length,
+      categories: enriched
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Create Category (Admin)
+ * POST /api/v1/admin/categories
+ */
+export async function createCategory(req, res, next) {
+  try {
+    const { name, slug, tagline, iconKey, image, sortOrder, isActive } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Category name is required.' });
+    }
+
+    const finalSlug = (slug || name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const existing = await Category.findOne({ slug: finalSlug });
+    if (existing) {
+      return res.status(400).json({ success: false, message: `Category with slug "${finalSlug}" already exists.` });
+    }
+
+    const category = await Category.create({
+      name: name.trim(),
+      slug: finalSlug,
+      tagline: tagline ? tagline.trim() : undefined,
+      iconKey: iconKey || 'PiHouseLine',
+      image: image || undefined,
+      sortOrder: Number(sortOrder) || 0,
+      isActive: isActive !== undefined ? Boolean(isActive) : true
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Category created successfully.',
+      category
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update Category (Admin)
+ * PUT /api/v1/admin/categories/:id
+ */
+export async function updateCategory(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { name, slug, tagline, iconKey, image, sortOrder, isActive } = req.body;
+
+    const category = await Category.findById(id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found.' });
+    }
+
+    if (name) category.name = name.trim();
+    if (slug) {
+      const newSlug = slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      if (newSlug !== category.slug) {
+        const existing = await Category.findOne({ slug: newSlug, _id: { $ne: id } });
+        if (existing) {
+          return res.status(400).json({ success: false, message: `Category slug "${newSlug}" is already taken.` });
+        }
+        category.slug = newSlug;
+      }
+    }
+    if (tagline !== undefined) category.tagline = tagline.trim();
+    if (iconKey !== undefined) category.iconKey = iconKey;
+    if (image !== undefined) category.image = image;
+    if (sortOrder !== undefined) category.sortOrder = Number(sortOrder);
+    if (isActive !== undefined) category.isActive = Boolean(isActive);
+
+    await category.save();
+
+    // Sync updated name and slug in any services referencing this category
+    await Service.updateMany(
+      { category: category._id },
+      { categoryName: category.name, categorySlug: category.slug }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Category updated successfully.',
+      category
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Delete Category (Admin)
+ * DELETE /api/v1/admin/categories/:id
+ */
+export async function deleteCategory(req, res, next) {
+  try {
+    const { id } = req.params;
+    const category = await Category.findById(id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found.' });
+    }
+
+    // Check if services are assigned to this category
+    const linkedServices = await Service.find({
+      $or: [{ category: id }, { categories: id }]
+    });
+
+    if (linkedServices.length > 0) {
+      const replacement = await Category.findOne({ _id: { $ne: id } });
+      if (replacement) {
+        for (const svc of linkedServices) {
+          svc.categories = (svc.categories || []).filter(c => c.toString() !== id);
+          if (svc.category && svc.category.toString() === id) {
+            svc.category = svc.categories[0] || replacement._id;
+            svc.categoryName = svc.categories[0] ? svc.categoryNames[0] : replacement.name;
+            svc.categorySlug = svc.categories[0] ? svc.categorySlugs[0] : replacement.slug;
+          }
+          await svc.save();
+        }
+      }
+    }
+
+    await Category.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: `Category "${category.name}" deleted successfully.`
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getStats,
   getAdminBookings,
@@ -797,6 +1005,10 @@ export default {
   updateService,
   createService,
   deleteService,
+  getAdminCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
   getAdminCoupons,
   createCoupon,
   updateCoupon,

@@ -34,9 +34,12 @@ const serviceSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, index: true },
   aliases: [{ type: String, index: true }], // Legacy URLs to redirect from
-  category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
+  category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', index: true },
   categorySlug: { type: String, index: true },
   categoryName: { type: String },
+  categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category', index: true }],
+  categorySlugs: [{ type: String, index: true }],
+  categoryNames: [{ type: String }],
   shortDescription: { type: String, trim: true },
   description: { type: String, required: true, trim: true },
   duration: { type: String, default: '1 hr' },

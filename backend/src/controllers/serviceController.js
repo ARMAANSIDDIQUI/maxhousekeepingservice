@@ -28,11 +28,19 @@ export async function getServices(req, res, next) {
       }
 
       if (catDoc) {
-        query.category = catDoc._id;
+        query.$or = [
+          { category: catDoc._id },
+          { categories: catDoc._id },
+          { categorySlug: catDoc.slug },
+          { categorySlugs: catDoc.slug }
+        ];
       } else {
         const svc = await Service.findOne({ slug: category });
         if (svc && svc.category) {
-          query.category = svc.category;
+          query.$or = [
+            { category: svc.category },
+            { categories: svc.category }
+          ];
         }
       }
     }
@@ -61,6 +69,7 @@ export async function getServices(req, res, next) {
 
     const services = await Service.find(query)
       .populate('category', 'name slug iconKey image')
+      .populate('categories', 'name slug iconKey image')
       .sort({ sortOrder: 1, createdAt: -1 });
 
     res.status(200).json({
@@ -83,7 +92,8 @@ export async function getServiceBySlug(req, res, next) {
 
     // First try direct slug
     let service = await Service.findOne({ slug: slug.toLowerCase() })
-      .populate('category', 'name slug iconKey image');
+      .populate('category', 'name slug iconKey image')
+      .populate('categories', 'name slug iconKey image');
 
     // If not found, check if it's an alias from legacy 37 URLs
     let isRedirect = false;
@@ -91,7 +101,8 @@ export async function getServiceBySlug(req, res, next) {
 
     if (!service) {
       service = await Service.findOne({ aliases: slug.toLowerCase() })
-        .populate('category', 'name slug iconKey image');
+        .populate('category', 'name slug iconKey image')
+        .populate('categories', 'name slug iconKey image');
 
       if (service) {
         isRedirect = true;
@@ -131,10 +142,21 @@ export async function getCategories(req, res, next) {
   try {
     const categories = await Category.find({ isActive: true }).sort({ sortOrder: 1 });
 
-    // Aggregate active service count per category
+    // Aggregate active service count per category across single and multi-category fields
     const counts = await Service.aggregate([
       { $match: { isActive: true } },
-      { $group: { _id: '$category', count: { $sum: 1 } } }
+      {
+        $project: {
+          allCats: {
+            $setUnion: [
+              { $cond: [{ $ifNull: ['$category', false] }, ['$category'], []] },
+              { $ifNull: ['$categories', []] }
+            ]
+          }
+        }
+      },
+      { $unwind: '$allCats' },
+      { $group: { _id: '$allCats', count: { $sum: 1 } } }
     ]);
 
     const countMap = {};

@@ -8,6 +8,10 @@ import {
   updateService,
   createService,
   deleteService,
+  getAdminCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
   getAdminCoupons,
   createCoupon,
   updateCoupon,
@@ -51,6 +55,12 @@ router.get('/services', getAdminServices);
 router.post('/services', createService);
 router.put('/services/:id', updateService);
 router.delete('/services/:id', deleteService);
+
+// Categories Management (Admin CRUD saved on MongoDB)
+router.get('/categories', getAdminCategories);
+router.post('/categories', createCategory);
+router.put('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
 
 // Cities Management (Admin CRUD saved on MongoDB)
 router.get('/cities', getAdminCities);

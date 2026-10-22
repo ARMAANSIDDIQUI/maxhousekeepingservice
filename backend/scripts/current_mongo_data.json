@@ -1,0 +1,1365 @@
+{
+  "categories": [
+    {
+      "_id": "6ace40253bcdb872f58436d1",
+      "name": "Kitchen Cleaning",
+      "slug": "kitchen-cleaning",
+      "iconKey": "PiCookingPot",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911387/max-housekeeping/categories/cat_kitchen-cleaning.jpg",
+        "publicId": "max-housekeeping/categories/cat_kitchen-cleaning",
+        "alt": "Kitchen Cleaning service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 3,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.241Z",
+      "updatedAt": "2026-10-13T17:09:48.124Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436cf",
+      "name": "Home Cleaning",
+      "slug": "home-deep-cleaning",
+      "iconKey": "PiHouseLine",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911379/max-housekeeping/categories/cat_home-deep-cleaning.jpg",
+        "publicId": "max-housekeeping/categories/cat_home-deep-cleaning",
+        "alt": "Home Cleaning service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 1,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.238Z",
+      "updatedAt": "2026-10-13T17:09:41.068Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436d2",
+      "name": "Sofa & Carpet Cleaning",
+      "slug": "sofa-carpet-cleaning",
+      "iconKey": "PiArmchair",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911391/max-housekeeping/categories/cat_sofa-carpet-cleaning.jpg",
+        "publicId": "max-housekeeping/categories/cat_sofa-carpet-cleaning",
+        "alt": "Sofa & Carpet Cleaning service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 4,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.242Z",
+      "updatedAt": "2026-10-13T17:09:52.082Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436d3",
+      "name": "Commercial Cleaning",
+      "slug": "commercial-cleaning",
+      "iconKey": "PiBuildingOffice",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911395/max-housekeeping/categories/cat_commercial-cleaning.jpg",
+        "publicId": "max-housekeeping/categories/cat_commercial-cleaning",
+        "alt": "Commercial Cleaning service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 5,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.242Z",
+      "updatedAt": "2026-10-13T17:09:56.054Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436d0",
+      "name": "Bathroom Cleaning",
+      "slug": "bathroom-cleaning",
+      "iconKey": "PiBathtub",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911383/max-housekeeping/categories/cat_bathroom-cleaning.jpg",
+        "publicId": "max-housekeeping/categories/cat_bathroom-cleaning",
+        "alt": "Bathroom Cleaning service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 2,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.241Z",
+      "updatedAt": "2026-10-13T17:09:44.466Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436d4",
+      "name": "Pest Control",
+      "slug": "pest-control",
+      "iconKey": "PiBug",
+      "image": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911400/max-housekeeping/categories/cat_pest-control.jpg",
+        "publicId": "max-housekeeping/categories/cat_pest-control",
+        "alt": "Pest Control service"
+      },
+      "serviceCount": 0,
+      "sortOrder": 6,
+      "isActive": true,
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.242Z",
+      "updatedAt": "2026-10-13T17:10:01.171Z"
+    }
+  ],
+  "services": [
+    {
+      "_id": "6ace40253bcdb872f58436e5",
+      "title": "Bed Mattress Dry Cleaning",
+      "slug": "bed-dry-cleaning",
+      "aliases": [
+        "service_single-bed-dry-cleaning",
+        "service_double-bed-dry-cleaning"
+      ],
+      "category": "6ace40253bcdb872f58436cf",
+      "categorySlug": "home-deep-cleaning",
+      "categoryName": "Home Cleaning",
+      "shortDescription": "Antibacterial UV sanitisation and hot-foam shampooing for mattresses.",
+      "description": "Neutralise bed allergens, dead skin flakes, and sweat stains with dual-sided deep extraction.",
+      "duration": "1 hr",
+      "icon": "Bed",
+      "pricingMode": "tiered",
+      "price": 600,
+      "mrp": 900,
+      "discountPct": 33,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Bed Size",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "single-bed",
+              "label": "Single Bed",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "double-bed",
+              "label": "Double Bed",
+              "priceDelta": 400,
+              "mrpDelta": 599,
+              "multiplier": 1,
+              "durationDelta": "1.5 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "single-bed"
+          },
+          "price": 600,
+          "mrp": 900,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "double-bed"
+          },
+          "price": 1000,
+          "mrp": 1499,
+          "duration": "1.5 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "HEPA-filter deep dry vacuuming",
+        "Spot stain cleaning",
+        "Antibacterial anti-mite treatment"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911431/max-housekeeping/services/svc_bed-dry-cleaning.jpg",
+          "alt": "Bed Mattress Dry Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": false,
+      "isActive": true,
+      "sortOrder": 6,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.417Z",
+      "updatedAt": "2026-10-20T15:32:25.798Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e0",
+      "title": "Full Home Deep Cleaning",
+      "slug": "full-home-deep-cleaning",
+      "aliases": [
+        "service_full-home-deep-cleaning-1-bhk",
+        "service_full-home-deep-cleaning-2-bhk",
+        "service_full-home-deep-cleaning-3-bhk",
+        "service_full-home-deep-cleaning-4-bhk"
+      ],
+      "category": "6ace40253bcdb872f58436cf",
+      "categorySlug": "home-deep-cleaning",
+      "categoryName": "Home Cleaning",
+      "shortDescription": "Complete residential deep cleaning with floor scrubbing machines, bathroom tile descaling, and dusting.",
+      "description": "Our signature whole-house treatment covers every corner of your home. Professional crew equipped with industrial single-disc floor scrubbers, wet extraction vacuums, and eco-friendly Taski chemicals.",
+      "duration": "4-5 hrs",
+      "icon": "House",
+      "pricingMode": "tiered",
+      "price": 2800,
+      "mrp": 2999,
+      "discountPct": 7,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Apartment / House Size",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "1-bhk",
+              "label": "1 BHK",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "4-5 hrs",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "2-bhk",
+              "label": "2 BHK",
+              "priceDelta": 3200,
+              "mrpDelta": 4500,
+              "multiplier": 1,
+              "durationDelta": "5-7 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "3-bhk",
+              "label": "3 BHK",
+              "priceDelta": 6700,
+              "mrpDelta": 7501,
+              "multiplier": 1,
+              "durationDelta": "7-9 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "4-bhk",
+              "label": "4 BHK",
+              "priceDelta": 9700,
+              "mrpDelta": 12001,
+              "multiplier": 1,
+              "durationDelta": "2 Days",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "villa",
+              "label": "Villa / Kothi (5+ BHK)",
+              "priceDelta": 15200,
+              "mrpDelta": 19001,
+              "multiplier": 1,
+              "durationDelta": "2-3 Days",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "1-bhk"
+          },
+          "price": 2800,
+          "mrp": 2999,
+          "duration": "4-5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "2-bhk"
+          },
+          "price": 6000,
+          "mrp": 7499,
+          "duration": "5-7 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "3-bhk"
+          },
+          "price": 9500,
+          "mrp": 10500,
+          "duration": "7-9 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "4-bhk"
+          },
+          "price": 12500,
+          "mrp": 15000,
+          "duration": "2 Days",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "villa"
+          },
+          "price": 18000,
+          "mrp": 22000,
+          "duration": "2-3 Days",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Floor scrubbing with single-disc machine",
+        "All bathrooms ceiling-to-floor acid-free tile descaling",
+        "Kitchen slab, sink, tiles, and cabinet exterior wipe",
+        "Window glass, tracks, grills, and mesh cleaning",
+        "Ceiling fans, switchboards, and doors disinfection"
+      ],
+      "exclusions": [
+        "Inside occupied closets without owner supervision",
+        "Heavy furniture shifting outside the room",
+        "Wall paint repair or patch fixing"
+      ],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911404/max-housekeeping/services/svc_full-home-deep-cleaning.jpg",
+          "alt": "Full Home Deep Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": true,
+      "isActive": true,
+      "sortOrder": 1,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.411Z",
+      "updatedAt": "2026-10-20T15:12:39.144Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e8",
+      "title": "Commercial Office Housekeeping",
+      "slug": "commercial-office-cleaning",
+      "aliases": [
+        "commercial-cleaning",
+        "corporate-cleaning"
+      ],
+      "category": "6ace40253bcdb872f58436d3",
+      "categorySlug": "commercial-cleaning",
+      "categoryName": "Commercial Cleaning",
+      "shortDescription": "Comprehensive deep cleaning for banks, retail showrooms, gyms, clinics, and workspaces.",
+      "description": "Trusted by leading institutions across Moradabad and Western UP including Bank of Baroda, Geetanjali Salon, Tanishq, and Subway.",
+      "duration": "3-4 hrs",
+      "icon": "Building",
+      "pricingMode": "tiered",
+      "price": 3500,
+      "mrp": 4500,
+      "discountPct": 22,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Office Carpet Area",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "small-office",
+              "label": "Small Office (Up to 1,000 Sq Ft)",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "3-4 hrs",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "medium-office",
+              "label": "Medium Office (1,000–3,000 Sq Ft)",
+              "priceDelta": 3000,
+              "mrpDelta": 4000,
+              "multiplier": 1,
+              "durationDelta": "5-6 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "large-floor",
+              "label": "Full Floor Commercial (3,000+ Sq Ft)",
+              "priceDelta": 8500,
+              "mrpDelta": 11500,
+              "multiplier": 1,
+              "durationDelta": "1-2 Days",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "small-office"
+          },
+          "price": 3500,
+          "mrp": 4500,
+          "duration": "3-4 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "medium-office"
+          },
+          "price": 6500,
+          "mrp": 8500,
+          "duration": "5-6 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "large-floor"
+          },
+          "price": 12000,
+          "mrp": 16000,
+          "duration": "1-2 Days",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Workstation desks and partitions sanitisation",
+        "Heavy-traffic carpet vacuuming and tile scrubbing",
+        "Staff pantry and cafeteria degreasing",
+        "Restroom high-frequency disinfection"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911446/max-housekeeping/services/svc_commercial-office-cleaning.jpg",
+          "alt": "Commercial Office Housekeeping deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": true,
+      "isActive": true,
+      "sortOrder": 9,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.418Z",
+      "updatedAt": "2026-10-20T15:31:21.608Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e2",
+      "title": "Kitchen Deep Cleaning",
+      "slug": "kitchen-deep-cleaning",
+      "aliases": [
+        "service_kitchen-deep-cleaning-medium-size-kitchen",
+        "service_kitchen-deep-cleaning-big-size-kitchen",
+        "service_kitchen-deep-cleaning-big-size-hotel-kitchen"
+      ],
+      "category": "6ace40253bcdb872f58436d1",
+      "categorySlug": "kitchen-cleaning",
+      "categoryName": "Kitchen Cleaning",
+      "shortDescription": "Industrial degreasing of chimney exterior, gas stove, sink, and tiles.",
+      "description": "Attack sticky oil residues and cooking grease with high-temp steam application and food-safe degreasers.",
+      "duration": "4-5 hrs",
+      "icon": "CookingPot",
+      "pricingMode": "tiered",
+      "price": 2500,
+      "mrp": 3000,
+      "discountPct": 17,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Kitchen Size & Commercial Type",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "medium-kitchen",
+              "label": "Medium Size Kitchen",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "4-5 hrs",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "big-kitchen",
+              "label": "Big Size Kitchen",
+              "priceDelta": 4000,
+              "mrpDelta": 5999,
+              "multiplier": 1,
+              "durationDelta": "4-5 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "hotel-kitchen",
+              "label": "Big Size Hotel / Commercial Kitchen",
+              "priceDelta": 7500,
+              "mrpDelta": 11999,
+              "multiplier": 1,
+              "durationDelta": "4-5 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "medium-kitchen"
+          },
+          "price": 2500,
+          "mrp": 3000,
+          "duration": "4-5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "big-kitchen"
+          },
+          "price": 6500,
+          "mrp": 8999,
+          "duration": "4-5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "hotel-kitchen"
+          },
+          "price": 10000,
+          "mrp": 14999,
+          "duration": "4-5 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Gas stove, burners, and countertop degreasing",
+        "Wall tiles steam wash and oil extraction",
+        "Kitchen sink descaling and pipe clearing",
+        "Cabinet exterior detailing and handles wipe",
+        "Chimney filter wash (exterior mesh)"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911411/max-housekeeping/services/svc_kitchen-deep-cleaning.jpg",
+          "alt": "Kitchen Deep Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": true,
+      "isActive": true,
+      "sortOrder": 3,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.413Z",
+      "updatedAt": "2026-10-20T15:33:05.933Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e4",
+      "title": "Carpet Deep Cleaning",
+      "slug": "carpet-cleaning",
+      "aliases": [
+        "service_carpet-cleaning",
+        "service_medium-carpet-50-100-sq-ft",
+        "service_large-carpet-100-150-sq-ft",
+        "service_extra-large-carpet-150-200-sq-ft"
+      ],
+      "category": "6ace40253bcdb872f58436d2",
+      "categorySlug": "sofa-carpet-cleaning",
+      "categoryName": "Sofa & Carpet Cleaning",
+      "shortDescription": "Deep wet shampoo extraction for living room and dining room carpets.",
+      "description": "Restore high-traffic carpet fibers, extract deep sand and pet hair, and eliminate bacteria with commercial scrubbers.",
+      "duration": "1 hr",
+      "icon": "Armchair",
+      "pricingMode": "tiered",
+      "price": 499,
+      "mrp": 699,
+      "discountPct": 29,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Carpet Area (Sq Ft)",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "small-50",
+              "label": "Small Carpet (Up to 50 Sq Ft)",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "medium-100",
+              "label": "Medium Carpet (50–100 Sq Ft)",
+              "priceDelta": 150,
+              "mrpDelta": 100,
+              "multiplier": 1,
+              "durationDelta": "1-2 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "large-150",
+              "label": "Large Carpet (100–150 Sq Ft)",
+              "priceDelta": 300,
+              "mrpDelta": 300,
+              "multiplier": 1,
+              "durationDelta": "1-2 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "xlarge-200",
+              "label": "Extra Large Carpet (150–200 Sq Ft)",
+              "priceDelta": 450,
+              "mrpDelta": 800,
+              "multiplier": 1,
+              "durationDelta": "2 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "small-50"
+          },
+          "price": 499,
+          "mrp": 699,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "medium-100"
+          },
+          "price": 649,
+          "mrp": 799,
+          "duration": "1-2 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "large-150"
+          },
+          "price": 799,
+          "mrp": 999,
+          "duration": "1-2 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "xlarge-200"
+          },
+          "price": 949,
+          "mrp": 1499,
+          "duration": "2 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Beater-bar dry vacuuming",
+        "Low-moisture foam shampoo application",
+        "High-suction water extraction"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911425/max-housekeeping/services/svc_carpet-cleaning.jpg",
+          "alt": "Carpet Deep Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": false,
+      "isActive": true,
+      "sortOrder": 5,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.417Z",
+      "updatedAt": "2026-10-20T15:32:39.653Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e6",
+      "title": "Water Tank Cleaning",
+      "slug": "water-tank-cleaning",
+      "aliases": [
+        "service_water-tank-cleaning-700l-tank",
+        "service_water-tank-cleaning-1000l-tank",
+        "service_water-tank-cleaning-1500l-tank",
+        "service_water-tank-cleaning-2000l-tank",
+        "service_water-tank-cleaning-3000l-tank",
+        "service_water-tank-cleaning-5000l-tank",
+        "service_upto-5000-litre",
+        "service_upto-10000-litre",
+        "service_upto-15000-litre",
+        "service_upto-20000-litre"
+      ],
+      "category": "6ace40253bcdb872f58436cf",
+      "categorySlug": "home-deep-cleaning",
+      "categoryName": "Home Cleaning",
+      "shortDescription": "6-stage mechanised sludge dewatering, high pressure jetting, and UV sanitisation.",
+      "description": "Ensure 100% pure drinking water. Our crew sterilises overhead and underground tanks without harsh chemicals.",
+      "duration": "1 hr",
+      "icon": "Waves",
+      "pricingMode": "tiered",
+      "price": 400,
+      "mrp": 499,
+      "discountPct": 20,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Tank Water Capacity",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "500l",
+              "label": "500L Tank",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "750l",
+              "label": "750L Tank",
+              "priceDelta": 100,
+              "mrpDelta": 200,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "1000l",
+              "label": "1,000L Tank",
+              "priceDelta": 300,
+              "mrpDelta": 501,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "1500l",
+              "label": "1,500L Tank",
+              "priceDelta": 600,
+              "mrpDelta": 701,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "2000l",
+              "label": "2,000L Tank",
+              "priceDelta": 1100,
+              "mrpDelta": 1201,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "3000l",
+              "label": "3,000L Tank",
+              "priceDelta": 1600,
+              "mrpDelta": 1701,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "5000l",
+              "label": "5,000L Tank",
+              "priceDelta": 2100,
+              "mrpDelta": 2501,
+              "multiplier": 1,
+              "durationDelta": "1-2 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "500l"
+          },
+          "price": 400,
+          "mrp": 499,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "750l"
+          },
+          "price": 500,
+          "mrp": 699,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "1000l"
+          },
+          "price": 700,
+          "mrp": 1000,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "1500l"
+          },
+          "price": 1000,
+          "mrp": 1200,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "2000l"
+          },
+          "price": 1500,
+          "mrp": 1700,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "3000l"
+          },
+          "price": 2000,
+          "mrp": 2200,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "5000l"
+          },
+          "price": 2500,
+          "mrp": 3000,
+          "duration": "1-2 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Mechanised de-watering & sludge extraction",
+        "High-pressure rotary wall jet wash",
+        "Vacuum bottom sediment removal",
+        "UV radiator antibacterial treatment"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911436/max-housekeeping/services/svc_water-tank-cleaning.jpg",
+          "alt": "Water Tank Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": false,
+      "isActive": true,
+      "sortOrder": 7,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.417Z",
+      "updatedAt": "2026-10-20T15:32:12.217Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e1",
+      "title": "Bathroom Deep Cleaning",
+      "slug": "bathroom-deep-cleaning",
+      "aliases": [
+        "service_bathroom-tiles-cleaning-medium-size",
+        "service_bathroom-tiles-cleaning-large-size",
+        "service_medium-size-tile-wala",
+        "service_large-size-tile-wala"
+      ],
+      "category": "6ace40253bcdb872f58436d0",
+      "categorySlug": "bathroom-cleaning",
+      "categoryName": "Bathroom Cleaning",
+      "shortDescription": "Tile hard-water descaling, acid-free tap polishing, and WC sanitisation.",
+      "description": "Remove yellow scaling, mildew, and limescale from tiles and glass partitions with professional chemical application and rotary scrubbing.",
+      "duration": "1 hr",
+      "icon": "Bath",
+      "pricingMode": "tiered",
+      "price": 550,
+      "mrp": 700,
+      "discountPct": 21,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Bathroom Type & Tile Size",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "medium-tile",
+              "label": "Medium Size Tile Wala",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "large-tile",
+              "label": "Large Size Tile Wala",
+              "priceDelta": 200,
+              "mrpDelta": 300,
+              "multiplier": 1,
+              "durationDelta": "1.5 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "medium-floor-wall",
+              "label": "Bathroom Tiles Medium (Floor marble, wall tiles)",
+              "priceDelta": 149,
+              "mrpDelta": 300,
+              "multiplier": 1,
+              "durationDelta": "1.5 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "large-marble",
+              "label": "Marble Bathroom Cleaning Large Size",
+              "priceDelta": 800,
+              "mrpDelta": 800,
+              "multiplier": 1,
+              "durationDelta": "2 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "medium-tile"
+          },
+          "price": 550,
+          "mrp": 700,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "large-tile"
+          },
+          "price": 750,
+          "mrp": 1000,
+          "duration": "1.5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "medium-floor-wall"
+          },
+          "price": 699,
+          "mrp": 1000,
+          "duration": "1.5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "large-marble"
+          },
+          "price": 1350,
+          "mrp": 1500,
+          "duration": "2 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Wall tiles descaling and grouting scrub",
+        "WC pot, washbasin, and vanity sanitisation",
+        "Taps, showerheads, and chrome fittings polishing",
+        "Mirror and glass partition streak-free wipe",
+        "Floor scrub and drain trap clearing"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911407/max-housekeeping/services/svc_bathroom-deep-cleaning.jpg",
+          "alt": "Bathroom Deep Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": true,
+      "isActive": true,
+      "sortOrder": 2,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.412Z",
+      "updatedAt": "2026-10-20T15:31:10.414Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e7",
+      "title": "Office & Dining Chair Dry Cleaning",
+      "slug": "chair-dry-cleaning",
+      "aliases": [
+        "service_chair-dry-cleaning",
+        "service_upto-6-chairs",
+        "service_upto-9-chairs",
+        "service_upto-12-chairs"
+      ],
+      "category": "6ace40253bcdb872f58436d2",
+      "categorySlug": "sofa-carpet-cleaning",
+      "categoryName": "Sofa & Carpet Cleaning",
+      "shortDescription": "Shampooing and stain removal for cushioned dining and office revolving chairs.",
+      "description": "Remove sweat, ink, and coffee marks from conference and dining chairs with rapid foam extraction.",
+      "duration": "1 hr",
+      "icon": "Building",
+      "pricingMode": "tiered",
+      "price": 700,
+      "mrp": 900,
+      "discountPct": 22,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Number of Chairs",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "4-chairs",
+              "label": "Upto 4 Chairs",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "6-chairs",
+              "label": "Upto 6 Chairs",
+              "priceDelta": 500,
+              "mrpDelta": 600,
+              "multiplier": 1,
+              "durationDelta": "1 hr",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "9-chairs",
+              "label": "Upto 9 Chairs",
+              "priceDelta": 800,
+              "mrpDelta": 900,
+              "multiplier": 1,
+              "durationDelta": "1.5 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "12-chairs",
+              "label": "Upto 12 Chairs",
+              "priceDelta": 1300,
+              "mrpDelta": 1600,
+              "multiplier": 1,
+              "durationDelta": "2 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "4-chairs"
+          },
+          "price": 700,
+          "mrp": 900,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "6-chairs"
+          },
+          "price": 1200,
+          "mrp": 1500,
+          "duration": "1 hr",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "9-chairs"
+          },
+          "price": 1500,
+          "mrp": 1800,
+          "duration": "1.5 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "12-chairs"
+          },
+          "price": 2000,
+          "mrp": 2500,
+          "duration": "2 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "Dry vacuuming of fabric cushioning",
+        "Foam shampoo scrub and stain removal",
+        "Base wheel and armrest wipe"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911441/max-housekeeping/services/svc_chair-dry-cleaning.jpg",
+          "alt": "Office & Dining Chair Dry Cleaning deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": false,
+      "isActive": true,
+      "sortOrder": 8,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.418Z",
+      "updatedAt": "2026-10-20T15:31:50.758Z"
+    },
+    {
+      "_id": "6ace40253bcdb872f58436e3",
+      "title": "Sofa Dry Cleaning & Shampooing",
+      "slug": "sofa-dry-cleaning",
+      "aliases": [
+        "service_sofa-drycleaning-per-seat",
+        "service_7-seater",
+        "service_9-seater",
+        "service_12-seater"
+      ],
+      "category": "6ace40253bcdb872f58436d2",
+      "categorySlug": "sofa-carpet-cleaning",
+      "categoryName": "Sofa & Carpet Cleaning",
+      "shortDescription": "Shampoo foam wash and industrial wet-vacuum moisture extraction.",
+      "description": "Revive your fabric or suede upholstery. Removes tea/coffee stains, dust mites, and odors, leaving the sofa 90% dry on spot.",
+      "duration": "1-2 hrs",
+      "icon": "Armchair",
+      "pricingMode": "tiered",
+      "price": 1750,
+      "mrp": 1999,
+      "discountPct": 12,
+      "optionGroups": [
+        {
+          "key": "size",
+          "label": "Sofa Seats Count",
+          "type": "single",
+          "required": true,
+          "sortOrder": 0,
+          "options": [
+            {
+              "key": "5-seater",
+              "label": "5 Seater",
+              "priceDelta": 0,
+              "mrpDelta": 0,
+              "multiplier": 1,
+              "durationDelta": "1-2 hrs",
+              "isDefault": true,
+              "isActive": true
+            },
+            {
+              "key": "7-seater",
+              "label": "7 Seater",
+              "priceDelta": 700,
+              "mrpDelta": 501,
+              "multiplier": 1,
+              "durationDelta": "2-3 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "9-seater",
+              "label": "9 Seater",
+              "priceDelta": 1400,
+              "mrpDelta": 1501,
+              "multiplier": 1,
+              "durationDelta": "3-4 hrs",
+              "isDefault": false,
+              "isActive": true
+            },
+            {
+              "key": "12-seater",
+              "label": "12 Seater",
+              "priceDelta": 2450,
+              "mrpDelta": 2501,
+              "multiplier": 1,
+              "durationDelta": "4-5 hrs",
+              "isDefault": false,
+              "isActive": true
+            }
+          ]
+        }
+      ],
+      "matrix": [
+        {
+          "selection": {
+            "size": "5-seater"
+          },
+          "price": 1750,
+          "mrp": 1999,
+          "duration": "1-2 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "7-seater"
+          },
+          "price": 2450,
+          "mrp": 2500,
+          "duration": "2-3 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "9-seater"
+          },
+          "price": 3150,
+          "mrp": 3500,
+          "duration": "3-4 hrs",
+          "isActive": true
+        },
+        {
+          "selection": {
+            "size": "12-seater"
+          },
+          "price": 4200,
+          "mrp": 4500,
+          "duration": "4-5 hrs",
+          "isActive": true
+        }
+      ],
+      "inclusions": [
+        "High-power dry vacuuming of dust and crumbs",
+        "Fabric shampoo agitation with soft horsehair brushes",
+        "Stain-spotting chemical treatment",
+        "Wet extraction vacuum to suck out dirty slurry",
+        "Fragrance mist application"
+      ],
+      "exclusions": [],
+      "media": {
+        "hero": {
+          "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911415/max-housekeeping/services/svc_sofa-dry-cleaning.jpg",
+          "alt": "Sofa Dry Cleaning & Shampooing deep cleaning"
+        }
+      },
+      "sampleBeforeAfter": {
+        "isSample": true
+      },
+      "cityAvailability": [],
+      "isPopular": true,
+      "isActive": true,
+      "sortOrder": 4,
+      "seo": {
+        "keywords": []
+      },
+      "cityOverrides": [],
+      "faqs": [],
+      "__v": 0,
+      "createdAt": "2026-10-13T14:28:53.416Z",
+      "updatedAt": "2026-10-20T15:32:52.607Z"
+    }
+  ]
+}

@@ -56,7 +56,7 @@ api.interceptors.response.use(
 
 export const FALLBACK_CATEGORIES = [
   {
-    _id: 'cat_home',
+    _id: '6ace40253bcdb872f58436cf',
     name: 'Home Cleaning',
     slug: 'home-deep-cleaning',
     description: 'Whole-house scrub, single-disc floor buffing & hospital-grade disinfection.',
@@ -65,7 +65,7 @@ export const FALLBACK_CATEGORIES = [
     image: { url: '/media/categories/home-deep-cleaning.jpg', alt: 'Home deep cleaning' }
   },
   {
-    _id: 'cat_bath',
+    _id: '6ace40253bcdb872f58436d0',
     name: 'Bathroom Cleaning',
     slug: 'bathroom-cleaning',
     description: 'Acid-free tile descaling, hard water stain removal & chrome tap polish.',
@@ -74,7 +74,7 @@ export const FALLBACK_CATEGORIES = [
     image: { url: '/media/categories/bathroom-cleaning.jpg', alt: 'Bathroom cleaning' }
   },
   {
-    _id: 'cat_kitchen',
+    _id: '6ace40253bcdb872f58436d1',
     name: 'Kitchen Cleaning',
     slug: 'kitchen-cleaning',
     description: 'Heavy grease extraction, chimney degrease & countertop hygiene scrub.',
@@ -83,7 +83,7 @@ export const FALLBACK_CATEGORIES = [
     image: { url: '/media/categories/kitchen-cleaning.jpg', alt: 'Kitchen cleaning' }
   },
   {
-    _id: 'cat_sofa',
+    _id: '6ace40253bcdb872f58436d2',
     name: 'Sofa & Carpet Cleaning',
     slug: 'sofa-carpet-cleaning',
     description: 'Industrial wet injection-extraction shampooing & fast moisture suction.',
@@ -92,7 +92,7 @@ export const FALLBACK_CATEGORIES = [
     image: { url: '/media/categories/sofa-carpet-cleaning.jpg', alt: 'Sofa and carpet cleaning' }
   },
   {
-    _id: 'cat_comm',
+    _id: '6ace40253bcdb872f58436d3',
     name: 'Commercial Cleaning',
     slug: 'commercial-cleaning',
     description: 'Offices, showrooms, banks, gyms & corporate facility housekeeping.',
@@ -101,7 +101,7 @@ export const FALLBACK_CATEGORIES = [
     image: { url: '/media/categories/commercial-cleaning.jpg', alt: 'Commercial cleaning' }
   },
   {
-    _id: 'cat_pest',
+    _id: '6ace40253bcdb872f58436d4',
     name: 'Pest Control',
     slug: 'pest-control',
     description: 'Odorless herbal gel pest treatments & long-lasting barrier protection.',
@@ -648,9 +648,8 @@ export function getFallbackResponse(url, options = {}) {
   const [pathPart] = url.split('?');
   const cleanPath = pathPart.toLowerCase().replace(/^\/api\/v1/, '').replace(/^\//, '/');
 
-  // If server is not connected, return empty datasets (no static fallbacks)
-  if (cleanPath === '/categories') {
-    return { success: false, categories: [] };
+  if (cleanPath === '/categories' || cleanPath === '/admin/categories') {
+    return { success: true, count: FALLBACK_CATEGORIES.length, categories: FALLBACK_CATEGORIES };
   }
 
   if (cleanPath === '/locations/cities') {
@@ -848,6 +847,11 @@ export const adminAPI = {
   updateService: (id, data) => apiRequest(`/admin/services/${id}`, { method: 'PUT', body: data }),
   createService: (data) => apiRequest('/admin/services', { method: 'POST', body: data }),
   deleteService: (id) => apiRequest(`/admin/services/${id}`, { method: 'DELETE' }),
+  // Categories management
+  getCategories: () => apiRequest('/admin/categories', { method: 'GET' }),
+  createCategory: (data) => apiRequest('/admin/categories', { method: 'POST', body: data }),
+  updateCategory: (id, data) => apiRequest(`/admin/categories/${id}`, { method: 'PUT', body: data }),
+  deleteCategory: (id) => apiRequest(`/admin/categories/${id}`, { method: 'DELETE' }),
   // Cloudinary image upload
   uploadImage: async (file, folder = 'max-housekeeping/uploads') => {
     const formData = new FormData();
