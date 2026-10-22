@@ -8,7 +8,7 @@ import { resolveLocation } from '../services/location/locationService.js';
 export async function getCities(req, res, next) {
   try {
     const cities = await City.find({ status: { $ne: 'inactive' } })
-      .sort({ sortOrder: 1, name: 1 });
+      .sort({ rankingScore: -1, sortOrder: 1, name: 1 });
 
     res.status(200).json({
       success: true,

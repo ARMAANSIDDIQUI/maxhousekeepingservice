@@ -1,0 +1,2352 @@
+[
+  {
+    "_id": "6ace40253bcdb872f58436e5",
+    "title": "Bed Mattress & Bedhead Dry Cleaning",
+    "slug": "bed-dry-cleaning",
+    "aliases": [
+      "service_single-bed-dry-cleaning",
+      "service_double-bed-dry-cleaning"
+    ],
+    "category": "6ace40253bcdb872f58436d2",
+    "categorySlug": "sofa-carpet-cleaning",
+    "categoryName": "Sofa & Carpet Cleaning",
+    "shortDescription": "Double bed mattress up drycleaning Rs.1,000 (backside 1000 extra). Bedhead: Single Rs.500, Double Rs.1,000. Bedhead+Bed combo Rs.1,500.",
+    "description": "Double bed mattress up drycleaning Rs. 1,000 (backside Rs. 1,000 extra pay only). Bedhead drycleaning services: Single bedhead Rs. 500, Double bedhead Rs. 1,000 (other city 500 extra pay). Medium Double bedhead with bed drycleaning service: Rs. 1,500 (MRP Rs. 2,000; front only, backside Rs. 1,000 extra pay, other city 500 extra pay). UV antibacterial anti-mite sanitisation included.",
+    "duration": "1-2 hrs",
+    "icon": "Bed",
+    "pricingMode": "tiered",
+    "price": 500,
+    "mrp": 700,
+    "discountPct": 29,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Mattress & Bedhead Type",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "single-bedhead",
+            "label": "Single Bedhead Drycleaning",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "double-bedhead",
+            "label": "Double Bedhead Drycleaning",
+            "priceDelta": 500,
+            "mrpDelta": 700,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "single-bed-mattress",
+            "label": "Single Bed Mattress (One Side)",
+            "priceDelta": 100,
+            "mrpDelta": 200,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "double-bed-mattress-up",
+            "label": "Double Bed Mattress (Up / Top Side Only)",
+            "priceDelta": 500,
+            "mrpDelta": 700,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "double-bed-mattress-both",
+            "label": "Double Bed Mattress (Both Sides Front & Back)",
+            "priceDelta": 1500,
+            "mrpDelta": 2100,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "bedhead-bed-combo",
+            "label": "Medium Double Bedhead with Bed (Front Only)",
+            "priceDelta": 1000,
+            "mrpDelta": 1300,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "single-bedhead"
+        },
+        "price": 500,
+        "mrp": 700,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "double-bedhead"
+        },
+        "price": 1000,
+        "mrp": 1400,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "single-bed-mattress"
+        },
+        "price": 600,
+        "mrp": 900,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "double-bed-mattress-up"
+        },
+        "price": 1000,
+        "mrp": 1400,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "double-bed-mattress-both"
+        },
+        "price": 2000,
+        "mrp": 2800,
+        "duration": "2 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "bedhead-bed-combo"
+        },
+        "price": 1500,
+        "mrp": 2000,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "High-filtration dry extraction for dust mites and dead skin cells",
+      "Targeted foam shampooing for sweat and makeup stains",
+      "Antibacterial sanitisation and fabric deodorising",
+      "Moisture extraction for clean, hygienic sleep"
+    ],
+    "exclusions": [
+      "Backside cleaning requires add-on selection or extra fee"
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911431/max-housekeeping/services/svc_bed-dry-cleaning.jpg",
+        "alt": "Bed Mattress & Bedhead Dry Cleaning deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": false,
+    "isActive": true,
+    "sortOrder": 10,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.417Z",
+    "updatedAt": "2026-10-22T07:06:26.115Z",
+    "categories": [
+      "6ace40253bcdb872f58436d2",
+      "6ace40253bcdb872f58436cf"
+    ],
+    "categoryNames": [
+      "Sofa & Carpet Cleaning",
+      "Home Cleaning"
+    ],
+    "categorySlugs": [
+      "sofa-carpet-cleaning",
+      "home-deep-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e0",
+    "title": "Full Home Deep Cleaning",
+    "slug": "full-home-deep-cleaning",
+    "aliases": [
+      "service_full-home-deep-cleaning-1-bhk",
+      "service_full-home-deep-cleaning-2-bhk",
+      "service_full-home-deep-cleaning-3-bhk",
+      "service_full-home-deep-cleaning-4-bhk"
+    ],
+    "category": "6ace40253bcdb872f58436cf",
+    "categorySlug": "home-deep-cleaning",
+    "categoryName": "Home Cleaning",
+    "shortDescription": "Full home cleaning services include both bathroom and kitchen cleaning. Moradabad square feet rate Rs.15.",
+    "description": "Complete residential deep cleaning services including both bathroom and kitchen deep cleaning. Moradabad area only (without sofa drycleaning). Square feet rate: Moradabad Rs. 15 / sq ft; Other cities Rs. 25 / sq ft deep cleaning (call for custom quotes). Professional crew equipped with industrial single-disc floor scrubbers, wet extraction vacuums, and eco-friendly Taski chemicals.",
+    "duration": "4-6 hrs",
+    "icon": "House",
+    "pricingMode": "tiered",
+    "price": 4999,
+    "mrp": 5999,
+    "discountPct": 17,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Apartment / House Size",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "1-bhk",
+            "label": "1 BHK Home Deep Cleaning",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "3-4 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "2-bhk",
+            "label": "2 BHK Home Deep Cleaning",
+            "priceDelta": 2501,
+            "mrpDelta": 3000,
+            "multiplier": 1,
+            "durationDelta": "5-6 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "3-bhk",
+            "label": "3 BHK Home Deep Cleaning",
+            "priceDelta": 5000,
+            "mrpDelta": 6000,
+            "multiplier": 1,
+            "durationDelta": "6-7 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "4-bhk",
+            "label": "4 BHK Home Deep Cleaning",
+            "priceDelta": 10000,
+            "mrpDelta": 12000,
+            "multiplier": 1,
+            "durationDelta": "1-2 Days",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "5-bhk",
+            "label": "5 BHK / Villa Deep Cleaning",
+            "priceDelta": 12000,
+            "mrpDelta": 15000,
+            "multiplier": 1,
+            "durationDelta": "2 Days",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "1-bhk"
+        },
+        "price": 4999,
+        "mrp": 5999,
+        "duration": "3-4 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "2-bhk"
+        },
+        "price": 7500,
+        "mrp": 8999,
+        "duration": "5-6 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "3-bhk"
+        },
+        "price": 9999,
+        "mrp": 11999,
+        "duration": "6-7 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "4-bhk"
+        },
+        "price": 14999,
+        "mrp": 17999,
+        "duration": "1-2 Days",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "5-bhk"
+        },
+        "price": 16999,
+        "mrp": 20999,
+        "duration": "2 Days",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Full home cleaning services include both bathroom and kitchen cleaning",
+      "Moradabad only without sofa drycleaning: Rs. 15 per square feet",
+      "Other city rate Rs. 25 square feet deep cleaning (call for custom orders)",
+      "Single disc machine floor scrubbing with Diversey chemicals",
+      "All cupboards deep cleaned exterior and interior",
+      "Balcony, window panes, grills & doors sanitisation",
+      "Ceiling fans, switchboards & light fixtures dusting"
+    ],
+    "exclusions": [
+      "Sofa dry cleaning (available as separate service or package add-on)"
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911413/max-housekeeping/services/svc_full-home-deep-cleaning.jpg",
+        "alt": "Full Home Deep Cleaning deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": true,
+    "isActive": true,
+    "sortOrder": 1,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.411Z",
+    "updatedAt": "2026-10-22T07:06:25.554Z",
+    "categories": [
+      "6ace40253bcdb872f58436cf"
+    ],
+    "categoryNames": [
+      "Home Cleaning"
+    ],
+    "categorySlugs": [
+      "home-deep-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e8",
+    "title": "Commercial Office Housekeeping",
+    "slug": "commercial-office-cleaning",
+    "aliases": [
+      "commercial-cleaning",
+      "corporate-cleaning"
+    ],
+    "category": "6ace40253bcdb872f58436d3",
+    "categorySlug": "commercial-cleaning",
+    "categoryName": "Commercial Cleaning",
+    "shortDescription": "End-to-end commercial housekeeping for offices, banks, clinics, and corporate spaces.",
+    "description": "Professional commercial office housekeeping covering workstations, reception lobbies, conference rooms, pantry sanitisation, glass partition wipe, and industrial floor machine scrubbing.",
+    "duration": "3-4 hrs",
+    "icon": "Building",
+    "pricingMode": "tiered",
+    "price": 3500,
+    "mrp": 4500,
+    "discountPct": 22,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Office Carpet Area",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "small-office",
+            "label": "Small Office (Up to 1,000 Sq Ft)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "3-4 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-office",
+            "label": "Medium Office (1,000–3,000 Sq Ft)",
+            "priceDelta": 3000,
+            "mrpDelta": 4000,
+            "multiplier": 1,
+            "durationDelta": "5-6 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "large-floor",
+            "label": "Full Floor Commercial (3,000+ Sq Ft)",
+            "priceDelta": 8500,
+            "mrpDelta": 11500,
+            "multiplier": 1,
+            "durationDelta": "1-2 Days",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "small-office"
+        },
+        "price": 3500,
+        "mrp": 4500,
+        "duration": "3-4 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-office"
+        },
+        "price": 6500,
+        "mrp": 8500,
+        "duration": "5-6 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "large-floor"
+        },
+        "price": 12000,
+        "mrp": 16000,
+        "duration": "1-2 Days",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Workstation, computer desk and chair dusting & sanitisation",
+      "Full pantry, coffee station and microwave deep cleaning",
+      "Restroom disinfection and chrome fittings polish",
+      "Glass partitions, doors and windows streak-free wipe",
+      "Floor single disc machine scrub and buff"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911440/max-housekeeping/services/svc_commercial-office-cleaning.jpg",
+        "alt": "Commercial Office Housekeeping deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": false,
+    "isActive": true,
+    "sortOrder": 15,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.418Z",
+    "updatedAt": "2026-10-22T07:06:26.367Z",
+    "categories": [
+      "6ace40253bcdb872f58436d3"
+    ],
+    "categoryNames": [
+      "Commercial Cleaning"
+    ],
+    "categorySlugs": [
+      "commercial-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e2",
+    "title": "Kitchen Deep Cleaning",
+    "slug": "kitchen-deep-cleaning",
+    "aliases": [
+      "service_kitchen-deep-cleaning-medium-size-kitchen",
+      "service_kitchen-deep-cleaning-big-size-kitchen",
+      "service_kitchen-deep-cleaning-big-size-hotel-kitchen"
+    ],
+    "category": "6ace40253bcdb872f58436d1",
+    "categorySlug": "kitchen-cleaning",
+    "categoryName": "Kitchen Cleaning",
+    "shortDescription": "From basic flat kitchen to big kitchen with cupboards, chimney, steel drawer, and complimentary cockroach pest control.",
+    "description": "Small kitchen cleaning flat ghar services: Rs. 1,000 (MRP Rs. 1,500) - basic flat cleaning without chimney or cupboard. Medium kitchen cleaning: Rs. 2,500 with complimentary cockroach treatment. Big kitchen deep cleaning: Rs. 5,000 (MRP Rs. 6,500) covering all cupboards deep clean with chimney, steel drawer, sink, tiles, marble slab, fans, refrigerator with cockroach & rat pest control.",
+    "duration": "2-4 hrs",
+    "icon": "CookingPot",
+    "pricingMode": "tiered",
+    "price": 1000,
+    "mrp": 1500,
+    "discountPct": 33,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Kitchen Size & Package",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "small-kitchen",
+            "label": "Small Kitchen Cleaning (Flat / Ghar)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1.5-2 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-kitchen",
+            "label": "Medium Kitchen Cleaning (Complimentary Cockroach Treatment)",
+            "priceDelta": 1500,
+            "mrpDelta": 1500,
+            "multiplier": 1,
+            "durationDelta": "2-3 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "big-kitchen",
+            "label": "Big Kitchen Deep Cleaning (Full Cupboards & Chimney)",
+            "priceDelta": 4000,
+            "mrpDelta": 5000,
+            "multiplier": 1,
+            "durationDelta": "3-4 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "hotel-kitchen",
+            "label": "Commercial / Hotel Kitchen Deep Cleaning",
+            "priceDelta": 9000,
+            "mrpDelta": 13499,
+            "multiplier": 1,
+            "durationDelta": "4-6 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "small-kitchen"
+        },
+        "price": 1000,
+        "mrp": 1500,
+        "duration": "1.5-2 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-kitchen"
+        },
+        "price": 2500,
+        "mrp": 3000,
+        "duration": "2-3 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "big-kitchen"
+        },
+        "price": 5000,
+        "mrp": 6500,
+        "duration": "3-4 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "hotel-kitchen"
+        },
+        "price": 10000,
+        "mrp": 14999,
+        "duration": "4-6 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Tiles, countertops and marble slab oil and grease extraction",
+      "Sink, taps, and stainless steel fittings descaling & buffing",
+      "Complimentary cockroach treatment in medium and big packages",
+      "All cupboards deep clean with chimney and steel drawer (Big Kitchen)",
+      "Refrigerator and fan cleaning included in Big Kitchen package"
+    ],
+    "exclusions": [
+      "Chimney and cupboard interior cleaning not included in Small Kitchen tier"
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911422/max-housekeeping/services/svc_kitchen-deep-cleaning.jpg",
+        "alt": "Kitchen Deep Cleaning deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": true,
+    "isActive": true,
+    "sortOrder": 2,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.413Z",
+    "updatedAt": "2026-10-22T07:06:25.647Z",
+    "categories": [
+      "6ace40253bcdb872f58436d1",
+      "6ace40253bcdb872f58436cf"
+    ],
+    "categoryNames": [
+      "Kitchen Cleaning",
+      "Home Cleaning"
+    ],
+    "categorySlugs": [
+      "kitchen-cleaning",
+      "home-deep-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e4",
+    "title": "Carpet Deep Cleaning Services",
+    "slug": "carpet-cleaning",
+    "aliases": [
+      "service_carpet-cleaning",
+      "service_medium-carpet-50-100-sq-ft",
+      "service_large-carpet-100-150-sq-ft",
+      "service_extra-large-carpet-150-200-sq-ft"
+    ],
+    "category": "6ace40253bcdb872f58436d2",
+    "categorySlug": "sofa-carpet-cleaning",
+    "categoryName": "Sofa & Carpet Cleaning",
+    "shortDescription": "Carpet cleaning services at Rs. 30 per square feet.",
+    "description": "Carpet cleaning services: Rs. 30 per square feet. High-temperature hot water extraction and specialized foam shampooing removes dirt, dust mites, spill stains, and odors from woollen, Persian, and synthetic rugs.",
+    "duration": "1-2 hrs",
+    "icon": "Layers",
+    "pricingMode": "tiered",
+    "price": 499,
+    "mrp": 650,
+    "discountPct": 23,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Carpet Area",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "small-30",
+            "label": "Small Carpet (Up to 30 Sq Ft)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-100",
+            "label": "Medium Carpet (50–100 Sq Ft)",
+            "priceDelta": 150,
+            "mrpDelta": 149,
+            "multiplier": 1,
+            "durationDelta": "1-1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "large-150",
+            "label": "Large Carpet (100–150 Sq Ft)",
+            "priceDelta": 300,
+            "mrpDelta": 349,
+            "multiplier": 1,
+            "durationDelta": "1.5-2 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "xlarge-200",
+            "label": "Extra Large Carpet (150–200 Sq Ft)",
+            "priceDelta": 450,
+            "mrpDelta": 849,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "per-sqft",
+            "label": "Custom Area (Rs. 30 per square foot)",
+            "priceDelta": 1001,
+            "mrpDelta": 1350,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "small-30"
+        },
+        "price": 499,
+        "mrp": 650,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-100"
+        },
+        "price": 649,
+        "mrp": 799,
+        "duration": "1-1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "large-150"
+        },
+        "price": 799,
+        "mrp": 999,
+        "duration": "1.5-2 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "xlarge-200"
+        },
+        "price": 949,
+        "mrp": 1499,
+        "duration": "2 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "per-sqft"
+        },
+        "price": 1500,
+        "mrp": 2000,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Dual-motor HEPA vacuuming for deep particulate extraction",
+      "Pre-spray enzyme stain treatment for stubborn spots",
+      "Taski carpet shampoo injection and mechanical agitation",
+      "Moisture recovery extraction for rapid drying"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911427/max-housekeeping/services/svc_carpet-cleaning.jpg",
+        "alt": "Carpet Deep Cleaning Services deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": false,
+    "isActive": true,
+    "sortOrder": 9,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.417Z",
+    "updatedAt": "2026-10-22T07:06:26.063Z",
+    "categories": [
+      "6ace40253bcdb872f58436d2",
+      "6ace40253bcdb872f58436d3"
+    ],
+    "categoryNames": [
+      "Sofa & Carpet Cleaning",
+      "Commercial Cleaning"
+    ],
+    "categorySlugs": [
+      "sofa-carpet-cleaning",
+      "commercial-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e6",
+    "title": "Water Tank Cleaning Services",
+    "slug": "water-tank-cleaning",
+    "aliases": [
+      "service_water-tank-cleaning-700l-tank",
+      "service_water-tank-cleaning-1000l-tank",
+      "service_water-tank-cleaning-1500l-tank",
+      "service_water-tank-cleaning-2000l-tank",
+      "service_water-tank-cleaning-3000l-tank",
+      "service_water-tank-cleaning-5000l-tank",
+      "service_upto-5000-litre",
+      "service_upto-10000-litre",
+      "service_upto-15000-litre",
+      "service_upto-20000-litre"
+    ],
+    "category": "6ace40253bcdb872f58436cf",
+    "categorySlug": "home-deep-cleaning",
+    "categoryName": "Home Cleaning",
+    "shortDescription": "500L Rs.400, 750L Rs.500, 1000L Rs.700, 1500L Rs.1000, 2000L Rs.1500, 3000L Rs.2000. Watch video: https://youtu.be/yCkBXdzwjic",
+    "description": "Water tank cleaning services with 6-stage hygienic process: de-sludging, high-pressure rotary jet washing, anti-bacterial sludge vacuuming, chlorine wash, and UV lamp sanitisation. Pricing: 500L Rs. 400, 750L Rs. 500, 1000L Rs. 700, 1500L Rs. 1000, 2000L Rs. 1500, 3000L Rs. 2000. Watch our live process video: https://youtu.be/yCkBXdzwjic",
+    "duration": "1-2 hrs",
+    "icon": "Waves",
+    "pricingMode": "tiered",
+    "price": 400,
+    "mrp": 499,
+    "discountPct": 20,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Tank Water Capacity",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "500l",
+            "label": "500 Litre Tank",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "750l",
+            "label": "750 Litre Tank",
+            "priceDelta": 100,
+            "mrpDelta": 200,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "1000l",
+            "label": "1,000 Litre Tank",
+            "priceDelta": 300,
+            "mrpDelta": 501,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "1500l",
+            "label": "1,500 Litre Tank",
+            "priceDelta": 600,
+            "mrpDelta": 701,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "2000l",
+            "label": "2,000 Litre Tank",
+            "priceDelta": 1100,
+            "mrpDelta": 1201,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "3000l",
+            "label": "3,000 Litre Tank",
+            "priceDelta": 1600,
+            "mrpDelta": 1901,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "5000l",
+            "label": "5,000 Litre Tank",
+            "priceDelta": 2100,
+            "mrpDelta": 2501,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "500l"
+        },
+        "price": 400,
+        "mrp": 499,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "750l"
+        },
+        "price": 500,
+        "mrp": 699,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "1000l"
+        },
+        "price": 700,
+        "mrp": 1000,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "1500l"
+        },
+        "price": 1000,
+        "mrp": 1200,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "2000l"
+        },
+        "price": 1500,
+        "mrp": 1700,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "3000l"
+        },
+        "price": 2000,
+        "mrp": 2400,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "5000l"
+        },
+        "price": 2500,
+        "mrp": 3000,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Drainage of residual contaminated water and silt",
+      "High-pressure rotary jet machine wall and ceiling scrub",
+      "Submersible vacuum sludge removal",
+      "Food-grade antibacterial chemical treatment",
+      "Process demonstration video: https://youtu.be/yCkBXdzwjic"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911436/max-housekeeping/services/svc_water-tank-cleaning.jpg",
+        "alt": "Water Tank Cleaning Services deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": false,
+    "isActive": true,
+    "sortOrder": 7,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.417Z",
+    "updatedAt": "2026-10-22T07:06:25.962Z",
+    "categories": [
+      "6ace40253bcdb872f58436cf",
+      "6ace40253bcdb872f58436d3"
+    ],
+    "categoryNames": [
+      "Home Cleaning",
+      "Commercial Cleaning"
+    ],
+    "categorySlugs": [
+      "home-deep-cleaning",
+      "commercial-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e1",
+    "title": "Bathroom Deep Cleaning",
+    "slug": "bathroom-deep-cleaning",
+    "aliases": [
+      "service_bathroom-tiles-cleaning-medium-size",
+      "service_bathroom-tiles-cleaning-large-size",
+      "service_medium-size-tile-wala",
+      "service_large-size-tile-wala"
+    ],
+    "category": "6ace40253bcdb872f58436d0",
+    "categorySlug": "bathroom-cleaning",
+    "categoryName": "Bathroom Cleaning",
+    "shortDescription": "Tile wala bathroom cleaning (Small Rs.499, Medium Rs.550, Large Rs.700) and Marble cleaning Rs.699.",
+    "description": "Tile wala bathroom cleaning: Small Rs. 499, Medium size Rs. 550 (MRP Rs. 700), Large size tiles Rs. 700 (MRP Rs. 1,000). Bathroom marble cleaning Rs. 699 includes taps, CW seat, wall tiles, marble floor, and exhaust fan cleaning using acid-free Taski R1 & R2 formulas.",
+    "duration": "1-1.5 hrs",
+    "icon": "Bath",
+    "pricingMode": "tiered",
+    "price": 499,
+    "mrp": 650,
+    "discountPct": 23,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Bathroom Type & Tile Size",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "small-tile",
+            "label": "Small Size Tile Wala Bathroom",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-tile",
+            "label": "Medium Size Tile Wala Bathroom",
+            "priceDelta": 51,
+            "mrpDelta": 50,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "large-tile",
+            "label": "Large Size Tiles Wala Bathroom",
+            "priceDelta": 201,
+            "mrpDelta": 350,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "marble-bathroom",
+            "label": "Bathroom Marble Cleaning",
+            "priceDelta": 200,
+            "mrpDelta": 350,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "premium-large-marble",
+            "label": "Large Marble Bathroom Polishing & Scrub",
+            "priceDelta": 851,
+            "mrpDelta": 850,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "small-tile"
+        },
+        "price": 499,
+        "mrp": 650,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-tile"
+        },
+        "price": 550,
+        "mrp": 700,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "large-tile"
+        },
+        "price": 700,
+        "mrp": 1000,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "marble-bathroom"
+        },
+        "price": 699,
+        "mrp": 1000,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "premium-large-marble"
+        },
+        "price": 1350,
+        "mrp": 1500,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Acid-free wall tile descaling and yellow stain eradication",
+      "Chrome taps, health faucets, and overhead showers mirror buffing",
+      "Commode / WC seat and ceramic washbasin sanitisation",
+      "Bathroom marble floor or tile mechanical scrubbing",
+      "Exhaust fan, mirror, and medicine cabinet wipe"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911418/max-housekeeping/services/svc_bathroom-deep-cleaning.jpg",
+        "alt": "Bathroom Deep Cleaning deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": true,
+    "isActive": true,
+    "sortOrder": 5,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.412Z",
+    "updatedAt": "2026-10-22T07:06:25.858Z",
+    "categories": [
+      "6ace40253bcdb872f58436d0",
+      "6ace40253bcdb872f58436cf"
+    ],
+    "categoryNames": [
+      "Bathroom Cleaning",
+      "Home Cleaning"
+    ],
+    "categorySlugs": [
+      "bathroom-cleaning",
+      "home-deep-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e7",
+    "title": "Chairs Dry Cleaning Services",
+    "slug": "chair-dry-cleaning",
+    "aliases": [
+      "service_chair-dry-cleaning",
+      "service_upto-6-chairs",
+      "service_upto-9-chairs",
+      "service_upto-12-chairs"
+    ],
+    "category": "6ace40253bcdb872f58436d2",
+    "categorySlug": "sofa-carpet-cleaning",
+    "categoryName": "Sofa & Carpet Cleaning",
+    "shortDescription": "Chairs drycleaning services: Moradabad Rs. 200 per chair. Other city available Rs. 250 per chair.",
+    "description": "Chairs drycleaning services: Moradabad Rs. 200 per chair; other cities available at Rs. 250 per chair. Professional foam extraction for dining chairs, executive office chairs, conference seating, and fabric armchairs.",
+    "duration": "1-2 hrs",
+    "icon": "Armchair",
+    "pricingMode": "tiered",
+    "price": 400,
+    "mrp": 500,
+    "discountPct": 20,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Number of Chairs",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "2-chairs",
+            "label": "2 Chairs (Moradabad Rs. 200/chair)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "4-chairs",
+            "label": "4 Chairs (Moradabad Rs. 200/chair)",
+            "priceDelta": 400,
+            "mrpDelta": 500,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "6-chairs",
+            "label": "6 Dining Chairs (Moradabad Rs. 200/chair)",
+            "priceDelta": 800,
+            "mrpDelta": 1000,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "8-chairs",
+            "label": "8 Chairs (Dining / Office)",
+            "priceDelta": 1200,
+            "mrpDelta": 1500,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "12-chairs",
+            "label": "12 Chairs (Office / Conference)",
+            "priceDelta": 2000,
+            "mrpDelta": 2500,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "2-chairs"
+        },
+        "price": 400,
+        "mrp": 500,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "4-chairs"
+        },
+        "price": 800,
+        "mrp": 1000,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "6-chairs"
+        },
+        "price": 1200,
+        "mrp": 1500,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "8-chairs"
+        },
+        "price": 1600,
+        "mrp": 2000,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "12-chairs"
+        },
+        "price": 2400,
+        "mrp": 3000,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "Dry vacuuming of fabric backrest and seat cushions",
+      "Foam shampoo scrub to lift food stains and dust",
+      "Moisture suction and fabric refresher spray"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911444/max-housekeeping/services/svc_chair-dry-cleaning.jpg",
+        "alt": "Chairs Dry Cleaning Services deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": false,
+    "isActive": true,
+    "sortOrder": 11,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.418Z",
+    "updatedAt": "2026-10-22T07:06:26.166Z",
+    "categories": [
+      "6ace40253bcdb872f58436d2",
+      "6ace40253bcdb872f58436d3"
+    ],
+    "categoryNames": [
+      "Sofa & Carpet Cleaning",
+      "Commercial Cleaning"
+    ],
+    "categorySlugs": [
+      "sofa-carpet-cleaning",
+      "commercial-cleaning"
+    ]
+  },
+  {
+    "_id": "6ace40253bcdb872f58436e3",
+    "title": "Sofa Dry Cleaning & Shampooing",
+    "slug": "sofa-dry-cleaning",
+    "aliases": [
+      "service_sofa-drycleaning-per-seat",
+      "service_7-seater",
+      "service_9-seater",
+      "service_12-seater"
+    ],
+    "category": "6ace40253bcdb872f58436d2",
+    "categorySlug": "sofa-carpet-cleaning",
+    "categoryName": "Sofa & Carpet Cleaning",
+    "shortDescription": "Sofa Drycleaning Moradabad Rs. 250 per seat. Other city rate Rs. 350 per seat.",
+    "description": "Sofa dry cleaning services: Moradabad Rs. 250 per seat; other city rate Rs. 350 per seat. Industrial injection-extraction shampooing lifts deeply embedded stains, dust mites, sweat marks, and odors while revitalising upholstery fabrics.",
+    "duration": "1-3 hrs",
+    "icon": "Armchair",
+    "pricingMode": "tiered",
+    "price": 750,
+    "mrp": 900,
+    "discountPct": 17,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Sofa Seats Count",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "3-seater",
+            "label": "3 Seater Sofa (Moradabad Rs. 250/seat)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1-1.5 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "5-seater",
+            "label": "5 Seater Sofa (Moradabad Rs. 250/seat)",
+            "priceDelta": 500,
+            "mrpDelta": 600,
+            "multiplier": 1,
+            "durationDelta": "1.5-2 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "7-seater",
+            "label": "7 Seater Sofa (Moradabad Rs. 250/seat)",
+            "priceDelta": 1000,
+            "mrpDelta": 1200,
+            "multiplier": 1,
+            "durationDelta": "2-3 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "9-seater",
+            "label": "9 Seater L-Shape Sofa",
+            "priceDelta": 1500,
+            "mrpDelta": 1800,
+            "multiplier": 1,
+            "durationDelta": "3-4 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "12-seater",
+            "label": "12 Seater Sectional Sofa",
+            "priceDelta": 2250,
+            "mrpDelta": 2700,
+            "multiplier": 1,
+            "durationDelta": "4-5 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "matrix": [
+      {
+        "selection": {
+          "size": "3-seater"
+        },
+        "price": 750,
+        "mrp": 900,
+        "duration": "1-1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "5-seater"
+        },
+        "price": 1250,
+        "mrp": 1500,
+        "duration": "1.5-2 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "7-seater"
+        },
+        "price": 1750,
+        "mrp": 2100,
+        "duration": "2-3 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "9-seater"
+        },
+        "price": 2250,
+        "mrp": 2700,
+        "duration": "3-4 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "12-seater"
+        },
+        "price": 3000,
+        "mrp": 3600,
+        "duration": "4-5 hrs",
+        "isActive": true
+      }
+    ],
+    "inclusions": [
+      "High-power dry vacuuming to remove loose lint and dirt",
+      "Specialised spot treatment on food and grease stains",
+      "Rotary foam shampoo scrub with fabric-safe conditioners",
+      "Moisture extraction for rapid 2-3 hour drying"
+    ],
+    "exclusions": [],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911409/max-housekeeping/services/svc_sofa-dry-cleaning.jpg",
+        "alt": "Sofa Dry Cleaning & Shampooing deep cleaning"
+      }
+    },
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "cityAvailability": [],
+    "isPopular": true,
+    "isActive": true,
+    "sortOrder": 8,
+    "seo": {
+      "keywords": []
+    },
+    "cityOverrides": [],
+    "faqs": [],
+    "__v": 0,
+    "createdAt": "2026-10-13T14:28:53.416Z",
+    "updatedAt": "2026-10-22T07:06:26.013Z",
+    "categories": [
+      "6ace40253bcdb872f58436d2",
+      "6ace40253bcdb872f58436cf"
+    ],
+    "categoryNames": [
+      "Sofa & Carpet Cleaning",
+      "Home Cleaning"
+    ],
+    "categorySlugs": [
+      "sofa-carpet-cleaning",
+      "home-deep-cleaning"
+    ]
+  },
+  {
+    "_id": "6ad9b5f0964df72a85cfff49",
+    "slug": "chimney-cleaning",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436d1"
+    ],
+    "category": "6ace40253bcdb872f58436d1",
+    "categoryName": "Kitchen Cleaning",
+    "categoryNames": [
+      "Kitchen Cleaning"
+    ],
+    "categorySlug": "kitchen-cleaning",
+    "categorySlugs": [
+      "kitchen-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:25.697Z",
+    "description": "Chimney cleaning services: Normal Rs. 500, Medium Rs. 600, Large Rs. 1,000. Specialized heavy-duty degreaser removes burnt carbon, oil clogs in mesh filters, baffle filters, and blower motor chamber.",
+    "discountPct": 23,
+    "duration": "1-1.5 hrs",
+    "exclusions": [],
+    "faqs": [],
+    "icon": "Flame",
+    "inclusions": [
+      "Baffle and mesh filter chemical degreasing wash",
+      "Oil collection tray emptying and hot chemical cleaning",
+      "Motor housing and blower fan dusting",
+      "Exterior stainless steel and curved glass mirror polish"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "size": "normal-chimney"
+        },
+        "price": 500,
+        "mrp": 650,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-chimney"
+        },
+        "price": 600,
+        "mrp": 800,
+        "duration": "1-1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "large-chimney"
+        },
+        "price": 1000,
+        "mrp": 1300,
+        "duration": "1.5-2 hrs",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911422/max-housekeeping/services/svc_kitchen-deep-cleaning.jpg",
+        "alt": "Chimney Cleaning Services deep cleaning"
+      }
+    },
+    "mrp": 650,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Chimney Size & Type",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "normal-chimney",
+            "label": "Normal Chimney (60cm)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-chimney",
+            "label": "Medium Chimney (75cm - 90cm)",
+            "priceDelta": 100,
+            "mrpDelta": 150,
+            "multiplier": 1,
+            "durationDelta": "1-1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "large-chimney",
+            "label": "Large / Curved Glass Chimney",
+            "priceDelta": 500,
+            "mrpDelta": 650,
+            "multiplier": 1,
+            "durationDelta": "1.5-2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 500,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Normal 500, Medium 600, Large 1000. Removes heavy grease, oil build-up and carbon deposits.",
+    "sortOrder": 3,
+    "title": "Chimney Cleaning Services",
+    "updatedAt": "2026-10-22T07:06:25.697Z"
+  },
+  {
+    "_id": "6ad9b5f0964df72a85cfff4a",
+    "slug": "fridge-cleaning",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436d1"
+    ],
+    "category": "6ace40253bcdb872f58436d1",
+    "categoryName": "Kitchen Cleaning",
+    "categoryNames": [
+      "Kitchen Cleaning"
+    ],
+    "categorySlug": "kitchen-cleaning",
+    "categorySlugs": [
+      "kitchen-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:25.808Z",
+    "description": "Fridge cleaning services: Offered at Rs. 500.00 (MRP Rs. 650.00). All internal trays, vegetable crisper baskets, and door shelves are dismantled, scrubbed, sanitised with food-grade disinfectants, and deodorised.",
+    "discountPct": 23,
+    "duration": "1 hr",
+    "exclusions": [],
+    "faqs": [],
+    "icon": "Snowflake",
+    "inclusions": [
+      "Removal and thorough wash of all internal racks and crisper trays",
+      "Door rubber gasket anti-mold disinfection",
+      "Food-safe antibacterial wipe and deodorisation",
+      "Exterior cabinet and handle shine"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "size": "single-door"
+        },
+        "price": 500,
+        "mrp": 650,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "double-door"
+        },
+        "price": 750,
+        "mrp": 950,
+        "duration": "1-1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "side-by-side"
+        },
+        "price": 1100,
+        "mrp": 1400,
+        "duration": "1.5-2 hrs",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911422/max-housekeeping/services/svc_kitchen-deep-cleaning.jpg",
+        "alt": "Fridge Cleaning Services deep cleaning"
+      }
+    },
+    "mrp": 650,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Refrigerator Type",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "single-door",
+            "label": "Single Door Refrigerator",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "double-door",
+            "label": "Double Door Frost-Free Refrigerator",
+            "priceDelta": 250,
+            "mrpDelta": 300,
+            "multiplier": 1,
+            "durationDelta": "1-1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "side-by-side",
+            "label": "Side-by-Side / Multi-Door Refrigerator",
+            "priceDelta": 600,
+            "mrpDelta": 750,
+            "multiplier": 1,
+            "durationDelta": "1.5-2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 500,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Effective Rs. 500.00 (MRP Rs. 650.00). Complete antibacterial sanitisation and odor eradication.",
+    "sortOrder": 4,
+    "title": "Fridge Cleaning Services",
+    "updatedAt": "2026-10-22T07:06:25.808Z"
+  },
+  {
+    "_id": "6ad9b5f0964df72a85cfff4b",
+    "slug": "bathroom-maintenance-membership",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436d0"
+    ],
+    "category": "6ace40253bcdb872f58436d0",
+    "categoryName": "Bathroom Cleaning",
+    "categoryNames": [
+      "Bathroom Cleaning"
+    ],
+    "categorySlug": "bathroom-cleaning",
+    "categorySlugs": [
+      "bathroom-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:25.908Z",
+    "description": "Exclusive annual bathroom maintenance offer for Moradabad homes. Enjoy 30 professional deep cleaning visits throughout the year (approx every 12 days). Per bathroom Rs. 9,999 (original rate Rs. 15,000). Keeps your bathroom spotless, scale-free, and hygienic year-round.",
+    "discountPct": 33,
+    "duration": "1 Year (30 Visits)",
+    "exclusions": [
+      "Valid in Moradabad municipal area only"
+    ],
+    "faqs": [],
+    "icon": "ShieldCheck",
+    "inclusions": [
+      "30 scheduled deep cleaning visits in 1 year (Moradabad only)",
+      "Full acid-free tile descaling and chrome polishing each visit",
+      "WC seat, washbasin and drain sanitisation",
+      "Priority dispatch and zero cancellation fees"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "coverage": "1-bathroom-30-visits"
+        },
+        "price": 9999,
+        "mrp": 15000,
+        "duration": "1 Year (30 visits)",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "coverage": "2-bathroom-60-visits"
+        },
+        "price": 18999,
+        "mrp": 28000,
+        "duration": "1 Year (60 visits)",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911418/max-housekeeping/services/svc_bathroom-deep-cleaning.jpg",
+        "alt": "Annual Bathroom Maintenance Membership deep cleaning"
+      }
+    },
+    "mrp": 15000,
+    "optionGroups": [
+      {
+        "key": "coverage",
+        "label": "Membership Coverage",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "1-bathroom-30-visits",
+            "label": "1 Bathroom (30 Visits / 1 Year)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1 Year (30 visits)",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "2-bathroom-60-visits",
+            "label": "2 Bathrooms (60 Visits / 1 Year)",
+            "priceDelta": 9000,
+            "mrpDelta": 13000,
+            "multiplier": 1,
+            "durationDelta": "1 Year (60 visits)",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 9999,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Membership Bathroom Maintenance of one year (offer). Rs. 9,999 for 30 visits (original rate 15,000). Moradabad only.",
+    "sortOrder": 6,
+    "title": "Annual Bathroom Maintenance Membership",
+    "updatedAt": "2026-10-22T07:06:25.908Z"
+  },
+  {
+    "_id": "6ad9b5f1964df72a85cfff4c",
+    "slug": "floor-cleaning",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436cf",
+      "6ace40253bcdb872f58436d3"
+    ],
+    "category": "6ace40253bcdb872f58436cf",
+    "categoryName": "Home Cleaning",
+    "categoryNames": [
+      "Home Cleaning",
+      "Commercial Cleaning"
+    ],
+    "categorySlug": "home-deep-cleaning",
+    "categorySlugs": [
+      "home-deep-cleaning",
+      "commercial-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:26.217Z",
+    "description": "Floor cleaning: Rs. 10 per square feet. Heavy-duty single disc machine with Red scouring pad deep scrubbing. Professional Diversey chemicals (Taski) used for grease, grout cleaning, floor dullness, and tile brightening.",
+    "discountPct": 25,
+    "duration": "2-4 hrs",
+    "exclusions": [],
+    "faqs": [],
+    "icon": "Sparkles",
+    "inclusions": [
+      "Single disc industrial machine scrub with Red Pad",
+      "Diversey Taski chemical treatment for hard floor stains",
+      "Wet vacuum suction of dislodged slurry and grime",
+      "Microfiber mop neutralisation and drying"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "size": "upto-200"
+        },
+        "price": 1500,
+        "mrp": 2000,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "upto-500"
+        },
+        "price": 2500,
+        "mrp": 3500,
+        "duration": "2-3 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "upto-1000"
+        },
+        "price": 4500,
+        "mrp": 6000,
+        "duration": "3-4 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "upto-2000"
+        },
+        "price": 8000,
+        "mrp": 10500,
+        "duration": "4-6 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "per-sqft"
+        },
+        "price": 10,
+        "mrp": 15,
+        "duration": "Custom",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911413/max-housekeeping/services/svc_full-home-deep-cleaning.jpg",
+        "alt": "Floor Machine Cleaning & Scrubbing deep cleaning"
+      }
+    },
+    "mrp": 2000,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Floor Area Coverage",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "upto-200",
+            "label": "Up to 200 Sq Ft (Mini Area / Shop)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "upto-500",
+            "label": "Up to 500 Sq Ft (Small Flat / Ground Floor)",
+            "priceDelta": 1000,
+            "mrpDelta": 1500,
+            "multiplier": 1,
+            "durationDelta": "2-3 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "upto-1000",
+            "label": "Up to 1,000 Sq Ft (Medium House / Showroom)",
+            "priceDelta": 3000,
+            "mrpDelta": 4000,
+            "multiplier": 1,
+            "durationDelta": "3-4 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "upto-2000",
+            "label": "Up to 2,000 Sq Ft (Large Bungalow / Office)",
+            "priceDelta": 6500,
+            "mrpDelta": 8500,
+            "multiplier": 1,
+            "durationDelta": "4-6 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "per-sqft",
+            "label": "Floor Cleaning (Rs. 10 per square feet)",
+            "priceDelta": -1490,
+            "mrpDelta": -1985,
+            "multiplier": 1,
+            "durationDelta": "Custom",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 1500,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Floor cleaning Rs. 10 per square feet. Single disc machine Red pad cleaning services, Diversey chemical used.",
+    "sortOrder": 12,
+    "title": "Floor Machine Cleaning & Scrubbing",
+    "updatedAt": "2026-10-22T07:06:26.217Z"
+  },
+  {
+    "_id": "6ad9b5f1964df72a85cfff4d",
+    "slug": "fans-cleaning-services",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436cf",
+      "6ace40253bcdb872f58436d1"
+    ],
+    "category": "6ace40253bcdb872f58436cf",
+    "categoryName": "Home Cleaning",
+    "categoryNames": [
+      "Home Cleaning",
+      "Kitchen Cleaning"
+    ],
+    "categorySlug": "home-deep-cleaning",
+    "categorySlugs": [
+      "home-deep-cleaning",
+      "kitchen-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:26.265Z",
+    "description": "Fans cleaning services: Rs. 80.00 (MRP Rs. 100.00). Complete degreasing and dust removal from ceiling fans, exhaust fans, and wall-mounted fans with drop-cloth protection.",
+    "discountPct": 20,
+    "duration": "1 hr",
+    "exclusions": [],
+    "faqs": [],
+    "icon": "Fan",
+    "inclusions": [
+      "Removal of thick dust cakes and sticky grease",
+      "Exhaust fan baffle and blade degrease",
+      "Motor casing wipe and shine",
+      "Floor cover protection during cleaning"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "quantity": "1-fan"
+        },
+        "price": 80,
+        "mrp": 100,
+        "duration": "30 mins",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "quantity": "3-fans"
+        },
+        "price": 240,
+        "mrp": 300,
+        "duration": "1 hr",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "quantity": "5-fans"
+        },
+        "price": 380,
+        "mrp": 500,
+        "duration": "1.5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "quantity": "8-fans"
+        },
+        "price": 599,
+        "mrp": 800,
+        "duration": "2 hrs",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911413/max-housekeeping/services/svc_full-home-deep-cleaning.jpg",
+        "alt": "Fans Cleaning Services deep cleaning"
+      }
+    },
+    "mrp": 100,
+    "optionGroups": [
+      {
+        "key": "quantity",
+        "label": "Fan Quantity",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "1-fan",
+            "label": "1 Fan (Ceiling or Exhaust)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "30 mins",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "3-fans",
+            "label": "3 Fans Package",
+            "priceDelta": 160,
+            "mrpDelta": 200,
+            "multiplier": 1,
+            "durationDelta": "1 hr",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "5-fans",
+            "label": "5 Fans Package",
+            "priceDelta": 300,
+            "mrpDelta": 400,
+            "multiplier": 1,
+            "durationDelta": "1.5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "8-fans",
+            "label": "8 Fans (Full House Package)",
+            "priceDelta": 519,
+            "mrpDelta": 700,
+            "multiplier": 1,
+            "durationDelta": "2 hrs",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 80,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Fans cleaning services: Rs. 80.00 (MRP Rs. 100.00) per fan.",
+    "sortOrder": 13,
+    "title": "Fans Cleaning Services",
+    "updatedAt": "2026-10-22T07:06:26.265Z"
+  },
+  {
+    "_id": "6ad9b5f1964df72a85cfff4e",
+    "slug": "swimming-pool-cleaning",
+    "__v": 0,
+    "aliases": [],
+    "categories": [
+      "6ace40253bcdb872f58436d3",
+      "6ace40253bcdb872f58436cf"
+    ],
+    "category": "6ace40253bcdb872f58436d3",
+    "categoryName": "Commercial Cleaning",
+    "categoryNames": [
+      "Commercial Cleaning",
+      "Home Cleaning"
+    ],
+    "categorySlug": "commercial-cleaning",
+    "categorySlugs": [
+      "commercial-cleaning",
+      "home-deep-cleaning"
+    ],
+    "cityAvailability": [],
+    "cityOverrides": [],
+    "createdAt": "2026-10-22T07:06:26.320Z",
+    "description": "Professional swimming pool cleaning and water clarity management. Pricing: Rs. 0.05 per litre Moradabad only, other city Rs. 0.10 per litre. Algae brushing, submersible vacuuming, sand filter backwash, and chlorine shock balancing.",
+    "discountPct": 29,
+    "duration": "3-6 hrs",
+    "exclusions": [],
+    "faqs": [],
+    "icon": "Waves",
+    "inclusions": [
+      "Surface leaf and debris netting",
+      "Mechanical wall and tile line scrub to eliminate algae spores",
+      "Underwater sediment and silt vacuuming",
+      "Filter backwash and rinse cycle",
+      "Chemical testing and chlorine balance dosing"
+    ],
+    "isActive": true,
+    "isPopular": false,
+    "matrix": [
+      {
+        "selection": {
+          "size": "small-pool"
+        },
+        "price": 2500,
+        "mrp": 3500,
+        "duration": "3 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "medium-pool"
+        },
+        "price": 4500,
+        "mrp": 6000,
+        "duration": "4-5 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "large-pool"
+        },
+        "price": 7500,
+        "mrp": 10000,
+        "duration": "6 hrs",
+        "isActive": true
+      },
+      {
+        "selection": {
+          "size": "resort-pool"
+        },
+        "price": 12000,
+        "mrp": 16000,
+        "duration": "1 Day",
+        "isActive": true
+      }
+    ],
+    "media": {
+      "hero": {
+        "url": "https://res.cloudinary.com/ewuoxjdy/image/upload/v1791911436/max-housekeeping/services/svc_water-tank-cleaning.jpg",
+        "alt": "Swimming Pool Cleaning deep cleaning"
+      }
+    },
+    "mrp": 3500,
+    "optionGroups": [
+      {
+        "key": "size",
+        "label": "Pool Water Capacity",
+        "type": "single",
+        "required": true,
+        "sortOrder": 0,
+        "options": [
+          {
+            "key": "small-pool",
+            "label": "Small Pool (Up to 25,000 Litres)",
+            "priceDelta": 0,
+            "mrpDelta": 0,
+            "multiplier": 1,
+            "durationDelta": "3 hrs",
+            "isDefault": true,
+            "isActive": true
+          },
+          {
+            "key": "medium-pool",
+            "label": "Medium Pool (25,000 - 50,000 Litres)",
+            "priceDelta": 2000,
+            "mrpDelta": 2500,
+            "multiplier": 1,
+            "durationDelta": "4-5 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "large-pool",
+            "label": "Large Pool (50,000 - 100,000 Litres)",
+            "priceDelta": 5000,
+            "mrpDelta": 6500,
+            "multiplier": 1,
+            "durationDelta": "6 hrs",
+            "isDefault": false,
+            "isActive": true
+          },
+          {
+            "key": "resort-pool",
+            "label": "Commercial / Resort Pool (100,000+ Litres)",
+            "priceDelta": 9500,
+            "mrpDelta": 12500,
+            "multiplier": 1,
+            "durationDelta": "1 Day",
+            "isDefault": false,
+            "isActive": true
+          }
+        ]
+      }
+    ],
+    "price": 2500,
+    "pricingMode": "tiered",
+    "sampleBeforeAfter": {
+      "isSample": true
+    },
+    "seo": {
+      "keywords": []
+    },
+    "shortDescription": "Swimming pool cleaning: Rs. 0.05 per litre Moradabad only, other city 0.10 per litre.",
+    "sortOrder": 14,
+    "title": "Swimming Pool Cleaning",
+    "updatedAt": "2026-10-22T07:06:26.320Z"
+  }
+]

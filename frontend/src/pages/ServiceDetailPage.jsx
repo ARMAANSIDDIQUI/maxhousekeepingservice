@@ -7,13 +7,15 @@ import {
   LuShieldCheck,
   LuCalendar,
   LuArrowLeft,
-  LuSparkles
+  LuSparkles,
+  LuMoveHorizontal
 } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
 import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
+import SEO from '../components/common/SEO';
 
 // Helper to compute exact variant pricing for any service and variant key
 function getVariantPricingInfo(service, optKey, groupKey) {
@@ -130,6 +132,12 @@ export default function ServiceDetailPage() {
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
+      <SEO
+        title={service?.title || 'Cleaning Service Details'}
+        description={service?.shortDescription || service?.description?.slice(0, 160) || 'Book professional doorstep cleaning with Max Housekeeping Service.'}
+        keywords={`${service?.title || ''}, cleaning, housekeeping, ${service?.categoryName || ''}, Moradabad, Rampur, Sambhal`}
+        image={service?.media?.hero?.url || service?.imageUrl || '/favicon.png'}
+      />
       <div className="container mx-auto px-4 max-w-5xl">
         {/* Breadcrumb Back */}
         <Link
@@ -253,8 +261,8 @@ export default function ServiceDetailPage() {
           {/* Inclusions */}
           <div className="p-6 rounded-2xl bg-[#ECE5D8]/70 border border-[#E2D9C8]">
             <h3 className="font-display font-bold text-lg text-[#10231D] mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#DDEBE4] text-[#10231D] text-xs font-bold flex items-center justify-center">
-                ✓
+              <span className="w-6 h-6 rounded-full bg-[#DDEBE4] text-[#10231D] flex items-center justify-center">
+                <LuCheck className="w-3.5 h-3.5 stroke-[2.5]" />
               </span>
               <span>What Is Included</span>
             </h3>
@@ -275,8 +283,8 @@ export default function ServiceDetailPage() {
           {/* Exclusions */}
           <div className="p-6 rounded-2xl bg-[#ECE5D8]/70 border border-[#E2D9C8]">
             <h3 className="font-display font-bold text-lg text-[#10231D] mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-bold flex items-center justify-center">
-                ✕
+              <span className="w-6 h-6 rounded-full bg-[#F9ECE8] text-[#C2512D] flex items-center justify-center">
+                <LuX className="w-3.5 h-3.5 stroke-[2.5]" />
               </span>
               <span>What Is Excluded</span>
             </h3>
@@ -343,7 +351,7 @@ export default function ServiceDetailPage() {
               style={{ left: `${sliderPosition}%` }}
             >
               <div className="w-8 h-8 rounded-full bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-bold text-xs shadow-lg">
-                ↔
+                <LuMoveHorizontal className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
 

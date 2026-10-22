@@ -42,9 +42,12 @@ export function BookingProvider({ children }) {
           if (selectedCity) {
             const matched = res.cities.find(c => c.slug === selectedCity.slug || c.name === selectedCity.name);
             if (!matched) {
-              setSelectedCity(null);
-              try { localStorage.removeItem('max_selected_city'); } catch {}
+              const mbd = res.cities.find(c => c.slug === 'moradabad') || res.cities[0];
+              setSelectedCity(mbd);
             }
+          } else {
+            const mbd = res.cities.find(c => c.slug === 'moradabad') || res.cities[0];
+            setSelectedCity(mbd);
           }
         } else {
           setCities([]);
@@ -186,12 +189,34 @@ export function BookingProvider({ children }) {
       }
     } catch {
       // Offline fallback: calculate accurate variant price locally
+      const isMbd = !selectedCity || selectedCity.slug === 'moradabad';
       const enriched = currentItems.map(i => {
         let p = i.service.price || 0;
         let m = i.service.mrp || i.service.price || 0;
-        
-        // Matrix match
-        if (i.service.matrix && Array.isArray(i.service.matrix)) {
+
+        // Dynamic Unit Pricing
+        if (i.service.pricingType === 'unit' || (i.service.pricingUnit && i.service.pricingUnit !== 'fixed')) {
+          const rateMbd = typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : (i.service.price || 0);
+          const rateOther = typeof i.service.unitRateOther === 'number'
+            ? i.service.unitRateOther
+            : (typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : i.service.price || 0);
+          const activeRate = isMbd ? rateMbd : rateOther;
+
+          const unitCount = Number(
+            i.selections?.units ??
+            i.selections?.unitCount ??
+            i.selections?.sqFt ??
+            i.selections?.litres ??
+            i.selections?.seats ??
+            i.selections?.chairs ??
+            i.selections?.fans
+          ) || i.service.minUnitQuantity || 1;
+
+          p = Math.round(activeRate * unitCount);
+          const mrpFactor = (i.service.mrp && i.service.price && i.service.mrp > i.service.price) ? (i.service.mrp / i.service.price) : 1.25;
+          m = Math.round(p * mrpFactor);
+        } else if (i.service.matrix && Array.isArray(i.service.matrix)) {
+          // Matrix match
           const match = i.service.matrix.find(row => {
             if (row.isActive === false) return false;
             const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
@@ -203,7 +228,13 @@ export function BookingProvider({ children }) {
             m = match.mrp || match.price;
           }
         }
-        
+
+        // Outstation surcharge
+        if (!isMbd && i.service.cityExtraCharge) {
+          p += i.service.cityExtraCharge;
+          m += i.service.cityExtraCharge;
+        }
+
         const qty = i.qty || 1;
         return {
           serviceId: i.service._id,

@@ -15,6 +15,7 @@ import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
 import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
+import SEO from '../components/common/SEO';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -76,6 +77,10 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <SEO
+        title="Max Housekeeping Service | Professional Cleaning in Western UP"
+        description="Top-rated home deep cleaning, bathroom sanitisation, kitchen degreasing, sofa shampooing & commercial cleaning across Moradabad, Rampur, Amroha, Sambhal, and Western Uttar Pradesh."
+      />
       {/* 1. Hero Section - Dynamic Screen Height & Reduced Top Padding */}
       <section className="relative bg-[#F4EFE6] min-h-[calc(100vh-68px)] lg:min-h-[calc(100dvh-68px)] flex flex-col justify-center pt-2 sm:pt-4 pb-6 sm:pb-10 border-b border-[#E2D9C8] overflow-hidden">
         <div className="container mx-auto px-4 my-auto">

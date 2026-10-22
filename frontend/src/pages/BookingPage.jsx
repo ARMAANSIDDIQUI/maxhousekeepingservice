@@ -16,9 +16,14 @@ import {
   LuBanknote,
   LuLock,
   LuLogIn,
-  LuCircleAlert
+  LuCircleAlert,
+  LuCalculator,
+  LuSparkles,
+  LuTruck,
+  LuInfo
 } from 'react-icons/lu';
 import confetti from 'canvas-confetti';
+import SEO from '../components/common/SEO';
 import { useBooking } from '../context/BookingContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -27,34 +32,113 @@ import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 
 // Helper to calculate exact variant unit price and MRP
-function getServiceVariantPrice(service, optKey, groupKey) {
+function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad', selections = {}) {
   if (!service) return { price: 0, mrp: 0 };
-  // 1. Matrix row match
+  const isMoradabad = !citySlug || citySlug.toLowerCase() === 'moradabad';
+
+  // 1. Dynamic Per Sq. Ft. / Unit Calculation (ONLY for dedicated unit services without static matrix variants)
+  if (service.pricingType === 'unit' && (!service.matrix || service.matrix.length === 0)) {
+    let activeRate = isMoradabad
+      ? (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : (service.price || 10))
+      : (typeof service.unitRateOther === 'number' ? service.unitRateOther : (service.unitRateMoradabad || service.price || 15));
+
+    // Check specific cityRates override if configured
+    if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
+      const targetSlug = (citySlug || 'moradabad').toLowerCase().trim();
+      const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+      if (match && typeof match.rate === 'number' && match.rate > 0) {
+        activeRate = match.rate;
+      }
+    }
+
+    const minQty = Number(service.minUnitQuantity) || 100;
+    const userEntered = Number(
+      selections?.sqFt ??
+      selections?.units ??
+      selections?.unitCount ??
+      selections?.litres ??
+      selections?.seats ??
+      selections?.chairs ??
+      selections?.fans
+    ) || minQty;
+
+    // Minimum sq ft rule: customer cannot be charged less than minimum sq ft
+    const effectiveUnits = Math.max(minQty, userEntered);
+
+    let p = Math.round(activeRate * effectiveUnits);
+    const mrpFactor = (service.mrp && service.price && service.mrp > service.price) ? (service.mrp / service.price) : 1.25;
+    let m = Math.round(p * mrpFactor);
+
+    if (!isMoradabad && service.cityExtraCharge) {
+      p += service.cityExtraCharge;
+      m += service.cityExtraCharge;
+    }
+
+    return {
+      price: p,
+      mrp: m,
+      duration: service.duration || '1-2 hrs',
+      activeRate,
+      unitCount: userEntered,
+      effectiveUnits,
+      minQty,
+      isUnit: true
+    };
+  }
+
+  // 2. Matrix row match
+  let basePrice = service.price || 0;
+  let baseMrp = service.mrp || service.price || 0;
+  let duration = service.duration || '1.5 hrs';
+
   if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
     for (const row of service.matrix) {
       if (row.isActive === false) continue;
       const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
       const rowVal = String(sel[groupKey] || '').toLowerCase().trim();
       if (rowVal === String(optKey).toLowerCase().trim()) {
-        return { price: row.price, mrp: row.mrp || row.price, duration: row.duration };
+        basePrice = row.price;
+        baseMrp = row.mrp || row.price;
+        if (row.duration) duration = row.duration;
+        break;
+      }
+    }
+  } else {
+    const group = service.optionGroups?.find(g => g.key === groupKey);
+    const opt = group?.options?.find(o => o.key === optKey);
+    if (opt) {
+      basePrice += (opt.priceDelta || 0);
+      baseMrp += (opt.mrpDelta || opt.priceDelta || 0);
+      if (opt.multiplier && opt.multiplier > 0) {
+        basePrice = Math.round(basePrice * opt.multiplier);
+        baseMrp = Math.round(baseMrp * opt.multiplier);
+      }
+      if (opt.durationDelta) duration = opt.durationDelta;
+    }
+  }
+
+  // Check additional option selections (e.g. backside)
+  if (service.optionGroups && Array.isArray(service.optionGroups)) {
+    for (const grp of service.optionGroups) {
+      if (grp.key === groupKey) continue;
+      const chosen = selections?.[grp.key];
+      if (chosen) {
+        const opt = grp.options?.find(o => o.key === chosen);
+        if (opt) {
+          basePrice += (opt.priceDelta || 0);
+          baseMrp += (opt.mrpDelta || opt.priceDelta || 0);
+        }
       }
     }
   }
-  // 2. Option group delta / multiplier match
-  const basePrice = service.price || 0;
-  const baseMrp = service.mrp || service.price || 0;
-  const group = service.optionGroups?.find(g => g.key === groupKey);
-  const opt = group?.options?.find(o => o.key === optKey);
-  if (opt) {
-    let p = basePrice + (opt.priceDelta || 0);
-    let m = baseMrp + (opt.mrpDelta || opt.priceDelta || 0);
-    if (opt.multiplier && opt.multiplier > 0) {
-      p = Math.round(p * opt.multiplier);
-      m = Math.round(m * opt.multiplier);
-    }
-    return { price: p, mrp: m };
+
+  // Outstation surcharge
+  if (!isMoradabad && service.cityExtraCharge) {
+    basePrice += service.cityExtraCharge;
+    baseMrp += service.cityExtraCharge;
   }
-  return { price: basePrice, mrp: baseMrp };
+
+  return { price: basePrice, mrp: baseMrp, duration };
 }
 
 export default function BookingPage() {
@@ -449,6 +533,28 @@ export default function BookingPage() {
       return;
     }
 
+    // Verify all cart items are serviceable in the selected city
+    const citySlug = (selectedCity?.slug || (selectedCity?.name ? selectedCity.name.toLowerCase() : 'moradabad')).toLowerCase();
+    if (citySlug !== 'moradabad') {
+      const unsupportedItem = items.find(it => {
+        const svc = it.service;
+        if (!svc) return false;
+        const allowed = Array.isArray(svc.cityAvailability) && svc.cityAvailability.length > 0
+          ? svc.cityAvailability.map(c => c.toLowerCase())
+          : ['moradabad'];
+        const isAllowed = allowed.includes(citySlug) || (
+          svc.slug?.includes('sofa') || svc.slug?.includes('carpet') || svc.slug?.includes('chair') ||
+          svc.title?.toLowerCase().includes('sofa') || svc.title?.toLowerCase().includes('carpet') || svc.title?.toLowerCase().includes('chair')
+        );
+        return !isAllowed;
+      });
+
+      if (unsupportedItem) {
+        toast.error(`"${unsupportedItem.service.title}" is only available in Moradabad. Please remove it or switch your city to Moradabad.`);
+        return;
+      }
+    }
+
     // 2. Validate Full Name (No numbers, no symbols, min 2 chars)
     const nameTrimmed = customer.name?.trim() || '';
     if (!nameTrimmed) {
@@ -594,13 +700,43 @@ export default function BookingPage() {
     }
   };
 
-  const filteredCatalog = allServices.filter(s =>
-    s.title.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-    s.categoryName?.toLowerCase().includes(serviceSearch.toLowerCase())
-  );
+  const currentCitySlug = (selectedCity?.slug || (selectedCity?.name ? selectedCity.name.toLowerCase() : 'moradabad')).toLowerCase();
+  const isMoradabadSelected = currentCitySlug === 'moradabad';
+
+  const filteredCatalog = allServices.filter(s => {
+    // 1. City availability filter
+    if (!isMoradabadSelected) {
+      const allowed = Array.isArray(s.cityAvailability) && s.cityAvailability.length > 0
+        ? s.cityAvailability.map(c => c.toLowerCase())
+        : ['moradabad'];
+      
+      const isDirectlyAllowed = allowed.includes(currentCitySlug);
+      const isKeywordAllowed = (
+        s.slug?.includes('sofa') || s.slug?.includes('carpet') || s.slug?.includes('chair') ||
+        s.title?.toLowerCase().includes('sofa') || s.title?.toLowerCase().includes('carpet') || s.title?.toLowerCase().includes('chair')
+      );
+
+      if (!isDirectlyAllowed && !isKeywordAllowed) {
+        return false;
+      }
+    }
+
+    // 2. Search query filter
+    const q = serviceSearch.toLowerCase().trim();
+    if (!q) return true;
+    const inTitle = s.title?.toLowerCase().includes(q);
+    const inCat = s.categoryName?.toLowerCase().includes(q);
+    const inTags = Array.isArray(s.tags) && s.tags.some(t => t.toLowerCase().includes(q));
+    const inDesc = s.shortDescription?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q);
+    return inTitle || inCat || inTags || inDesc;
+  });
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
+      <SEO
+        title="Book Cleaning Service"
+        description="Book professional cleaning, sofa dry cleaning, and sanitisation services in Moradabad, Rampur, Sambhal, and Western UP with Max Housekeeping Service."
+      />
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Page Title */}
         <div className="mb-8">
@@ -611,7 +747,7 @@ export default function BookingPage() {
             Book Your Cleaning Service
           </h1>
           <p className="text-sm text-[#3D524A] mt-1">
-            Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Select City'}</strong> (Western UP)
+            Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Moradabad'}</strong> (Western UP)
           </p>
         </div>
 
@@ -641,6 +777,111 @@ export default function BookingPage() {
             </button>
           </div>
         )}
+
+        {/* STEP 0: INITIAL CITY SELECTION & FILTERING BAR */}
+        <div className="mb-8 p-5 sm:p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2D9C8]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+                <LuMapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display font-bold text-lg text-[#10231D]">
+                    Select Your Service City First
+                  </h3>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#10231D] text-[#E9A23B] font-mono">
+                    {selectedCity?.name || 'Moradabad'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#6B8077] mt-0.5">
+                  Catalog and pricing filter instantly. All services are available in Moradabad; Sofa, Carpet & Chair cleaning across other cities.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Select City Pills */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-[#3D524A] uppercase tracking-wider">
+                Quick Select Delivery City:
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {cities.map((c) => {
+                const cSlug = (typeof c === 'string' ? c : (c.slug || c.name)).toLowerCase();
+                const cName = typeof c === 'string' ? c : (c.name || c.slug);
+                const isSelected = (selectedCity?.slug || 'moradabad').toLowerCase() === cSlug;
+
+                return (
+                  <button
+                    key={cSlug}
+                    type="button"
+                    onClick={() => {
+                      if (typeof c === 'object') {
+                        setSelectedCity(c);
+                        setAddressForm(prev => ({ ...prev, cityText: c.name }));
+                        toast.info(`Switched city to ${c.name}`);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-[#10231D] text-[#E9A23B] shadow-md ring-2 ring-[#E9A23B]'
+                        : 'bg-white hover:bg-[#F4EFE6] text-[#10231D] border border-[#E2D9C8]'
+                    }`}
+                  >
+                    <LuMapPin className={`w-3.5 h-3.5 ${isSelected ? 'text-[#E9A23B]' : 'text-[#6B8077]'}`} />
+                    <span>{cName}</span>
+                    {cSlug === 'moradabad' && (
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${
+                        isSelected ? 'bg-[#E9A23B] text-[#10231D]' : 'bg-[#10231D] text-[#E9A23B]'
+                      }`}>
+                        HQ
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* City Coverage Notice Banner */}
+          {isMoradabadSelected ? (
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-950 flex items-center gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-800 text-white flex items-center justify-center shrink-0">
+                <LuCheck className="w-3 h-3 stroke-[3]" />
+              </span>
+              <span>
+                <strong>Moradabad Operational Hub:</strong> All 25 cleaning services (Full Home Deep Clean, Kitchen, Bathroom, Water Tank, Sofa, Carpet, Marble polishing) are active with zero outstation dispatch surcharge.
+              </span>
+            </div>
+          ) : (
+            <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center shrink-0">
+                  <LuTruck className="w-3 h-3 stroke-[2.5]" />
+                </span>
+                <span>
+                  <strong>{selectedCity?.name} Service Zone:</strong> Specialized Sofa Dry Cleaning, Carpet Cleaning, and Chair Dry Cleaning are available with doorstep mobile equipment vans. (Full home cleaning is available in Moradabad).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const mbd = cities.find(c => (typeof c === 'string' ? c : c.slug) === 'moradabad') || cities[0];
+                  if (mbd && typeof mbd === 'object') {
+                    setSelectedCity(mbd);
+                    setAddressForm(prev => ({ ...prev, cityText: mbd.name }));
+                  }
+                }}
+                className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B] shrink-0 cursor-pointer self-start sm:self-auto"
+              >
+                Switch to Moradabad
+              </button>
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleBookingSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Form Column (Steps 1, 2, 3) */}
@@ -684,10 +925,11 @@ export default function BookingPage() {
                 <div className="space-y-4">
                   {items.map((item, idx) => {
                     const svc = item.service;
+                    const isUnitService = svc.pricingType === 'unit' && (!svc.matrix || svc.matrix.length === 0);
                     const primaryOptionGroup = svc.optionGroups?.[0];
-                    const hasVariants = (svc.matrix && svc.matrix.length > 0) || (primaryOptionGroup && primaryOptionGroup.options?.length > 1);
+                    const hasVariants = !isUnitService && ((svc.matrix && svc.matrix.length > 0) || (primaryOptionGroup && primaryOptionGroup.options?.length > 1));
                     const currentVariantKey = item.selections?.[primaryOptionGroup?.key] || primaryOptionGroup?.options?.[0]?.key || '';
-                    const currentPriceInfo = getServiceVariantPrice(svc, currentVariantKey, primaryOptionGroup?.key);
+                    const currentPriceInfo = getServiceVariantPrice(svc, currentVariantKey, primaryOptionGroup?.key, currentCitySlug, item.selections);
                     
                     const quoteItem = quote?.items?.[idx];
                     const unitPrice = quoteItem?.unitPrice ?? currentPriceInfo.price ?? svc.price ?? 0;
@@ -696,19 +938,58 @@ export default function BookingPage() {
                     const itemMrpTotal = quoteItem?.totalMrp ?? (unitMrp * (item.qty || 1));
                     const itemSavings = quoteItem?.savings ?? Math.max(0, itemMrpTotal - itemTotal);
 
-                    const variantOptions = (primaryOptionGroup?.options || []).map((opt) => {
-                      const optPriceInfo = getServiceVariantPrice(svc, opt.key, primaryOptionGroup.key);
+                    const variantOptions = !isUnitService && primaryOptionGroup ? (primaryOptionGroup.options || []).map((opt) => {
+                      const optPriceInfo = getServiceVariantPrice(svc, opt.key, primaryOptionGroup.key, currentCitySlug, item.selections);
                       return {
                         value: opt.key,
                         label: `${opt.label} · ₹${optPriceInfo.price.toLocaleString('en-IN')}`
                       };
-                    });
+                    }) : [];
+
+                    // City coverage check
+                    const isAllowedInCity = isMoradabadSelected || (
+                      svc.allowedCitySlugs && Array.isArray(svc.allowedCitySlugs) && svc.allowedCitySlugs.length > 0
+                        ? svc.allowedCitySlugs.includes(currentCitySlug)
+                        : /sofa|carpet|chair/i.test(`${svc.slug || ''} ${svc.title || ''}`)
+                    );
 
                     return (
                       <div
                         key={idx}
                         className="p-4 sm:p-5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-xs space-y-3.5 transition-all"
                       >
+                        {/* Outstation Availability Warning if service not serviced in active city */}
+                        {!isAllowedInCity && (
+                          <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <span>
+                              This service is currently only available for doorstep dispatch in <strong>Moradabad</strong>.
+                            </span>
+                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const mbd = cities.find(c => (typeof c === 'string' ? c : c.slug) === 'moradabad') || cities[0];
+                                  if (mbd && typeof mbd === 'object') {
+                                    setSelectedCity(mbd);
+                                    setAddressForm(prev => ({ ...prev, cityText: mbd.name }));
+                                  }
+                                }}
+                                className="font-bold underline text-[#10231D] hover:text-[#E9A23B] cursor-pointer"
+                              >
+                                Switch to Moradabad
+                              </button>
+                              <span>·</span>
+                              <button
+                                type="button"
+                                onClick={() => removeItem(idx)}
+                                className="font-bold underline text-[#C2512D] hover:text-[#9A381B] cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Top Row: Service Title & Header Actions (Stepper + Remove) */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -758,8 +1039,101 @@ export default function BookingPage() {
                           </div>
                         </div>
 
-                        {/* Middle Row: Variant CustomSelect (Dedicated row with full clearance) */}
-                        {hasVariants && primaryOptionGroup && (
+                        {/* Middle Row: Area / Unit Calculator OR Normal Variant CustomSelect */}
+                        {isUnitService ? (
+                          (() => {
+                            const unitName = svc.unitLabel || 'Sq. Ft.';
+                            const isLitre = svc.pricingUnit === 'litre' || unitName.toLowerCase().includes('ltr') || unitName.toLowerCase().includes('litre');
+                            const incrementOptions = isLitre ? [1000, 2500, 5000, 10000] : [50, 100, 200, 500];
+                            const currentQty = item.selections?.litres ?? item.selections?.sqFt ?? item.selections?.units ?? currentPriceInfo.minQty ?? (isLitre ? 1000 : 100);
+
+                            return (
+                              <div className="pt-2 p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                                    <LuCalculator className="w-4 h-4 text-[#E9A23B]" />
+                                    <span>
+                                      {isLitre
+                                        ? `Specify Pool / Tank Capacity (${unitName}):`
+                                        : `Specify Your Required Area (${unitName}):`}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] font-bold text-[#3D524A] bg-white px-2.5 py-1 rounded-lg border border-[#E2D9C8] flex items-center gap-1.5">
+                                    <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                                    <span>Rate in {selectedCity?.name || 'Moradabad'}:</span>
+                                    <strong className="text-[#10231D]">₹{currentPriceInfo.activeRate || svc.price} / {unitName}</strong>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      step="1"
+                                      value={currentQty}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, Number(e.target.value) || 1);
+                                        updateItemVariant(idx, {
+                                          ...item.selections,
+                                          sqFt: val,
+                                          units: val,
+                                          litres: val
+                                        });
+                                      }}
+                                      className="w-32 p-2 rounded-xl bg-white border border-[#E2D9C8] text-sm font-bold text-[#10231D] text-center focus:border-[#E9A23B] focus:outline-none"
+                                    />
+                                    <span className="text-xs font-semibold text-[#6B8077]">
+                                      {unitName}
+                                    </span>
+                                  </div>
+
+                                  {/* Quick Increment Buttons */}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {incrementOptions.map((inc) => (
+                                      <button
+                                        key={inc}
+                                        type="button"
+                                        onClick={() => {
+                                          const nextVal = Number(currentQty) + inc;
+                                          updateItemVariant(idx, {
+                                            ...item.selections,
+                                            sqFt: nextVal,
+                                            units: nextVal,
+                                            litres: nextVal
+                                          });
+                                        }}
+                                        className="px-2 py-1 rounded-lg bg-white hover:bg-[#ECE5D8] border border-[#E2D9C8] text-[11px] font-bold text-[#10231D] transition-colors cursor-pointer"
+                                      >
+                                        +{inc.toLocaleString('en-IN')}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Minimum Notice if entered amount is below min */}
+                                {Number(currentQty) < (currentPriceInfo.minQty || (isLitre ? 1000 : 100)) && (
+                                  <div className="text-[11px] text-amber-900 bg-amber-500/10 p-2 rounded-lg border border-amber-500/30 flex items-center gap-1.5">
+                                    <LuInfo className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+                                    <span>
+                                      Minimum chargeable {isLitre ? 'capacity' : 'area'} is {currentPriceInfo.minQty} {unitName}. Billing calculation applied for {currentPriceInfo.minQty} {unitName}.
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Live Calculation Formula */}
+                                <div className="text-[11px] font-mono text-[#3D524A] bg-white/80 p-2.5 rounded-lg border border-[#E2D9C8]/60 flex items-center justify-between">
+                                  <span>
+                                    Formula: {currentPriceInfo.effectiveUnits} {unitName} × ₹{currentPriceInfo.activeRate || svc.price}
+                                  </span>
+                                  <span className="font-bold text-[#10231D] text-xs">
+                                    = ₹{currentPriceInfo.price?.toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : hasVariants && primaryOptionGroup ? (
                           <div className="pt-1">
                             <label className="block text-xs font-bold text-[#3D524A] mb-1.5">
                               {primaryOptionGroup.label || 'Select Variant / Size'}:
@@ -779,7 +1153,7 @@ export default function BookingPage() {
                               />
                             </div>
                           </div>
-                        )}
+                        ) : null}
 
                         {/* Bottom Row: Duration (Left) & Live Price + Savings Pill (Right) */}
                         <div className="pt-2.5 border-t border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -890,7 +1264,7 @@ export default function BookingPage() {
                     options={[
                       ...user.addresses.map((a) => ({
                         value: a._id,
-                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})${a.isDefault ? ' ★ Default' : ''}`
+                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})${a.isDefault ? ' (Default)' : ''}`
                       })),
                       { value: 'new', label: '+ Enter a different address' }
                     ]}
@@ -899,8 +1273,9 @@ export default function BookingPage() {
                 </div>
               ) : user && (!user.addresses || user.addresses.length === 0) && !isTemporaryAddress ? (
                 <div className="mb-4 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex items-center justify-between text-xs">
-                  <span className="text-[#6B8077]">
-                    💡 No saved addresses yet. Enter your address below and it will be saved to your profile!
+                  <span className="text-[#6B8077] flex items-center gap-1.5">
+                    <LuInfo className="w-3.5 h-3.5 text-[#3D524A] shrink-0" />
+                    <span>No saved addresses yet. Enter your address below and it will be saved to your profile!</span>
                   </span>
                   <Link to="/dashboard" className="font-bold text-[#10231D] underline hover:text-[#E9A23B] shrink-0 ml-2">
                     Manage in Dashboard
@@ -1501,7 +1876,7 @@ export default function BookingPage() {
           isOpen={isAddServiceOpen}
           onClose={() => setIsAddServiceOpen(false)}
           title="Add a Service to Booking"
-          subtitle="Select from 37+ specialized home and commercial packages"
+          subtitle="Select from specialized home, upholstery and commercial packages"
           maxWidth="max-w-xl"
         >
           <div className="mb-4">
@@ -1524,8 +1899,10 @@ export default function BookingPage() {
                   <p className="font-bold text-sm text-[#10231D]">{s.title}</p>
                   <p className="text-xs text-[#6B8077]">{s.categoryName} · {s.duration || '1 hr'}</p>
                   <p className="text-xs font-bold text-[#10231D] mt-1 tnum">
-                    From ₹{s.price.toLocaleString('en-IN')}
-                    {s.mrp > s.price && (
+                    {s.pricingType === 'unit'
+                      ? `₹${s.unitRateMoradabad || s.price} / ${s.pricingUnit === 'sq_ft' ? 'Sq. Ft.' : (s.unitLabel || 'unit')}`
+                      : `From ₹${s.price.toLocaleString('en-IN')}`}
+                    {s.mrp > s.price && s.pricingType !== 'unit' && (
                       <span className="ml-1.5 text-[11px] text-[#6B8077] line-through">
                         ₹{s.mrp.toLocaleString('en-IN')}
                       </span>

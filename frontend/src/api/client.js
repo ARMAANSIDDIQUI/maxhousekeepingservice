@@ -387,13 +387,19 @@ export const FALLBACK_SERVICES = [
     categoryName: 'Sofa & Carpet Cleaning',
     categorySlug: 'sofa-carpet-cleaning',
     icon: 'Sparkles',
-    price: 699,
-    mrp: 899,
+    pricingType: 'unit',
+    pricingUnit: 'sq_ft',
+    unitLabel: 'Sq. Ft.',
+    minUnitQuantity: 50,
+    unitRateMoradabad: 30,
+    unitRateOther: 30,
+    price: 30,
+    mrp: 40,
     duration: '1 hr',
-    isPopular: false,
+    isPopular: true,
     sortOrder: 5,
-    shortDescription: 'Industrial rotary shampooing and fiber sanitisation for living room rugs and carpets.',
-    description: 'Gentle on fine wool and silk fibers, tough on ground-in dirt. Restores original texture and color vibrancy.',
+    shortDescription: 'Professional carpet deep cleaning at ₹30 per square foot.',
+    description: 'Carpet cleaning services: ₹30 per square foot. High-temperature hot water extraction and specialized foam shampooing removes dirt, dust mites, spill stains, and odors from woollen, Persian, and synthetic rugs.',
     media: { hero: { url: '/media/categories/sofa-carpet-cleaning.jpg', alt: 'Carpet cleaning in progress' } },
     inclusions: [
       'High-power vacuuming of embedded grit',
@@ -401,23 +407,44 @@ export const FALLBACK_SERVICES = [
       'Spot treatment for coffee/tea spills',
       'Odor disinfectant misting'
     ],
-    optionGroups: [
-      {
-        key: 'size',
-        label: 'Carpet Size',
-        type: 'single',
-        options: [
-          { key: 'medium', label: 'Medium (50 – 100 sq ft)', isDefault: true },
-          { key: 'large', label: 'Large (100 – 150 sq ft)' },
-          { key: 'extra-large', label: 'Extra Large (150 – 200 sq ft)' }
-        ]
-      }
+    optionGroups: [],
+    matrix: []
+  },
+  {
+    _id: 's_swimming_pool',
+    title: 'Swimming Pool Cleaning',
+    slug: 'swimming-pool-cleaning',
+    aliases: [
+      'service_swimming-pool-cleaning',
+      'swimming-pool-cleaning'
     ],
-    matrix: [
-      { selection: { size: 'medium' }, price: 699, mrp: 899, duration: '45 mins' },
-      { selection: { size: 'large' }, price: 999, mrp: 1299, duration: '1 hr' },
-      { selection: { size: 'extra-large' }, price: 1499, mrp: 1899, duration: '1.5 hrs' }
-    ]
+    categoryName: 'Commercial Cleaning',
+    categorySlug: 'commercial-cleaning',
+    icon: 'Waves',
+    pricingType: 'unit',
+    pricingUnit: 'litre',
+    unitLabel: 'Litres',
+    minUnitQuantity: 1000,
+    unitRateMoradabad: 0.05,
+    unitRateOther: 0.10,
+    price: 0.05,
+    mrp: 0.08,
+    hasCitySpecificRates: true,
+    duration: '3-6 hrs',
+    isPopular: false,
+    sortOrder: 14,
+    shortDescription: 'Professional swimming pool cleaning: ₹0.05/L in Moradabad, ₹0.10/L in other cities.',
+    description: 'Professional swimming pool cleaning and water clarity management. Pricing: ₹0.05 per litre in Moradabad, ₹0.10 per litre in other cities. Algae brushing, submersible vacuuming, sand filter backwash, and chlorine shock balancing.',
+    media: { hero: { url: '/media/categories/commercial-cleaning.jpg', alt: 'Swimming pool cleaning' } },
+    inclusions: [
+      'Surface leaf and debris netting',
+      'Mechanical wall and tile line scrub to eliminate algae spores',
+      'Underwater sediment and silt vacuuming',
+      'Filter backwash and rinse cycle',
+      'Chemical testing and chlorine balance dosing'
+    ],
+    optionGroups: [],
+    matrix: []
   },
   {
     _id: 's_bed',

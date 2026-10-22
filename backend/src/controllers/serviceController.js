@@ -46,11 +46,16 @@ export async function getServices(req, res, next) {
     }
 
     if (city) {
-      query.$or = [
-        { cityAvailability: { $exists: false } },
-        { cityAvailability: { $size: 0 } },
-        { cityAvailability: city.toLowerCase() }
-      ];
+      const citySlug = city.toLowerCase().trim();
+      if (citySlug === 'moradabad') {
+        query.$or = [
+          { cityAvailability: 'moradabad' },
+          { cityAvailability: { $size: 0 } },
+          { cityAvailability: { $exists: false } }
+        ];
+      } else {
+        query.cityAvailability = citySlug;
+      }
     }
 
     if (popular === 'true') {
@@ -63,14 +68,15 @@ export async function getServices(req, res, next) {
       query.$or = [
         { title: regex },
         { description: regex },
-        { shortDescription: regex }
+        { shortDescription: regex },
+        { tags: regex }
       ];
     }
 
     const services = await Service.find(query)
       .populate('category', 'name slug iconKey image')
       .populate('categories', 'name slug iconKey image')
-      .sort({ sortOrder: 1, createdAt: -1 });
+      .sort({ rankingScore: -1, sortOrder: 1, createdAt: -1 });
 
     res.status(200).json({
       success: true,

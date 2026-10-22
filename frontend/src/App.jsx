@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-route
 import Lenis from 'lenis';
 
 import { ToastProvider } from './context/ToastContext';
+import { HelmetProvider } from 'react-helmet-async';
 import { LoadingProvider } from './context/LoadingContext';
 import { AuthProvider } from './context/AuthContext';
 import { BookingProvider } from './context/BookingContext';
@@ -68,58 +69,60 @@ function LenisProvider({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <LenisProvider>
-        <ToastProvider>
-          <LoadingProvider>
-            <AuthProvider>
-              <BookingProvider>
-                <PWAProvider>
-                  <div className="flex flex-col min-h-screen bg-[#F4EFE6] text-[#10231D]">
-                    <ScrollToTop />
-                    
-                    {/* Top Navigation */}
-                    <Header />
+    <HelmetProvider>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <LenisProvider>
+          <ToastProvider>
+            <LoadingProvider>
+              <AuthProvider>
+                <BookingProvider>
+                  <PWAProvider>
+                    <div className="flex flex-col min-h-screen bg-[#F4EFE6] text-[#10231D]">
+                      <ScrollToTop />
+                      
+                      {/* Top Navigation */}
+                      <Header />
 
-                    {/* Main Route Content */}
-                    <main className="flex-1">
-                      <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/services" element={<ServicesPage />} />
-                        <Route path="/services/:slug" element={<ServiceDetailPage />} />
-                        <Route path="/book" element={<BookingPage />} />
-                        <Route path="/book/:slug" element={<BookingPage />} />
-                        <Route path="/about" element={<AboutPage />} />
-                        <Route path="/contact" element={<ContactPage />} />
-                        <Route path="/track" element={<TrackBookingPage />} />
-                        <Route path="/track/:code" element={<TrackBookingPage />} />
-                        <Route path="/login" element={<LoginPage />} />
-                        <Route path="/dashboard" element={<CustomerDashboard />} />
-                        <Route path="/my-bookings" element={<CustomerDashboard />} />
-                        <Route path="/admin/*" element={<AdminDashboard />} />
-                        {/* Broken / Non-existent links redirect to Home */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                      </Routes>
-                    </main>
+                      {/* Main Route Content */}
+                      <main className="flex-1">
+                        <Routes>
+                          <Route path="/" element={<HomePage />} />
+                          <Route path="/services" element={<ServicesPage />} />
+                          <Route path="/services/:slug" element={<ServiceDetailPage />} />
+                          <Route path="/book" element={<BookingPage />} />
+                          <Route path="/book/:slug" element={<BookingPage />} />
+                          <Route path="/about" element={<AboutPage />} />
+                          <Route path="/contact" element={<ContactPage />} />
+                          <Route path="/track" element={<TrackBookingPage />} />
+                          <Route path="/track/:code" element={<TrackBookingPage />} />
+                          <Route path="/login" element={<LoginPage />} />
+                          <Route path="/dashboard" element={<CustomerDashboard />} />
+                          <Route path="/my-bookings" element={<CustomerDashboard />} />
+                          <Route path="/admin/*" element={<AdminDashboard />} />
+                          {/* Broken / Non-existent links redirect to Home */}
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </main>
 
-                    {/* Mobile Sticky Bar (<768px) */}
-                    <MobileBar />
+                      {/* Mobile Sticky Bar (<768px) */}
+                      <MobileBar />
 
-                    {/* Floating Scroll To Top Button */}
-                    <ScrollToTopButton />
+                      {/* Floating Scroll To Top Button */}
+                      <ScrollToTopButton />
 
-                    {/* Editorial Footer */}
-                    <Footer />
+                      {/* Editorial Footer */}
+                      <Footer />
 
-                    {/* Once-per-day PWA App Download Modal Pop Up on site load & explicit clicks */}
-                    <PWAInstallModal />
-                  </div>
-                </PWAProvider>
-              </BookingProvider>
-            </AuthProvider>
-          </LoadingProvider>
-        </ToastProvider>
-      </LenisProvider>
-    </BrowserRouter>
+                      {/* Once-per-day PWA App Download Modal Pop Up on site load & explicit clicks */}
+                      <PWAInstallModal />
+                    </div>
+                  </PWAProvider>
+                </BookingProvider>
+              </AuthProvider>
+            </LoadingProvider>
+          </ToastProvider>
+        </LenisProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }

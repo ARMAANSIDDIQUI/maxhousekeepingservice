@@ -6,6 +6,7 @@ import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
 import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
+import SEO from '../components/common/SEO';
 
 export default function ServicesPage() {
   const navigate = useNavigate();
@@ -77,6 +78,10 @@ export default function ServicesPage() {
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
+      <SEO
+        title="All Cleaning Services"
+        description="Browse all professional home and commercial cleaning services by Max Housekeeping Service in Moradabad, Rampur, Sambhal, and Western UP."
+      />
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-10">

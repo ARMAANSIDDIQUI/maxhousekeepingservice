@@ -18,6 +18,7 @@ import {
 import { FaGoogle } from 'react-icons/fa6';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import SEO from '../components/common/SEO';
 
 export default function LoginPage() {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
@@ -86,14 +87,6 @@ export default function LoginPage() {
     }
   }, [user, isAuthLoading, navigate]);
 
-  React.useEffect(() => {
-    document.title =
-      mode === 'signin'
-        ? 'Login Page | Max Housekeeping Service'
-        : mode === 'signup'
-        ? 'Create Account | Max Housekeeping Service'
-        : 'Reset Password | Max Housekeeping Service';
-  }, [mode]);
 
   const handlePostLoginRedirect = (userRole) => {
     if (userRole === 'admin') {
@@ -445,6 +438,10 @@ export default function LoginPage() {
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">
+      <SEO
+        title={mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
+        description="Secure sign in and account access for Max Housekeeping Service customers and staff."
+      />
       <div className="w-full max-w-md bg-[#ECE5D8] px-5 py-7 sm:p-8 rounded-2xl sm:rounded-3xl border-2 border-[#10231D] shadow-2xl">
         {/* Header */}
         <div className="text-center mb-6">
@@ -456,7 +453,7 @@ export default function LoginPage() {
           />
           <h1 className="font-display font-black text-2xl sm:text-3xl text-[#10231D]">
             {mode === 'signin'
-              ? 'Login Page'
+              ? 'Sign In'
               : mode === 'signup'
               ? 'Create Account'
               : 'Reset Password'}

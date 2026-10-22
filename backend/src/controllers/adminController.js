@@ -248,6 +248,34 @@ async function resolveCategoriesPayload(payload) {
  * Helper to normalize and synchronize service variants, option groups, and matrix
  */
 function processVariantsPayload(payload) {
+  if (payload.pricingType === 'unit') {
+    payload.pricingMode = 'combination';
+    const rateMbd = Number(payload.unitRateMoradabad) || Number(payload.price) || 0;
+    const rateOther = Number(payload.unitRateOther) || rateMbd;
+    if (!payload.price || payload.price === 0) {
+      payload.price = rateMbd;
+    }
+    if (!payload.mrp || payload.mrp === 0) {
+      payload.mrp = Math.round(payload.price * 1.25);
+    }
+    if (payload.mrp > payload.price) {
+      payload.discountPct = Math.round(((payload.mrp - payload.price) / payload.mrp) * 100);
+    }
+    if (Array.isArray(payload.cityRates)) {
+      payload.cityRates = payload.cityRates.map(cr => ({
+        citySlug: String(cr.citySlug || '').trim().toLowerCase(),
+        cityName: String(cr.cityName || cr.citySlug || '').trim(),
+        rate: Math.max(0, Number(cr.rate) || 0)
+      })).filter(cr => cr.citySlug && cr.rate > 0);
+    }
+    // If no variants provided for unit pricing, keep matrix empty
+    if (!Array.isArray(payload.variants) || payload.variants.length === 0) {
+      payload.matrix = [];
+      payload.optionGroups = [];
+      return;
+    }
+  }
+
   if (Array.isArray(payload.variants)) {
     const groupKey = (payload.variantGroupKey || 'size').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const groupLabel = (payload.variantGroupLabel || 'Apartment / House Size').trim();
@@ -270,7 +298,7 @@ function processVariantsPayload(payload) {
       payload.mrp = defaultVar.mrp;
       payload.discountPct = defaultVar.mrp > defaultVar.price ? Math.round(((defaultVar.mrp - defaultVar.price) / defaultVar.mrp) * 100) : 0;
       payload.duration = defaultVar.duration;
-      payload.pricingMode = 'tiered';
+      payload.pricingMode = payload.pricingType === 'unit' ? 'combination' : 'tiered';
 
       payload.matrix = validVariants.map(v => ({
         selection: { [groupKey]: v.key },
@@ -298,7 +326,7 @@ function processVariantsPayload(payload) {
           }))
         }
       ];
-    } else {
+    } else if (payload.pricingType !== 'unit') {
       payload.matrix = [];
       payload.optionGroups = [];
       payload.pricingMode = 'fixed';
@@ -333,6 +361,12 @@ export async function updateService(req, res, next) {
     }
     if (updates.exclusions !== undefined) {
       updates.exclusions = sanitizeStringList(updates.exclusions) || [];
+    }
+    if (updates.tags !== undefined) {
+      updates.tags = sanitizeStringList(updates.tags) || [];
+    }
+    if (updates.rankingScore !== undefined) {
+      updates.rankingScore = Number(updates.rankingScore) || 100;
     }
 
     // Resolve multi-category selection if provided
@@ -401,6 +435,12 @@ export async function createService(req, res, next) {
     }
     if (serviceData.exclusions !== undefined) {
       serviceData.exclusions = sanitizeStringList(serviceData.exclusions) || [];
+    }
+    if (serviceData.tags !== undefined) {
+      serviceData.tags = sanitizeStringList(serviceData.tags) || [];
+    }
+    if (serviceData.rankingScore !== undefined) {
+      serviceData.rankingScore = Number(serviceData.rankingScore) || 100;
     }
 
     if (!serviceData.slug && serviceData.title) {
@@ -698,7 +738,7 @@ export async function deleteContactMessage(req, res, next) {
  */
 export async function getAdminCities(req, res, next) {
   try {
-    const cities = await City.find().sort({ sortOrder: 1, name: 1 });
+    const cities = await City.find().sort({ rankingScore: -1, sortOrder: 1, name: 1 });
     res.status(200).json({ success: true, count: cities.length, cities });
   } catch (err) {
     next(err);
@@ -711,11 +751,12 @@ export async function getAdminCities(req, res, next) {
  */
 export async function createCity(req, res, next) {
   try {
-    const { name, slug, state, serviceRadiusKm, pincodes, status, sortOrder, contactOverrides } = req.body;
+    const { name, slug, state, serviceRadiusKm, pincodes, status, sortOrder, contactOverrides, tags, rankingScore, rankingTier } = req.body;
     if (!name) {
       return res.status(400).json({ success: false, message: 'City name is required' });
     }
     const finalSlug = (slug || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
+    const parsedTags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []);
     const city = await City.create({
       name: name.trim(),
       slug: finalSlug,
@@ -725,6 +766,9 @@ export async function createCity(req, res, next) {
       pincodes: Array.isArray(pincodes) ? pincodes : (typeof pincodes === 'string' ? pincodes.split(',').map(p => p.trim()).filter(Boolean) : []),
       status: status || 'active',
       sortOrder: Number(sortOrder) || 0,
+      rankingScore: Number(rankingScore) || 100,
+      rankingTier: rankingTier || 'primary',
+      tags: parsedTags,
       contactOverrides: contactOverrides || {}
     });
     res.status(201).json({ success: true, message: 'City created successfully', city });
@@ -743,6 +787,12 @@ export async function updateCity(req, res, next) {
     const updateData = { ...req.body };
     if (typeof updateData.pincodes === 'string') {
       updateData.pincodes = updateData.pincodes.split(',').map(p => p.trim()).filter(Boolean);
+    }
+    if (typeof updateData.tags === 'string') {
+      updateData.tags = updateData.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+    if (updateData.rankingScore !== undefined) {
+      updateData.rankingScore = Number(updateData.rankingScore) || 100;
     }
     const city = await City.findByIdAndUpdate(id, updateData, { new: true });
     if (!city) {

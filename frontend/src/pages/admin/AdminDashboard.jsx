@@ -30,7 +30,11 @@ import {
   LuClock,
   LuCreditCard,
   LuLayers,
-  LuChevronDown
+  LuChevronDown,
+  LuRuler,
+  LuCalculator,
+  LuVideo,
+  LuTag
 } from 'react-icons/lu';
 import {
   apiRequest,
@@ -45,6 +49,7 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import CustomSelect from '../../components/common/CustomSelect';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
 import ServiceCarousel from '../../components/common/ServiceCarousel';
+import SEO from '../../components/common/SEO';
 
 const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
   value: ic.key,
@@ -117,8 +122,20 @@ export default function AdminDashboard() {
   const [newServiceForm, setNewServiceForm] = useState({
     title: '',
     slug: '',
+    pricingType: 'normal',
+    pricingUnit: 'fixed',
     price: 499,
     mrp: 699,
+    unitRateMoradabad: 499,
+    unitRateOther: 499,
+    unitLabel: 'Sq. Ft.',
+    minUnitQuantity: 1,
+    hasCitySpecificRates: false,
+    cityRates: [],
+    cityExtraCharge: 0,
+    moradabadOnly: false,
+    cityAvailability: ['moradabad'],
+    videoUrl: '',
     duration: '1.5 hrs',
     icon: 'Sparkles',
     shortDescription: '',
@@ -130,7 +147,10 @@ export default function AdminDashboard() {
     variantGroupKey: 'size',
     variants: [],
     inclusions: '',
-    exclusions: ''
+    exclusions: '',
+    tags: 'deep-cleaning, housekeeping, professional-cleaning',
+    rankingScore: 100,
+    rankingTier: 'standard'
   });
   const [savingNewService, setSavingNewService] = useState(false);
   const [uploadingNewServiceImage, setUploadingNewServiceImage] = useState(false);
@@ -142,17 +162,97 @@ export default function AdminDashboard() {
   const [serviceForm, setServiceForm] = useState({
     title: '',
     slug: '',
+    pricingType: 'normal',
+    pricingUnit: 'fixed',
+    price: 0,
+    mrp: 0,
+    unitRateMoradabad: 0,
+    unitRateOther: 0,
+    unitLabel: 'Sq. Ft.',
+    minUnitQuantity: 1,
+    hasCitySpecificRates: false,
+    cityRates: [],
+    cityExtraCharge: 0,
+    moradabadOnly: false,
+    cityAvailability: ['moradabad'],
+    videoUrl: '',
     categories: [],
     icon: 'Sparkles',
-    price: 0, // Offered Price
-    mrp: 0,   // Shown Price (regular)
     duration: '',
     matrix: [],
     imageUrl: '',
     images: [],
     inclusions: '',
-    exclusions: ''
+    exclusions: '',
+    tags: '',
+    rankingScore: 100,
+    rankingTier: 'standard'
   });
+
+  // Booking Details Modal State
+  const [viewBookingDetails, setViewBookingDetails] = useState(null);
+
+  // Extra Filter States for Admin Sections
+  const [bookingCityFilter, setBookingCityFilter] = useState('all');
+  const [bookingPaymentFilter, setBookingPaymentFilter] = useState('all');
+
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [serviceCategoryFilter, setServiceCategoryFilter] = useState('all');
+  const [servicePricingTypeFilter, setServicePricingTypeFilter] = useState('all');
+  const [serviceCityFilter, setServiceCityFilter] = useState('all');
+
+  const [categoryStatusFilter, setCategoryStatusFilter] = useState('all');
+
+  const [citySearch, setCitySearch] = useState('');
+  const [cityStatusFilter, setCityStatusFilter] = useState('all');
+
+  const [testimonialSearch, setTestimonialSearch] = useState('');
+  const [testimonialStatusFilter, setTestimonialStatusFilter] = useState('all');
+
+  const [messageSearch, setMessageSearch] = useState('');
+  const [messageStatusFilter, setMessageStatusFilter] = useState('all');
+
+  const [couponSearch, setCouponSearch] = useState('');
+  const [couponStatusFilter, setCouponStatusFilter] = useState('all');
+
+  // Automatic Tag & SEO Generation (No manual admin entry needed)
+  const generateAutoServiceTags = (title, catIds, isMoradabadOnly, pricingType) => {
+    const tagSet = new Set();
+    if (title) {
+      title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2).forEach(w => tagSet.add(w));
+      tagSet.add(title.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    }
+    if (Array.isArray(catIds)) {
+      catIds.forEach(id => {
+        const cat = categories.find(c => String(c._id) === String(id));
+        if (cat?.slug) tagSet.add(cat.slug);
+        if (cat?.name) tagSet.add(cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+      });
+    }
+    if (isMoradabadOnly) {
+      tagSet.add('moradabad');
+      tagSet.add('moradabad-exclusive');
+    } else {
+      tagSet.add('moradabad');
+      tagSet.add('all-cities-available');
+      tagSet.add('rampur');
+      tagSet.add('sambhal');
+      tagSet.add('amroha');
+      tagSet.add('bijnor');
+    }
+    if (pricingType === 'unit') {
+      tagSet.add('per-sqft');
+      tagSet.add('custom-area');
+    }
+    tagSet.add('deep-cleaning');
+    tagSet.add('professional-cleaning');
+    tagSet.add('top-rated');
+    return Array.from(tagSet);
+  };
+
+  // User Search & Role Filter State
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
 
   // City Modal & Form State
@@ -165,7 +265,10 @@ export default function AdminDashboard() {
     serviceRadiusKm: 25,
     pincodes: '',
     status: 'active',
-    sortOrder: 0
+    sortOrder: 0,
+    tags: '',
+    rankingScore: 100,
+    rankingTier: 'primary'
   });
 
   // Testimonial Modal & Form State
@@ -208,8 +311,20 @@ export default function AdminDashboard() {
       title: '',
       slug: '',
       categories: defaultCatId ? [defaultCatId] : [],
+      pricingType: 'normal',
+      pricingUnit: 'fixed',
       price: 499,
       mrp: 699,
+      unitRateMoradabad: 499,
+      unitRateOther: 499,
+      unitLabel: 'Sq. Ft.',
+      minUnitQuantity: 1,
+      hasCitySpecificRates: false,
+      cityRates: [],
+      cityExtraCharge: 0,
+      moradabadOnly: false,
+      cityAvailability: ['moradabad'],
+      videoUrl: '',
       duration: '1.5 hrs',
       icon: 'Sparkles',
       shortDescription: '',
@@ -361,8 +476,8 @@ export default function AdminDashboard() {
                   </div>
 
                   {isPrimary ? (
-                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D]">
-                      ★ Primary
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D] flex items-center gap-1">
+                      <LuStar className="w-2.5 h-2.5 fill-current" /> Primary
                     </span>
                   ) : isSelected ? (
                     <button
@@ -544,8 +659,15 @@ export default function AdminDashboard() {
                   <LuX className="w-3 h-3 stroke-[2.5]" />
                 </button>
 
-                <div className="p-1.5 bg-white text-[10px] font-bold text-[#6B8077] truncate text-center border-t border-[#ECE5D8]">
-                  {idx === 0 ? '★ Primary Cover' : `Gallery Photo #${idx + 1}`}
+                <div className="p-1.5 bg-white text-[10px] font-bold text-[#6B8077] truncate text-center border-t border-[#ECE5D8] flex items-center justify-center gap-1">
+                  {idx === 0 ? (
+                    <>
+                      <LuStar className="w-2.5 h-2.5 fill-[#E9A23B] text-[#E9A23B]" />
+                      <span>Primary Cover</span>
+                    </>
+                  ) : (
+                    `Gallery Photo #${idx + 1}`
+                  )}
                 </div>
               </div>
             ))}
@@ -561,6 +683,884 @@ export default function AdminDashboard() {
             </p>
           </div>
         )}
+      </div>
+    );
+  };
+
+  // Dedicated Service Type & City Pricing Configuration (Step 1: Normal vs Per Sq. Ft. / Unit Calculation + City-Wise Rates & Availability)
+  const renderServicePricingConfig = (isEdit = false) => {
+    const form = isEdit ? serviceForm : newServiceForm;
+    const setter = isEdit ? setServiceForm : setNewServiceForm;
+
+    const isUnit = form.pricingType === 'unit';
+    const activePricingUnit = form.pricingUnit || (isUnit ? 'sq_ft' : 'fixed');
+    const unitLabel = form.unitLabel || (activePricingUnit === 'sq_ft' ? 'Sq. Ft.' : activePricingUnit === 'litre' ? 'Litres' : activePricingUnit === 'seat' ? 'Seats' : activePricingUnit === 'chair' ? 'Chairs' : activePricingUnit === 'fan' ? 'Fans' : 'Units');
+
+    // Available cities list
+    const cityList = cities.map(c => {
+      if (typeof c === 'string') return { name: c, slug: c.toLowerCase() };
+      return { name: c.name || c.slug, slug: (c.slug || c.name || '').toLowerCase() };
+    });
+    if (!cityList.some(c => c.slug === 'moradabad')) {
+      cityList.unshift({ name: 'Moradabad', slug: 'moradabad' });
+    }
+
+    const currentCities = Array.isArray(form.cityAvailability) ? form.cityAvailability : ['moradabad'];
+
+    const handleToggleCity = (slug) => {
+      const lowerSlug = slug.toLowerCase();
+      setter(prev => {
+        const curr = Array.isArray(prev.cityAvailability) ? prev.cityAvailability : ['moradabad'];
+        let updated;
+        if (curr.includes(lowerSlug)) {
+          if (curr.length <= 1) {
+            toast.error('Service must be available in at least one city.');
+            return prev;
+          }
+          updated = curr.filter(s => s !== lowerSlug);
+        } else {
+          updated = [...curr, lowerSlug];
+        }
+        return {
+          ...prev,
+          cityAvailability: updated,
+          moradabadOnly: updated.length === 1 && updated[0] === 'moradabad'
+        };
+      });
+    };
+
+    const handleSelectAllCities = () => {
+      const allSlugs = cityList.map(c => c.slug);
+      setter(prev => ({
+        ...prev,
+        cityAvailability: allSlugs,
+        moradabadOnly: false
+      }));
+      toast.success('Service enabled for all cities!');
+    };
+
+    const handleMoradabadOnly = () => {
+      setter(prev => ({
+        ...prev,
+        cityAvailability: ['moradabad'],
+        moradabadOnly: true
+      }));
+      toast.info('Service restricted to Moradabad only.');
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* STEP 1: TYPE OF SERVICE (NORMAL VS PER SQ. FT. / UNIT CALC) */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+                <LuCalculator className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                  Step 1: Type of Service & Calculation Method
+                </h4>
+                <p className="text-[10px] text-[#6B8077] mt-0.5">
+                  Select service model: Normal service (flat/BHK) or dynamic Per Sq. Ft. / Unit calculator
+                </p>
+              </div>
+            </div>
+            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase font-mono flex items-center gap-1.5 ${
+              isUnit ? 'bg-[#E9A23B] text-[#10231D]' : 'bg-[#10231D] text-[#F4EFE6]'
+            }`}>
+              {isUnit ? (
+                <>
+                  <LuRuler className="w-3 h-3" />
+                  <span>Per Sq. Ft. / Unit</span>
+                </>
+              ) : (
+                <span>Normal Service</span>
+              )}
+            </span>
+          </div>
+
+          {/* Toggle Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setter(prev => ({ ...prev, pricingType: 'normal', pricingUnit: 'fixed' }))}
+              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                !isUnit
+                  ? 'bg-[#10231D] border-[#10231D] text-[#F4EFE6] shadow-md ring-2 ring-[#E9A23B]'
+                  : 'bg-white border-[#E2D9C8] text-[#10231D] hover:bg-[#F4EFE6]'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${!isUnit ? 'bg-[#E9A23B] text-[#10231D]' : 'bg-[#ECE5D8] text-[#3D524A]'}`}>
+                <LuLayers className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight">Normal Service</p>
+                <p className={`text-[10px] mt-0.5 leading-snug ${!isUnit ? 'text-[#E2D9C8]' : 'text-[#6B8077]'}`}>
+                  Fixed prices, tiered BHK variants (1, 2, 3, 4, 5+ BHK), or fixed package rates. Form remains standard.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setter(prev => ({
+                ...prev,
+                pricingType: 'unit',
+                pricingUnit: prev.pricingUnit === 'fixed' ? 'sq_ft' : prev.pricingUnit,
+                unitLabel: prev.unitLabel || 'Sq. Ft.',
+                minUnitQuantity: prev.minUnitQuantity || 100,
+                unitRateMoradabad: prev.unitRateMoradabad || prev.price || 4,
+                unitRateOther: prev.unitRateOther || prev.unitRateMoradabad || prev.price || 5,
+                mrp: prev.mrp || Math.round((prev.unitRateMoradabad || prev.price || 4) * 1.3)
+              }))}
+              className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                isUnit
+                  ? 'bg-[#10231D] border-[#10231D] text-[#F4EFE6] shadow-md ring-2 ring-[#E9A23B]'
+                  : 'bg-white border-[#E2D9C8] text-[#10231D] hover:bg-[#F4EFE6]'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isUnit ? 'bg-[#E9A23B] text-[#10231D]' : 'bg-[#ECE5D8] text-[#3D524A]'}`}>
+                <LuRuler className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight">Per Sq. Ft. / Unit Calculation</p>
+                <p className={`text-[10px] mt-0.5 leading-snug ${isUnit ? 'text-[#E2D9C8]' : 'text-[#6B8077]'}`}>
+                  Dynamic calculator for customer: carpet area (sq ft), water tank (litres), sofa seats, chairs, fans.
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* CONDITIONAL BODY: NORMAL SERVICE FORM */}
+        {!isUnit ? (
+          <div className="space-y-4">
+            {/* Base Prices */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Base Shown Price (MRP Crossed Out):
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.mrp}
+                  onChange={(e) => setter(prev => ({ ...prev, mrp: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-bold text-[#10231D] tnum"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Base Offered Price (Payable):
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.price}
+                  onChange={(e) => setter(prev => ({ ...prev, price: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Dynamic Service Variants & Tiered Rates */}
+            <div className="pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div>
+                  <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                    <LuTicket className="w-4 h-4 text-[#E9A23B]" />
+                    <span>Service Variants & Tiered Rates ({form.variants?.length || 0})</span>
+                  </h4>
+                  <p className="text-[11px] text-[#6B8077]">
+                    Add 1, 2, 3, 4, 5+ BHK variants or custom sizes with individual rates & MRPs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newIdx = (form.variants?.length || 0) + 1;
+                    setter(prev => {
+                      const newVar = {
+                        key: `variant-${newIdx}`,
+                        label: `${newIdx} BHK`,
+                        price: (Number(prev.price) || 2800) + (newIdx * 1000),
+                        mrp: (Number(prev.mrp) || 2999) + (newIdx * 1500),
+                        duration: `${newIdx + 2}-${newIdx + 3} hrs`,
+                        isDefault: (prev.variants?.length || 0) === 0
+                      };
+                      return {
+                        ...prev,
+                        variants: [...(prev.variants || []), newVar]
+                      };
+                    });
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto transition-colors shadow-xs"
+                >
+                  <LuPlus className="w-4 h-4" />
+                  <span>Add Variant</span>
+                </button>
+              </div>
+
+              {/* Variant Group Label */}
+              <div className="mb-3">
+                <label className="block text-[11px] font-bold text-[#3D524A] mb-1">
+                  Variant Group Label (e.g. Apartment / House Size, Sofa Seats, Tank Capacity):
+                </label>
+                <input
+                  type="text"
+                  value={form.variantGroupLabel || ''}
+                  placeholder="e.g. Apartment / House Size"
+                  onChange={(e) => setter(prev => ({ ...prev, variantGroupLabel: e.target.value }))}
+                  className="w-full p-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-semibold text-[#10231D]"
+                />
+              </div>
+
+              {/* List of Dynamic Variants */}
+              {(!form.variants || form.variants.length === 0) ? (
+                <div className="p-4 rounded-xl border-2 border-dashed border-[#E2D9C8] bg-[#ECE5D8]/40 text-center">
+                  <p className="text-xs text-[#6B8077]">
+                    No variants added. This service currently uses a single flat rate.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setter(prev => ({
+                          ...prev,
+                          variantGroupLabel: 'Apartment / House Size',
+                          variantGroupKey: 'size',
+                          price: 4999,
+                          mrp: 6999,
+                          duration: '4-5 hrs',
+                          variants: [
+                            { key: '1-bhk', label: '1 BHK', price: 4999, mrp: 6999, duration: '3-4 hrs', isDefault: true },
+                            { key: '2-bhk', label: '2 BHK', price: 7500, mrp: 9999, duration: '4-5 hrs', isDefault: false },
+                            { key: '3-bhk', label: '3 BHK', price: 9999, mrp: 12999, duration: '5-7 hrs', isDefault: false },
+                            { key: '4-bhk', label: '4 BHK', price: 14999, mrp: 18999, duration: '1-2 Days', isDefault: false },
+                            { key: '5-bhk', label: '5 BHK', price: 16999, mrp: 21999, duration: '2 Days', isDefault: false }
+                          ]
+                        }));
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#E9A23B] px-3 py-1.5 rounded-lg hover:bg-[#D48E28] transition-colors"
+                    >
+                      <LuPlus className="w-3.5 h-3.5" />
+                      <span>Load 1 to 5 BHK Apartment Preset</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setter(prev => ({
+                          ...prev,
+                          variantGroupLabel: 'Seating Configuration',
+                          variantGroupKey: 'seats',
+                          price: 1500,
+                          mrp: 1800,
+                          duration: '2-3 hrs',
+                          variants: [
+                            { key: '3-seater', label: '3 Seater Sofa', price: 900, mrp: 1200, duration: '1.5-2 hrs', isDefault: false },
+                            { key: '5-seater', label: '5 Seater Sofa (3+1+1)', price: 1500, mrp: 1800, duration: '2-3 hrs', isDefault: true },
+                            { key: '7-seater', label: '7 Seater Sofa', price: 2100, mrp: 2500, duration: '3-4 hrs', isDefault: false }
+                          ]
+                        }));
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
+                    >
+                      <LuPlus className="w-3.5 h-3.5" />
+                      <span>Load Sofa Seats Preset</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                  {form.variants.map((v, vIdx) => {
+                    const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
+                    return (
+                      <div key={vIdx} className="p-3 rounded-xl bg-white border border-[#E2D9C8] shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono font-bold text-[#6B8077] uppercase">
+                            Variant #{vIdx + 1}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1 text-[11px] font-semibold text-[#10231D] cursor-pointer">
+                              <input
+                                type="radio"
+                                name={isEdit ? "edit-default-variant" : "create-default-variant"}
+                                checked={Boolean(v.isDefault)}
+                                onChange={() => {
+                                  setter(prev => ({
+                                    ...prev,
+                                    variants: prev.variants.map((item, i) => ({
+                                      ...item,
+                                      isDefault: i === vIdx
+                                    }))
+                                  }));
+                                }}
+                                className="accent-[#E9A23B]"
+                              />
+                              <span>Default</span>
+                            </label>
+                            {discount > 0 && (
+                              <span className="text-[10px] font-bold text-[#C2512D] bg-[#F9ECE8] px-1.5 py-0.5 rounded">
+                                {discount}% OFF
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setter(prev => ({
+                                  ...prev,
+                                  variants: prev.variants.filter((_, i) => i !== vIdx)
+                                }));
+                              }}
+                              className="p-1 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
+                              title="Delete variant"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              placeholder="Variant Label (e.g. 2 BHK)"
+                              value={v.label}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setter(prev => {
+                                  const updated = [...prev.variants];
+                                  updated[vIdx] = {
+                                    ...updated[vIdx],
+                                    label: val,
+                                    key: val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || updated[vIdx].key
+                                  };
+                                  return { ...prev, variants: updated };
+                                });
+                              }}
+                              className="w-full p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-bold text-[#10231D]"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                              <input
+                                type="number"
+                                placeholder="Payable"
+                                title="Payable Price"
+                                value={v.price}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setter(prev => {
+                                    const updated = [...prev.variants];
+                                    updated[vIdx] = { ...updated[vIdx], price: val };
+                                    return { ...prev, variants: updated };
+                                  });
+                                }}
+                                className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D] font-black tnum"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
+                              <input
+                                type="number"
+                                placeholder="MRP"
+                                title="Shown Price (MRP Crossed Out)"
+                                value={v.mrp}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setter(prev => {
+                                    const updated = [...prev.variants];
+                                    updated[vIdx] = { ...updated[vIdx], mrp: val };
+                                    return { ...prev, variants: updated };
+                                  });
+                                }}
+                                className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className="text-[#6B8077] shrink-0">Duration:</span>
+                          <input
+                            type="text"
+                            placeholder="e.g. 4-5 hrs, 2 Days"
+                            value={v.duration || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setter(prev => {
+                                const updated = [...prev.variants];
+                                updated[vIdx] = { ...updated[vIdx], duration: val };
+                                return { ...prev, variants: updated };
+                              });
+                            }}
+                            className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* CONDITIONAL BODY: PER SQ. FT. / UNIT CALCULATION FORM */
+          <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-4 shadow-2xs">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+              <div className="flex items-center gap-2">
+                <LuRuler className="w-4 h-4 text-[#E9A23B]" />
+                <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                  Per Sq. Ft. & Unit Configuration
+                </h4>
+              </div>
+              <span className="text-[10px] text-[#6B8077] font-mono">Dynamic Booking Calculator</span>
+            </div>
+
+            {/* Quick Presets Bar */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+              <span className="text-[11px] font-bold text-[#6B8077]">Quick Presets:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setter(prev => ({
+                    ...prev,
+                    pricingType: 'unit',
+                    pricingUnit: 'sq_ft',
+                    unitLabel: 'Sq. Ft.',
+                    minUnitQuantity: 50,
+                    unitRateMoradabad: 30,
+                    unitRateOther: 30,
+                    price: 30,
+                    mrp: 40,
+                    hasCitySpecificRates: false
+                  }));
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold border border-[#E2D9C8] transition-colors cursor-pointer"
+              >
+                + Carpet Cleaning (₹30 / Sq. Ft.)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setter(prev => ({
+                    ...prev,
+                    pricingType: 'unit',
+                    pricingUnit: 'litre',
+                    unitLabel: 'Litres',
+                    minUnitQuantity: 1000,
+                    unitRateMoradabad: 0.05,
+                    unitRateOther: 0.10,
+                    price: 0.05,
+                    mrp: 0.08,
+                    hasCitySpecificRates: true
+                  }));
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold border border-[#E2D9C8] transition-colors cursor-pointer"
+              >
+                + Swimming Pool (₹0.05/L Moradabad · ₹0.10/L Others)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setter(prev => ({
+                    ...prev,
+                    pricingType: 'unit',
+                    pricingUnit: 'sq_ft',
+                    unitLabel: 'Sq. Ft.',
+                    minUnitQuantity: 100,
+                    unitRateMoradabad: 10,
+                    unitRateOther: 15,
+                    price: 10,
+                    mrp: 15,
+                    hasCitySpecificRates: true
+                  }));
+                }}
+                className="px-2.5 py-1 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold border border-[#E2D9C8] transition-colors cursor-pointer"
+              >
+                + Floor Cleaning (₹10/Sq. Ft. Moradabad · ₹15/Sq. Ft. Others)
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Unit Type:
+                </label>
+                <select
+                  value={form.pricingUnit || 'sq_ft'}
+                  onChange={(e) => {
+                    const u = e.target.value;
+                    const labels = {
+                      sq_ft: 'Sq. Ft.',
+                      litre: 'Litres',
+                      seat: 'Seats',
+                      chair: 'Chairs',
+                      fan: 'Fans',
+                      unit: 'Units'
+                    };
+                    const mins = {
+                      sq_ft: 100,
+                      litre: 1000,
+                      seat: 1,
+                      chair: 2,
+                      fan: 1,
+                      unit: 1
+                    };
+                    setter(prev => ({
+                      ...prev,
+                      pricingUnit: u,
+                      unitLabel: labels[u] || 'Units',
+                      minUnitQuantity: mins[u] || 1
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:ring-1 focus:ring-[#E9A23B]"
+                >
+                  <option value="sq_ft">Square Feet (Sq. Ft.) - Carpet, Floor, Marble</option>
+                  <option value="litre">Swimming Pool / Water Tank Volume (Litres / Ltr)</option>
+                  <option value="seat">Sofa / Recliner (Seats)</option>
+                  <option value="chair">Dining / Office (Chairs)</option>
+                  <option value="fan">Ceiling / Exhaust (Fans)</option>
+                  <option value="unit">Custom Count / Items (Units)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Unit Label Display:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sq. Ft. or Litres"
+                  value={form.unitLabel || 'Sq. Ft.'}
+                  onChange={(e) => setter(prev => ({ ...prev, unitLabel: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Min. Order Quantity:
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 100 or 500"
+                  value={form.minUnitQuantity || 1}
+                  onChange={(e) => setter(prev => ({ ...prev, minUnitQuantity: Math.max(1, Number(e.target.value) || 1) }))}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] tnum"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* City-Wise Unit Rates Configuration */}
+            <div className="pt-2 border-t border-[#E2D9C8] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="block text-xs font-black text-[#10231D] uppercase tracking-wide">
+                  Pricing & Rates (Per {unitLabel}):
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-[#ECE5D8] px-3 py-1.5 rounded-xl border border-[#E2D9C8]">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.hasCitySpecificRates)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setter(prev => ({
+                        ...prev,
+                        hasCitySpecificRates: checked
+                      }));
+                    }}
+                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-[#10231D]">
+                    Different rates for different cities?
+                  </span>
+                </label>
+              </div>
+
+              {/* Base Rates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-[#ECE5D8]/70 border border-[#E2D9C8]">
+                  <label className="block text-[11px] font-bold text-[#10231D] mb-1">
+                    Base Rate (₹ / {unitLabel}): <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2.5 text-[#6B8077] font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={form.unitRateMoradabad ?? form.price ?? 0}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setter(prev => ({
+                          ...prev,
+                          unitRateMoradabad: val,
+                          price: val,
+                          unitRateOther: prev.unitRateOther || val
+                        }));
+                      }}
+                      className="w-full p-2 pl-6 rounded-lg bg-white border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#6B8077] mt-1">Default rate used for booking calculations</p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-[#ECE5D8]/70 border border-[#E2D9C8]">
+                  <label className="block text-[11px] font-bold text-[#10231D] mb-1">
+                    Crossed-out MRP (₹ / {unitLabel}):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2.5 text-[#6B8077] font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={form.mrp ?? 0}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setter(prev => ({ ...prev, mrp: val }));
+                      }}
+                      className="w-full p-2 pl-6 rounded-lg bg-white border border-[#E2D9C8] text-sm font-bold text-[#6B8077] line-through tnum"
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#6B8077] mt-1">Strikethrough original rate shown to customers</p>
+                </div>
+              </div>
+
+              {/* City-by-City Rates Grid when hasCitySpecificRates is enabled */}
+              {form.hasCitySpecificRates ? (
+                <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] block">
+                        City-Wise Custom Rates (Per {unitLabel})
+                      </span>
+                      <span className="text-[10px] text-[#6B8077]">
+                        Enter specific rate for each city. Any unset city defaults to the base rate.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {cities.filter(c => c.status === 'active' || !c.status).map(city => {
+                      const citySlug = (city.slug || city.name.toLowerCase()).trim();
+                      const currentCityRate = Array.isArray(form.cityRates)
+                        ? form.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug)?.rate
+                        : undefined;
+                      const displayVal = currentCityRate !== undefined
+                        ? currentCityRate
+                        : (citySlug === 'moradabad' ? (form.unitRateMoradabad || form.price || 0) : (form.unitRateOther || form.unitRateMoradabad || form.price || 0));
+
+                      return (
+                        <div key={city._id || citySlug} className="p-2.5 rounded-lg bg-white border border-[#E2D9C8]">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-bold text-[#10231D]">{city.name}</span>
+                            <span className="text-[10px] font-mono text-[#6B8077] uppercase">{city.state || 'UP'}</span>
+                          </div>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-xs">₹</span>
+                            <input
+                              type="number"
+                              step="any"
+                              min={0}
+                              value={displayVal}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                setter(prev => {
+                                  const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
+                                  const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                  const entry = {
+                                    cityId: city._id,
+                                    cityName: city.name,
+                                    citySlug: citySlug,
+                                    rate: val
+                                  };
+                                  if (idx >= 0) {
+                                    existingRates[idx] = entry;
+                                  } else {
+                                    existingRates.push(entry);
+                                  }
+                                  const updates = { ...prev, cityRates: existingRates };
+                                  if (citySlug === 'moradabad') {
+                                    updates.unitRateMoradabad = val;
+                                    updates.price = val;
+                                  }
+                                  return updates;
+                                });
+                              }}
+                              className="w-full pl-6 pr-2 py-1.5 rounded-md bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-bold text-[#10231D] tnum"
+                              placeholder={`Rate in ${city.name}`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-[#ECE5D8]/50 border border-[#E2D9C8] text-[11px] text-[#6B8077]">
+                  All serviceable cities currently use the uniform base rate of <strong>₹{form.unitRateMoradabad || form.price || 0} / {unitLabel}</strong>. Check "Different rates for different cities?" above to customize rates per city.
+                </div>
+              )}
+            </div>
+
+            {/* Live Calculation Formula Preview */}
+            <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-xs">
+              <span className="font-bold text-[#10231D] block mb-1">Live Calculation Formula Preview:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded-lg bg-white border border-[#E2D9C8]">
+                  <span className="font-bold text-[#3D524A] block">In Moradabad:</span>
+                  <span className="font-mono text-[#10231D]">
+                    500 {unitLabel} × ₹{form.unitRateMoradabad || form.price || 0} = <strong>₹{Math.round(500 * (Number(form.unitRateMoradabad) || Number(form.price) || 0)).toLocaleString('en-IN')}</strong>
+                  </span>
+                </div>
+                <div className="p-2 rounded-lg bg-white border border-[#E2D9C8]">
+                  <span className="font-bold text-[#3D524A] block">In Other Cities:</span>
+                  <span className="font-mono text-[#10231D]">
+                    500 {unitLabel} × ₹{form.unitRateOther || form.unitRateMoradabad || 0}
+                    {Number(form.cityExtraCharge) > 0 ? ` + ₹${form.cityExtraCharge} outstation` : ''} = <strong>₹{(Math.round(500 * (Number(form.unitRateOther) || Number(form.unitRateMoradabad) || 0)) + (Number(form.cityExtraCharge) || 0)).toLocaleString('en-IN')}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CITY-WISE SURCHARGE & DEMO VIDEO */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+            <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider flex items-center gap-1.5">
+              <LuDollarSign className="w-4 h-4 text-[#E9A23B]" />
+              <span>Outstation Dispatch Surcharge & Demo Link</span>
+            </h4>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                Outstation Extra Surcharge (₹ added for cities outside Moradabad):
+              </label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 100 or 0"
+                value={form.cityExtraCharge || 0}
+                onChange={(e) => setter(prev => ({ ...prev, cityExtraCharge: Number(e.target.value) || 0 }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D] tnum"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-1">
+                Automatically added on checkout when service is booked outside Moradabad.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                YouTube Video Demo URL (optional):
+              </label>
+              <input
+                type="url"
+                placeholder="https://youtu.be/yCkBXdzwjic"
+                value={form.videoUrl || ''}
+                onChange={(e) => setter(prev => ({ ...prev, videoUrl: e.target.value }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D]"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-1">
+                Demonstration link embedded on the service detail page.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CITY AVAILABILITY MULTI-CHECKBOXES */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3.5 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-[#E2D9C8] gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+                <LuMapPin className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                    City Availability Checkboxes
+                  </h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#10231D] text-[#F4EFE6]">
+                    {currentCities.length} {currentCities.length === 1 ? 'City' : 'Cities'} Active
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#6B8077] mt-0.5">
+                  Check which cities can book this service. Unchecked cities will automatically hide this service.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleSelectAllCities}
+                className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#F4EFE6] border border-[#E2D9C8] text-[11px] font-bold text-[#10231D] transition-colors cursor-pointer"
+              >
+                All Cities
+              </button>
+              <button
+                type="button"
+                onClick={handleMoradabadOnly}
+                className="px-2.5 py-1 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[11px] font-bold text-[#F4EFE6] transition-colors cursor-pointer"
+              >
+                Moradabad Only
+              </button>
+            </div>
+          </div>
+
+          {/* Grid of City Checkboxes */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-1">
+            {cityList.map((c) => {
+              const isChecked = currentCities.includes(c.slug);
+              return (
+                <label
+                  key={c.slug}
+                  className={`p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all select-none ${
+                    isChecked
+                      ? 'bg-white border-[#10231D] shadow-2xs ring-1 ring-[#10231D]'
+                      : 'bg-[#F4EFE6]/70 border-[#E2D9C8] hover:bg-white text-[#6B8077]'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleToggleCity(c.slug)}
+                    className="w-4 h-4 rounded text-[#10231D] accent-[#10231D] focus:ring-0 cursor-pointer shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-bold truncate ${isChecked ? 'text-[#10231D]' : 'text-[#6B8077]'}`}>
+                      {c.name}
+                    </p>
+                    {c.slug === 'moradabad' && (
+                      <span className="text-[9px] font-black uppercase text-[#E9A23B] bg-[#10231D] px-1.5 py-0.5 rounded-sm inline-block">
+                        HQ
+                      </span>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
     );
   };
@@ -714,6 +1714,11 @@ export default function AdminDashboard() {
       }
     }
 
+    const activePricingType = service.pricingType || (service.pricingUnit && service.pricingUnit !== 'fixed' ? 'unit' : 'normal');
+    const allAvailableCities = Array.isArray(service.cityAvailability) && service.cityAvailability.length > 0
+      ? service.cityAvailability
+      : ['moradabad'];
+
     setServiceForm({
       title: service.title,
       slug: service.slug || '',
@@ -721,6 +1726,18 @@ export default function AdminDashboard() {
         ? service.categories.map(c => (c && c._id ? String(c._id) : String(c)))
         : (service.category ? [String(service.category._id || service.category)] : (categories.length > 0 ? [String(categories[0]._id)] : [])),
       icon: service.icon || 'Sparkles',
+      pricingType: activePricingType,
+      pricingUnit: service.pricingUnit || (activePricingType === 'unit' ? 'sq_ft' : 'fixed'),
+      unitRateMoradabad: service.unitRateMoradabad ?? service.price ?? 0,
+      unitRateOther: service.unitRateOther ?? service.unitRateMoradabad ?? service.price ?? 0,
+      unitLabel: service.unitLabel || (service.pricingUnit === 'litre' ? 'Litres' : 'Sq. Ft.'),
+      minUnitQuantity: service.minUnitQuantity || (service.pricingUnit === 'sq_ft' ? 100 : service.pricingUnit === 'litre' ? 500 : 1),
+      hasCitySpecificRates: Boolean(service.hasCitySpecificRates),
+      cityRates: Array.isArray(service.cityRates) ? service.cityRates : [],
+      cityExtraCharge: service.cityExtraCharge || 0,
+      moradabadOnly: Boolean(service.moradabadOnly || (allAvailableCities.length === 1 && allAvailableCities[0] === 'moradabad')),
+      cityAvailability: allAvailableCities,
+      videoUrl: service.videoUrl || '',
       price: service.price,
       mrp: service.mrp,
       duration: service.duration || '1.5 hrs',
@@ -730,7 +1747,10 @@ export default function AdminDashboard() {
       imageUrl: initialImages[0]?.url || service.media?.hero?.url || '',
       images: initialImages,
       inclusions: Array.isArray(service.inclusions) ? service.inclusions.join('\n') : (service.inclusions || ''),
-      exclusions: Array.isArray(service.exclusions) ? service.exclusions.join('\n') : (service.exclusions || '')
+      exclusions: Array.isArray(service.exclusions) ? service.exclusions.join('\n') : (service.exclusions || ''),
+      tags: Array.isArray(service.tags) ? service.tags.join(', ') : (service.tags || ''),
+      rankingScore: service.rankingScore ?? 100,
+      rankingTier: service.rankingTier || 'standard'
     });
   };
 
@@ -777,19 +1797,41 @@ export default function AdminDashboard() {
         return;
       }
 
+      const isUnit = serviceForm.pricingType === 'unit';
+      const mbdRate = Number(serviceForm.unitRateMoradabad) || Number(serviceForm.price) || 0;
+      const otherRate = Number(serviceForm.unitRateOther) || mbdRate;
+      const activeCities = Array.isArray(serviceForm.cityAvailability) && serviceForm.cityAvailability.length > 0
+        ? serviceForm.cityAvailability
+        : ['moradabad'];
+
       const payload = {
         title: serviceForm.title,
         slug: serviceForm.slug,
         categories: selectedCats,
         icon: serviceForm.icon,
-        price: Number(serviceForm.price),
-        mrp: Number(serviceForm.mrp),
+        pricingType: serviceForm.pricingType || 'normal',
+        pricingUnit: isUnit ? (serviceForm.pricingUnit || 'sq_ft') : 'fixed',
+        unitRateMoradabad: mbdRate,
+        unitRateOther: otherRate,
+        unitLabel: serviceForm.unitLabel || 'Sq. Ft.',
+        minUnitQuantity: Number(serviceForm.minUnitQuantity) || 1,
+        hasCitySpecificRates: Boolean(serviceForm.hasCitySpecificRates),
+        cityRates: Array.isArray(serviceForm.cityRates) ? serviceForm.cityRates : [],
+        cityExtraCharge: Number(serviceForm.cityExtraCharge) || 0,
+        moradabadOnly: Boolean(serviceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
+        cityAvailability: activeCities,
+        videoUrl: serviceForm.videoUrl || '',
+        price: isUnit ? mbdRate : Number(serviceForm.price),
+        mrp: isUnit ? (Number(serviceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(serviceForm.mrp),
         duration: serviceForm.duration,
         variantGroupLabel: serviceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: serviceForm.variantGroupKey || 'size',
-        variants: serviceForm.variants || [],
+        variants: isUnit ? [] : (serviceForm.variants || []),
         inclusions: parseList(serviceForm.inclusions),
-        exclusions: parseList(serviceForm.exclusions)
+        exclusions: parseList(serviceForm.exclusions),
+        tags: generateAutoServiceTags(serviceForm.title, selectedCats, serviceForm.moradabadOnly, serviceForm.pricingType),
+        rankingScore: 500,
+        rankingTier: 'standard'
       };
 
       const formImages = serviceForm.images && serviceForm.images.length > 0
@@ -874,21 +1916,43 @@ export default function AdminDashboard() {
         return;
       }
 
+      const isUnit = newServiceForm.pricingType === 'unit';
+      const mbdRate = Number(newServiceForm.unitRateMoradabad) || Number(newServiceForm.price) || 0;
+      const otherRate = Number(newServiceForm.unitRateOther) || mbdRate;
+      const activeCities = Array.isArray(newServiceForm.cityAvailability) && newServiceForm.cityAvailability.length > 0
+        ? newServiceForm.cityAvailability
+        : ['moradabad'];
+
       const payload = {
         title: newServiceForm.title.trim(),
         slug: newServiceForm.slug.trim() || newServiceForm.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
         categories: selectedCats,
-        price: Number(newServiceForm.price),
-        mrp: Number(newServiceForm.mrp),
+        pricingType: newServiceForm.pricingType || 'normal',
+        pricingUnit: isUnit ? (newServiceForm.pricingUnit || 'sq_ft') : 'fixed',
+        unitRateMoradabad: mbdRate,
+        unitRateOther: otherRate,
+        unitLabel: newServiceForm.unitLabel || 'Sq. Ft.',
+        minUnitQuantity: Number(newServiceForm.minUnitQuantity) || 1,
+        hasCitySpecificRates: Boolean(newServiceForm.hasCitySpecificRates),
+        cityRates: Array.isArray(newServiceForm.cityRates) ? newServiceForm.cityRates : [],
+        cityExtraCharge: Number(newServiceForm.cityExtraCharge) || 0,
+        moradabadOnly: Boolean(newServiceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
+        cityAvailability: activeCities,
+        videoUrl: newServiceForm.videoUrl || '',
+        price: isUnit ? mbdRate : Number(newServiceForm.price),
+        mrp: isUnit ? (Number(newServiceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(newServiceForm.mrp),
         duration: newServiceForm.duration || '1.5 hrs',
         icon: newServiceForm.icon || 'Sparkles',
         shortDescription: newServiceForm.shortDescription,
         description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max House Keeping Service.`,
         variantGroupLabel: newServiceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: newServiceForm.variantGroupKey || 'size',
-        variants: newServiceForm.variants || [],
+        variants: isUnit ? [] : (newServiceForm.variants || []),
         inclusions: parseList(newServiceForm.inclusions),
-        exclusions: parseList(newServiceForm.exclusions)
+        exclusions: parseList(newServiceForm.exclusions),
+        tags: generateAutoServiceTags(newServiceForm.title, selectedCats, newServiceForm.moradabadOnly, newServiceForm.pricingType),
+        rankingScore: 500,
+        rankingTier: 'standard'
       };
       const formImages = newServiceForm.images && newServiceForm.images.length > 0
         ? newServiceForm.images
@@ -928,7 +1992,10 @@ export default function AdminDashboard() {
           variantGroupKey: 'size',
           variants: [],
           inclusions: '',
-          exclusions: ''
+          exclusions: '',
+          tags: 'deep-cleaning, housekeeping, professional-cleaning',
+          rankingScore: 100,
+          rankingTier: 'standard'
         });
       }
     } catch (err) {
@@ -1363,7 +2430,10 @@ export default function AdminDashboard() {
         serviceRadiusKm: city.serviceRadiusKm || 25,
         pincodes: Array.isArray(city.pincodes) ? city.pincodes.join(', ') : '',
         status: city.status || 'active',
-        sortOrder: city.sortOrder || 0
+        sortOrder: city.sortOrder || 0,
+        tags: Array.isArray(city.tags) ? city.tags.join(', ') : (city.tags || ''),
+        rankingScore: city.rankingScore ?? 100,
+        rankingTier: city.rankingTier || 'primary'
       });
     } else {
       setEditingCity(null);
@@ -1374,7 +2444,10 @@ export default function AdminDashboard() {
         serviceRadiusKm: 25,
         pincodes: '',
         status: 'active',
-        sortOrder: cities.length + 1
+        sortOrder: cities.length + 1,
+        tags: '',
+        rankingScore: 100,
+        rankingTier: 'primary'
       });
     }
     setCityModalOpen(true);
@@ -1392,6 +2465,10 @@ export default function AdminDashboard() {
       .map(p => p.trim())
       .filter(Boolean);
 
+    const tagsArray = cityForm.tags
+      ? (typeof cityForm.tags === 'string' ? cityForm.tags.split(',').map(t => t.trim()).filter(Boolean) : cityForm.tags)
+      : [];
+
     const payload = {
       name: cityForm.name.trim(),
       slug: cityForm.slug.trim() || cityForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -1399,7 +2476,10 @@ export default function AdminDashboard() {
       serviceRadiusKm: Number(cityForm.serviceRadiusKm) || 25,
       pincodes: pincodesArray,
       status: cityForm.status,
-      sortOrder: Number(cityForm.sortOrder) || 0
+      sortOrder: Number(cityForm.sortOrder) || 0,
+      tags: tagsArray,
+      rankingScore: Number(cityForm.rankingScore) || 100,
+      rankingTier: cityForm.rankingTier || 'primary'
     };
 
     try {
@@ -1502,12 +2582,104 @@ export default function AdminDashboard() {
 
   const filteredCategories = categories.filter(c => {
     const q = categorySearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
+    const matchesSearch = !q || (
       c.name?.toLowerCase().includes(q) ||
       c.slug?.toLowerCase().includes(q) ||
       c.tagline?.toLowerCase().includes(q)
     );
+    const matchesStatus = categoryStatusFilter === 'all' || (
+      categoryStatusFilter === 'active' ? Boolean(c.isActive) : !c.isActive
+    );
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredBookings = bookings.filter((b) => {
+    const q = bookingSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      b.bookingCode?.toLowerCase().includes(q) ||
+      b.customer?.name?.toLowerCase().includes(q) ||
+      b.customer?.phone?.includes(q) ||
+      b.customer?.email?.toLowerCase().includes(q) ||
+      b.cityName?.toLowerCase().includes(q)
+    );
+    const matchesStatus = bookingStatusFilter === 'all' || b.status === bookingStatusFilter;
+    const matchesCity = bookingCityFilter === 'all' || (
+      (b.citySlug && b.citySlug.toLowerCase() === bookingCityFilter.toLowerCase()) ||
+      (b.cityName && b.cityName.toLowerCase() === bookingCityFilter.toLowerCase())
+    );
+    const matchesPayment = bookingPaymentFilter === 'all' || (
+      b.paymentStatus === bookingPaymentFilter || b.paymentMode === bookingPaymentFilter
+    );
+    return matchesSearch && matchesStatus && matchesCity && matchesPayment;
+  });
+
+  const filteredServices = services.filter((s) => {
+    const q = serviceSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      s.title?.toLowerCase().includes(q) ||
+      s.slug?.toLowerCase().includes(q) ||
+      s.shortDescription?.toLowerCase().includes(q)
+    );
+    const matchesCategory = serviceCategoryFilter === 'all' || (
+      Array.isArray(s.categories) && s.categories.some(c => (typeof c === 'string' ? c === serviceCategoryFilter : (c._id === serviceCategoryFilter || c.slug === serviceCategoryFilter)))
+    );
+    const matchesPricingType = servicePricingTypeFilter === 'all' || (
+      servicePricingTypeFilter === 'unit'
+        ? (s.pricingType === 'unit' || s.pricingType === 'per_unit')
+        : (s.pricingType !== 'unit' && s.pricingType !== 'per_unit')
+    );
+    const matchesCity = serviceCityFilter === 'all' || (
+      serviceCityFilter === 'moradabad'
+        ? true
+        : (!s.moradabadOnly && Array.isArray(s.cityAvailability) && s.cityAvailability.includes(serviceCityFilter))
+    );
+    return matchesSearch && matchesCategory && matchesPricingType && matchesCity;
+  });
+
+  const filteredCitiesList = cities.filter(city => {
+    const q = citySearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      city.name?.toLowerCase().includes(q) ||
+      city.slug?.toLowerCase().includes(q) ||
+      city.state?.toLowerCase().includes(q)
+    );
+    const matchesStatus = cityStatusFilter === 'all' || city.status === cityStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredTestimonialsList = testimonials.filter(t => {
+    const q = testimonialSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      t.name?.toLowerCase().includes(q) ||
+      t.city?.toLowerCase().includes(q) ||
+      t.quote?.toLowerCase().includes(q)
+    );
+    const matchesStatus = testimonialStatusFilter === 'all' || (
+      testimonialStatusFilter === 'active' ? Boolean(t.isActive) : !t.isActive
+    );
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredMessagesList = contactMessages.filter(m => {
+    const q = messageSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      m.name?.toLowerCase().includes(q) ||
+      m.email?.toLowerCase().includes(q) ||
+      m.phone?.includes(q) ||
+      m.message?.toLowerCase().includes(q) ||
+      m.subject?.toLowerCase().includes(q)
+    );
+    const matchesStatus = messageStatusFilter === 'all' || m.status === messageStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredCouponsList = coupons.filter(c => {
+    const q = couponSearch.trim().toLowerCase();
+    const matchesSearch = !q || c.code?.toLowerCase().includes(q);
+    const matchesStatus = couponStatusFilter === 'all' || (
+      couponStatusFilter === 'active' ? Boolean(c.isActive) : !c.isActive
+    );
+    return matchesSearch && matchesStatus;
   });
 
   const adminTabs = [
@@ -1521,19 +2693,6 @@ export default function AdminDashboard() {
     { id: 'coupons', label: 'Coupons & Promos', icon: LuTicket, count: coupons.length },
     { id: 'settings', label: 'Business Settings', icon: LuSettings }
   ];
-
-  const filteredBookings = bookings.filter((b) => {
-    const q = bookingSearch.trim().toLowerCase();
-    const matchesSearch = !q || (
-      b.bookingCode?.toLowerCase().includes(q) ||
-      b.customer?.name?.toLowerCase().includes(q) ||
-      b.customer?.phone?.includes(q) ||
-      b.customer?.email?.toLowerCase().includes(q) ||
-      b.cityName?.toLowerCase().includes(q)
-    );
-    const matchesStatus = bookingStatusFilter === 'all' || b.status === bookingStatusFilter;
-    return matchesSearch && matchesStatus;
-  });
 
   if (isAuthLoading) {
     return (
@@ -1846,14 +3005,40 @@ export default function AdminDashboard() {
                     </button>
                   ))}
                 </div>
+                {/* City Filter Dropdown */}
+                <select
+                  value={bookingCityFilter}
+                  onChange={(e) => setBookingCityFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Cities</option>
+                  {cities.map(c => (
+                    <option key={c._id || c.slug} value={c.slug || c.name}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* Payment Filter Dropdown */}
+                <select
+                  value={bookingPaymentFilter}
+                  onChange={(e) => setBookingPaymentFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Payments</option>
+                  <option value="cash_on_service">Cash on Service</option>
+                  <option value="online_before">Online Paid</option>
+                  <option value="paid">Status: Paid</option>
+                  <option value="pending">Status: Pending</option>
+                </select>
               </div>
 
-              {(bookingSearch || bookingStatusFilter !== 'all') && (
+              {(bookingSearch || bookingStatusFilter !== 'all' || bookingCityFilter !== 'all' || bookingPaymentFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setBookingSearch('');
                     setBookingStatusFilter('all');
+                    setBookingCityFilter('all');
+                    setBookingPaymentFilter('all');
                   }}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#C2512D] text-xs font-bold transition-colors self-start md:self-auto cursor-pointer"
                 >
@@ -1923,6 +3108,15 @@ export default function AdminDashboard() {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               type="button"
+                              onClick={() => setViewBookingDetails(b)}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title="View Full Booking Details"
+                            >
+                              <LuEye className="w-3.5 h-3.5" />
+                              <span>View Details</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setChatBooking(b)}
                               className="px-2.5 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
                             >
@@ -1979,8 +3173,93 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {/* Search and Filters Bar for Services */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6 p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8]">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                {/* Search input */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="Search services by title, slug, keywords..."
+                    className="w-full pl-9 pr-7 py-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] placeholder-[#6B8077] focus:outline-none focus:border-[#E9A23B]"
+                  />
+                  {serviceSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setServiceSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter */}
+                <select
+                  value={serviceCategoryFilter}
+                  onChange={(e) => setServiceCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(c => (
+                    <option key={c._id || c.slug} value={c._id || c.slug}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* Pricing Type Filter */}
+                <select
+                  value={servicePricingTypeFilter}
+                  onChange={(e) => setServicePricingTypeFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Pricing Types</option>
+                  <option value="normal">Standard / BHK Variants</option>
+                  <option value="unit">Per Sq. Ft. / Unit Calculator</option>
+                </select>
+
+                {/* City Filter */}
+                <select
+                  value={serviceCityFilter}
+                  onChange={(e) => setServiceCityFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Service Cities</option>
+                  <option value="moradabad">Moradabad (HQ)</option>
+                  {cities.filter(c => c.slug !== 'moradabad').map(c => (
+                    <option key={c._id || c.slug} value={c.slug || c.name.toLowerCase()}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {(serviceSearch || serviceCategoryFilter !== 'all' || servicePricingTypeFilter !== 'all' || serviceCityFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setServiceSearch('');
+                    setServiceCategoryFilter('all');
+                    setServicePricingTypeFilter('all');
+                    setServiceCityFilter('all');
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#C2512D] text-xs font-bold transition-colors self-start md:self-auto cursor-pointer"
+                >
+                  <LuRotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {services.map((svc) => {
+              {filteredServices.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-[#6B8077]">
+                  <LuSparkles className="w-8 h-8 mx-auto mb-2 text-[#E9A23B] opacity-50" />
+                  <p className="text-sm font-bold text-[#10231D]">No services match your current filters</p>
+                  <p className="text-xs text-[#6B8077] mt-1">Try resetting the search keyword or selecting a different category/city.</p>
+                </div>
+              ) : (
+                filteredServices.map((svc) => {
                 const savings = (svc.mrp || svc.price) - svc.price;
                 const discountPct = svc.mrp ? Math.round(((svc.mrp - svc.price) / svc.mrp) * 100) : 0;
 
@@ -2033,6 +3312,58 @@ export default function AdminDashboard() {
                         </div>
                       )}
 
+                      {/* Unit Pricing / City Badges */}
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {svc.pricingType === 'unit' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#10231D] text-[#E9A23B] flex items-center gap-1 font-mono">
+                            <LuRuler className="w-3 h-3" />
+                            <span>Per {svc.unitLabel || 'Sq. Ft.'} Calc</span>
+                          </span>
+                        )}
+                        {svc.cityAvailability && svc.cityAvailability.length > 0 && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                            svc.cityAvailability.length === 1 && svc.cityAvailability[0] === 'moradabad'
+                              ? 'bg-amber-500/15 text-amber-900 border border-amber-500/30'
+                              : 'bg-emerald-500/15 text-emerald-900 border border-emerald-500/30'
+                          }`}>
+                            <LuMapPin className="w-3 h-3" />
+                            <span>{svc.cityAvailability.length === 1 && svc.cityAvailability[0] === 'moradabad' ? 'Moradabad Only' : `${svc.cityAvailability.length} Cities Active`}</span>
+                          </span>
+                        )}
+                        {svc.rankingScore !== undefined && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#10231D] text-[#E9A23B] flex items-center gap-1 font-mono">
+                            <span>Rank {svc.rankingScore}</span>
+                          </span>
+                        )}
+                        {svc.rankingTier && svc.rankingTier !== 'standard' && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase font-mono ${
+                            svc.rankingTier === 'bestseller'
+                              ? 'bg-[#E9A23B] text-[#10231D]'
+                              : svc.rankingTier === 'top_rated'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-orange-100 text-orange-900 border border-orange-300'
+                          }`}>
+                            {svc.rankingTier.replace('_', ' ')}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Scaling & SEO Tags */}
+                      {Array.isArray(svc.tags) && svc.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {svc.tags.slice(0, 4).map((t, tIdx) => (
+                            <span key={tIdx} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/80 text-[#3D524A] border border-[#E2D9C8]">
+                              #{t}
+                            </span>
+                          ))}
+                          {svc.tags.length > 4 && (
+                            <span className="text-[9px] text-[#6B8077] self-center font-mono">
+                              +{svc.tags.length - 4}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {/* Pricing Comparison */}
                       <div className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-1 mb-4 text-xs">
                         <div className="flex justify-between">
@@ -2074,7 +3405,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
         )}
@@ -2283,8 +3614,8 @@ export default function AdminDashboard() {
                         <td className="py-3 px-3 font-bold text-[#10231D]">
                           {test.name}
                           {test.isFeatured && (
-                            <span className="block text-[10px] font-mono font-bold text-[#E9A23B]">
-                              ★ FEATURED
+                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#E9A23B]">
+                              <LuStar className="w-2.5 h-2.5 fill-current" /> FEATURED
                             </span>
                           )}
                         </td>
@@ -2298,7 +3629,9 @@ export default function AdminDashboard() {
                         {/* Rating */}
                         <td className="py-3 px-3 font-bold text-[#E9A23B]">
                           <div className="flex items-center gap-0.5">
-                            {'★'.repeat(test.rating || 5)}
+                            {[...Array(test.rating || 5)].map((_, rIdx) => (
+                              <LuStar key={rIdx} className="w-3.5 h-3.5 fill-current text-[#E9A23B]" />
+                            ))}
                           </div>
                         </td>
 
@@ -2492,11 +3825,61 @@ export default function AdminDashboard() {
               </button>
             </div>
 
-            {cities.length === 0 ? (
+            {/* Search and Filters Bar for Cities */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8]">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                <div className="relative flex-1 min-w-[200px]">
+                  <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={citySearch}
+                    onChange={(e) => setCitySearch(e.target.value)}
+                    placeholder="Search city by name, slug or state..."
+                    className="w-full pl-9 pr-7 py-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] placeholder-[#6B8077] focus:outline-none focus:border-[#E9A23B]"
+                  />
+                  {citySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCitySearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <select
+                  value={cityStatusFilter}
+                  onChange={(e) => setCityStatusFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active Service</option>
+                  <option value="coming_soon">Coming Soon</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              {(citySearch || cityStatusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCitySearch('');
+                    setCityStatusFilter('all');
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#C2512D] text-xs font-bold transition-colors self-start sm:self-auto cursor-pointer"
+                >
+                  <LuRotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+            </div>
+
+            {filteredCitiesList.length === 0 ? (
               <div className="py-12 text-center text-[#6B8077]">
                 <LuMapPin className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#E9A23B]" />
-                <p className="text-sm font-bold text-[#10231D]">No service cities found</p>
-                <p className="text-xs text-[#6B8077] mt-1">Click "+ Add New City" to register an active service location.</p>
+                <p className="text-sm font-bold text-[#10231D]">No service cities match your criteria</p>
+                <p className="text-xs text-[#6B8077] mt-1">Try resetting the search keyword or status filter.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -2505,6 +3888,7 @@ export default function AdminDashboard() {
                     <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
                       <th className="py-3 px-3">City Name</th>
                       <th className="py-3 px-3">State & Slug</th>
+                      <th className="py-3 px-3">Ranking & Tags</th>
                       <th className="py-3 px-3">Service Radius</th>
                       <th className="py-3 px-3">Covered Pincodes</th>
                       <th className="py-3 px-3">Status</th>
@@ -2513,7 +3897,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E2D9C8]/60">
-                    {cities.map((city) => (
+                    {filteredCitiesList.map((city) => (
                       <tr key={city._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3">
                           <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
@@ -2524,6 +3908,32 @@ export default function AdminDashboard() {
                         <td className="py-3 px-3">
                           <p className="text-[#10231D] font-medium">{city.state || 'Uttar Pradesh'}</p>
                           <code className="text-[10px] text-[#6B8077] font-mono">/{city.slug}</code>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex flex-col gap-1 min-w-[140px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#10231D] text-[#E9A23B]">
+                                Rank {city.rankingScore ?? 100}
+                              </span>
+                              {city.rankingTier && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-[#E9A23B]/20 text-[#10231D]">
+                                  {city.rankingTier}
+                                </span>
+                              )}
+                            </div>
+                            {Array.isArray(city.tags) && city.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                {city.tags.slice(0, 3).map((tag, tIdx) => (
+                                  <span key={tIdx} className="text-[9px] px-1.5 py-0.2 rounded bg-white text-[#3D524A] border border-[#E2D9C8]">
+                                    #{tag}
+                                  </span>
+                                ))}
+                                {city.tags.length > 3 && (
+                                  <span className="text-[9px] text-[#6B8077]">+{city.tags.length - 3}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-3 font-mono font-bold text-[#10231D]">
                           {city.serviceRadiusKm || 25} km
@@ -2613,29 +4023,115 @@ export default function AdminDashboard() {
                   Registered customer profiles and role-based administration.
                 </p>
               </div>
+
+              {/* Search & Role Filter Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <div className="relative min-w-[240px]">
+                  <LuSearch className="w-4 h-4 text-[#6B8077] absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search users by name, phone, email..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-[#E2D9C8] text-xs font-semibold text-[#10231D] focus:ring-1 focus:ring-[#E9A23B] focus:outline-none"
+                  />
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearch('')}
+                      className="absolute right-2.5 top-2.5 text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                      title="Clear search"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="min-w-[130px]">
+                  <CustomSelect
+                    size="sm"
+                    value={userRoleFilter}
+                    onChange={(val) => setUserRoleFilter(val)}
+                    options={[
+                      { value: 'all', label: 'All Roles' },
+                      { value: 'customer', label: 'Customers' },
+                      { value: 'cleaner', label: 'Staff' },
+                      { value: 'admin', label: 'Admins' }
+                    ]}
+                    placeholder="Filter Role..."
+                  />
+                </div>
+              </div>
             </div>
 
-            {users.length === 0 ? (
-              <div className="py-12 text-center text-[#6B8077]">
-                <LuUsers className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#10231D]" />
-                <p className="text-sm font-bold text-[#10231D]">No registered users loaded</p>
-                <p className="text-xs text-[#6B8077] mt-1">Users will appear here as soon as they create an account via the Sign Up form.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
-                      <th className="py-3 px-3">User Profile</th>
-                      <th className="py-3 px-3">Contact Details</th>
-                      <th className="py-3 px-3">Role</th>
-                      <th className="py-3 px-3">Saved Addresses</th>
-                      <th className="py-3 px-3">Registered Date</th>
-                      <th className="py-3 px-3 text-right">Account Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E2D9C8]/60">
-                    {users.map((u) => (
+            {(() => {
+              const q = userSearch.toLowerCase().trim();
+              const filteredUsers = users.filter((u) => {
+                const matchesSearch = !q || (
+                  (u.name && u.name.toLowerCase().includes(q)) ||
+                  (u.email && u.email.toLowerCase().includes(q)) ||
+                  (u.phone && u.phone.toLowerCase().includes(q)) ||
+                  (u.role && u.role.toLowerCase().includes(q))
+                );
+                const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+                return matchesSearch && matchesRole;
+              });
+
+              if (users.length === 0) {
+                return (
+                  <div className="py-12 text-center text-[#6B8077]">
+                    <LuUsers className="w-10 h-10 mx-auto mb-2 opacity-50 text-[#10231D]" />
+                    <p className="text-sm font-bold text-[#10231D]">No registered users loaded</p>
+                    <p className="text-xs text-[#6B8077] mt-1">Users will appear here as soon as they create an account via the Sign Up form.</p>
+                  </div>
+                );
+              }
+
+              if (filteredUsers.length === 0) {
+                return (
+                  <div className="py-12 text-center text-[#6B8077] bg-white/60 rounded-2xl border border-dashed border-[#E2D9C8]">
+                    <LuSearch className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#10231D]" />
+                    <p className="text-sm font-bold text-[#10231D]">No users found matching "{userSearch}"</p>
+                    <p className="text-xs text-[#6B8077] mt-1">Try adjusting your search terms or clearing the role filter.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setUserSearch(''); setUserRoleFilter('all'); }}
+                      className="mt-3 px-3 py-1.5 rounded-lg bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-3 text-[11px] text-[#6B8077]">
+                    <span>Showing <strong>{filteredUsers.length}</strong> of {users.length} accounts</span>
+                    {(userSearch || userRoleFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={() => { setUserSearch(''); setUserRoleFilter('all'); }}
+                        className="text-[#C2512D] font-bold hover:underline cursor-pointer"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
+                          <th className="py-3 px-3">User Profile</th>
+                          <th className="py-3 px-3">Contact Details</th>
+                          <th className="py-3 px-3">Role</th>
+                          <th className="py-3 px-3">Saved Addresses</th>
+                          <th className="py-3 px-3">Registered Date</th>
+                          <th className="py-3 px-3 text-right">Account Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E2D9C8]/60">
+                        {filteredUsers.map((u) => (
                       <tr key={u._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-2.5">
@@ -2708,9 +4204,11 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
+      </div>
+    )}
 
         {/* ========================================================
             TAB 7: COUPONS & DISCOUNT PROMOTIONS
@@ -2970,317 +4468,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Base Prices */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Base Shown Price (MRP Crossed Out):
-                  </label>
-                  <input
-                    type="number"
-                    value={serviceForm.mrp}
-                    onChange={(e) => setServiceForm({ ...serviceForm, mrp: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-bold text-[#10231D] tnum"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Base Offered Price (Payable):
-                  </label>
-                  <input
-                    type="number"
-                    value={serviceForm.price}
-                    onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic Service Variants & Tiered Rates (N Variants) */}
-              <div className="pt-4 border-t border-[#E2D9C8]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div>
-                    <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
-                      <LuTicket className="w-4 h-4 text-[#E9A23B]" />
-                      <span>Service Variants & Tiered Rates ({serviceForm.variants?.length || 0})</span>
-                    </h4>
-                    <p className="text-[11px] text-[#6B8077]">
-                      Add 1, 2, 3, 4, 5+ BHK variants or custom sizes with individual rates & MRPs.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newIdx = (serviceForm.variants?.length || 0) + 1;
-                      setServiceForm(prev => {
-                        const newVar = {
-                          key: `variant-${newIdx}`,
-                          label: `${newIdx} BHK`,
-                          price: (prev.price || 2800) + (newIdx * 1000),
-                          mrp: (prev.mrp || 2999) + (newIdx * 1500),
-                          duration: `${newIdx + 2}-${newIdx + 3} hrs`,
-                          isDefault: (prev.variants?.length || 0) === 0
-                        };
-                        return {
-                          ...prev,
-                          variants: [...(prev.variants || []), newVar]
-                        };
-                      });
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto transition-colors shadow-xs"
-                  >
-                    <LuPlus className="w-4 h-4" />
-                    <span>Add Variant</span>
-                  </button>
-                </div>
-
-                {/* Variant Group Label */}
-                <div className="mb-3">
-                  <label className="block text-[11px] font-bold text-[#3D524A] mb-1">
-                    Variant Group Label (e.g. Apartment / House Size, Sofa Seats, Tank Capacity):
-                  </label>
-                  <input
-                    type="text"
-                    value={serviceForm.variantGroupLabel || ''}
-                    placeholder="e.g. Apartment / House Size"
-                    onChange={(e) => setServiceForm({ ...serviceForm, variantGroupLabel: e.target.value })}
-                    className="w-full p-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-semibold text-[#10231D]"
-                  />
-                </div>
-
-                {/* List of Dynamic Variants */}
-                {(!serviceForm.variants || serviceForm.variants.length === 0) ? (
-                  <div className="p-4 rounded-xl border-2 border-dashed border-[#E2D9C8] bg-[#ECE5D8]/40 text-center">
-                    <p className="text-xs text-[#6B8077]">
-                      No variants added. This service currently uses a single flat rate.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Apartment / House Size',
-                            variantGroupKey: 'size',
-                            price: 2800,
-                            mrp: 2999,
-                            duration: '4-5 hrs',
-                            variants: [
-                              { key: '1-bhk', label: '1 BHK', price: 2800, mrp: 2999, duration: '4-5 hrs', isDefault: true },
-                              { key: '2-bhk', label: '2 BHK', price: 6000, mrp: 7499, duration: '5-7 hrs', isDefault: false },
-                              { key: '3-bhk', label: '3 BHK', price: 9500, mrp: 10500, duration: '7-9 hrs', isDefault: false },
-                              { key: '4-bhk', label: '4 BHK', price: 12500, mrp: 15000, duration: '2 Days', isDefault: false },
-                              { key: 'villa', label: 'Villa / Kothi (5+ BHK)', price: 18000, mrp: 22000, duration: '2-3 Days', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#E9A23B] px-3 py-1.5 rounded-lg hover:bg-[#D48E28] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load 1 to 5 BHK Apartment Preset</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Seating Configuration',
-                            variantGroupKey: 'seats',
-                            price: 1750,
-                            mrp: 1999,
-                            duration: '2-3 hrs',
-                            variants: [
-                              { key: '5-seater', label: '5 Seater (3+1+1)', price: 1750, mrp: 1999, duration: '2-3 hrs', isDefault: true },
-                              { key: '7-seater', label: '7 Seater (3+2+2)', price: 2450, mrp: 2500, duration: '3-4 hrs', isDefault: false },
-                              { key: '9-seater', label: '9 Seater (L-Shape / Sectional)', price: 3150, mrp: 3500, duration: '4-5 hrs', isDefault: false },
-                              { key: '12-seater', label: '12 Seater Grand Royal', price: 4200, mrp: 4500, duration: '5-6 hrs', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load Sofa Seats Preset</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Water Tank Capacity',
-                            variantGroupKey: 'capacity',
-                            price: 400,
-                            mrp: 499,
-                            duration: '1-1.5 hrs',
-                            variants: [
-                              { key: '500l', label: 'Up to 500 Liters', price: 400, mrp: 499, duration: '1-1.5 hrs', isDefault: true },
-                              { key: '750l', label: '500L – 750 Liters', price: 500, mrp: 699, duration: '1.5-2 hrs', isDefault: false },
-                              { key: '1000l', label: '750L – 1,000 Liters', price: 700, mrp: 1000, duration: '2-2.5 hrs', isDefault: false },
-                              { key: '1500l', label: '1,000L – 1,500 Liters', price: 900, mrp: 1300, duration: '2.5-3 hrs', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load Water Tank Preset</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                    {serviceForm.variants.map((v, vIdx) => {
-                      const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
-
-                      return (
-                        <div
-                          key={vIdx}
-                          className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2 transition-colors hover:border-[#10231D]/30"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
-                                {vIdx + 1}
-                              </span>
-                              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#10231D]">
-                                <input
-                                  type="radio"
-                                  name="defaultVariantRadio"
-                                  checked={Boolean(v.isDefault)}
-                                  onChange={() => {
-                                    setServiceForm(prev => ({
-                                      ...prev,
-                                      price: v.price,
-                                      mrp: v.mrp,
-                                      duration: v.duration,
-                                      variants: prev.variants.map((varItem, i) => ({
-                                        ...varItem,
-                                        isDefault: i === vIdx
-                                      }))
-                                    }));
-                                  }}
-                                  className="text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
-                                />
-                                <span>Default Selection</span>
-                              </label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {discount > 0 && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1B5E20]/15 text-[#1B5E20]">
-                                  {discount}% OFF
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setServiceForm(prev => ({
-                                    ...prev,
-                                    variants: prev.variants.filter((_, i) => i !== vIdx)
-                                  }));
-                                }}
-                                className="p-1 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
-                                title="Delete variant"
-                              >
-                                <LuTrash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                            <div className="sm:col-span-2">
-                              <input
-                                type="text"
-                                placeholder="Variant Label (e.g. 2 BHK)"
-                                value={v.label}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setServiceForm(prev => {
-                                    const updated = [...prev.variants];
-                                    updated[vIdx] = {
-                                      ...updated[vIdx],
-                                      label: val,
-                                      key: val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || updated[vIdx].key
-                                    };
-                                    return { ...prev, variants: updated };
-                                  });
-                                }}
-                                className="w-full p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-bold text-[#10231D]"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <div className="relative">
-                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  placeholder="Payable"
-                                  title="Payable Price"
-                                  value={v.price}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setServiceForm(prev => {
-                                      const updated = [...prev.variants];
-                                      updated[vIdx] = { ...updated[vIdx], price: val };
-                                      return { ...prev, variants: updated };
-                                    });
-                                  }}
-                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-black text-[#10231D] tnum"
-                                  required
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <div className="relative">
-                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  placeholder="MRP"
-                                  title="Shown Price (MRP Crossed Out)"
-                                  value={v.mrp}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setServiceForm(prev => {
-                                      const updated = [...prev.variants];
-                                      updated[vIdx] = { ...updated[vIdx], mrp: val };
-                                      return { ...prev, variants: updated };
-                                    });
-                                  }}
-                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
-                                  required
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span className="text-[#6B8077] shrink-0">Duration:</span>
-                            <input
-                              type="text"
-                              placeholder="e.g. 4-5 hrs, 2 Days"
-                              value={v.duration || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setServiceForm(prev => {
-                                  const updated = [...prev.variants];
-                                  updated[vIdx] = { ...updated[vIdx], duration: val };
-                                  return { ...prev, variants: updated };
-                                });
-                              }}
-                              className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {/* Step 1 Service Type, Dynamic Unit Pricing & City Availability */}
+              {renderServicePricingConfig(true)}
 
               {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
               <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
@@ -3295,7 +4484,9 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] text-[10px] font-bold flex items-center justify-center">✓</span>
+                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] flex items-center justify-center">
+                        <LuCheck className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
                       <span>What Is Included:</span>
                     </label>
                     <textarea
@@ -3310,7 +4501,9 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] text-[10px] font-bold flex items-center justify-center">✕</span>
+                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] flex items-center justify-center">
+                        <LuX className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
                       <span>What Is Excluded:</span>
                     </label>
                     <textarea
@@ -3416,7 +4609,7 @@ export default function AdminDashboard() {
                             : 'text-[#D5C9B5]'
                         }`}
                       >
-                        ★
+                        <LuStar className="w-4 h-4 fill-current" />
                       </button>
                     ))}
                     <span className="ml-2 text-xs font-mono font-bold text-[#10231D]">
@@ -3724,6 +4917,73 @@ export default function AdminDashboard() {
                 </p>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    City Ranking Score (100 - 1000):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={cityForm.rankingScore ?? 100}
+                    onChange={(e) => setCityForm({ ...cityForm, rankingScore: Number(e.target.value) || 100 })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                  />
+                  <p className="text-[10px] text-[#6B8077] mt-1">
+                    Higher scores rank higher in user city selection & routing.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    City Regional Tier:
+                  </label>
+                  <CustomSelect
+                    value={cityForm.rankingTier || 'primary'}
+                    onChange={(val) => setCityForm({ ...cityForm, rankingTier: val })}
+                    options={[
+                      { value: 'primary', label: 'Primary Hub (Headquarters)' },
+                      { value: 'tier_1', label: 'Tier 1 Outstation City' },
+                      { value: 'tier_2', label: 'Tier 2 Regional Outpost' },
+                      { value: 'upcoming', label: 'Upcoming Expansion' }
+                    ]}
+                    placeholder="Regional Tier..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Tags for Scaling & Local SEO (comma-separated):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. headquarters, moradabad, kanth-road, full-home-cleaning, zero-dispatch-fee"
+                  value={cityForm.tags || ''}
+                  onChange={(e) => setCityForm({ ...cityForm, tags: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <span className="text-[10px] font-bold text-[#6B8077] self-center mr-1">Quick Add:</span>
+                  {['headquarters', 'zero-dispatch-fee', 'same-day-service', 'sofa-carpet-hub', 'doorstep-dispatch', 'fast-service'].map((qt) => (
+                    <button
+                      key={qt}
+                      type="button"
+                      onClick={() => {
+                        const cur = (cityForm.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+                        if (!cur.includes(qt)) {
+                          setCityForm(prev => ({ ...prev, tags: [...cur, qt].join(', ') }));
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white hover:bg-[#F4EFE6] border border-[#E2D9C8] text-[10px] font-mono text-[#10231D] cursor-pointer"
+                    >
+                      +{qt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
                   Sort Order:
@@ -3831,334 +5091,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Base Prices */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Base Shown Price (MRP Crossed Out):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={newServiceForm.mrp}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, mrp: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-bold text-[#10231D] tnum"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Base Offered Price (Payable):
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={newServiceForm.price}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic Service Variants & Tiered Rates (N Variants) */}
-              <div className="pt-4 border-t border-[#E2D9C8]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div>
-                    <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
-                      <LuTicket className="w-4 h-4 text-[#E9A23B]" />
-                      <span>Service Variants & Tiered Rates ({newServiceForm.variants?.length || 0})</span>
-                    </h4>
-                    <p className="text-[11px] text-[#6B8077]">
-                      Add 1, 2, 3, 4, 5+ BHK variants, sofa seats, or custom sizes with individual rates & MRPs.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newIdx = (newServiceForm.variants?.length || 0) + 1;
-                      setNewServiceForm(prev => {
-                        const newVar = {
-                          key: `variant-${newIdx}`,
-                          label: `${newIdx} BHK`,
-                          price: (Number(prev.price) || 2800) + (newIdx * 1000),
-                          mrp: (Number(prev.mrp) || 2999) + (newIdx * 1500),
-                          duration: `${newIdx + 2}-${newIdx + 3} hrs`,
-                          isDefault: (prev.variants?.length || 0) === 0
-                        };
-                        return {
-                          ...prev,
-                          variants: [...(prev.variants || []), newVar]
-                        };
-                      });
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto transition-colors shadow-xs"
-                  >
-                    <LuPlus className="w-4 h-4" />
-                    <span>Add Variant</span>
-                  </button>
-                </div>
-
-                {/* Variant Group Label */}
-                <div className="mb-3">
-                  <label className="block text-[11px] font-bold text-[#3D524A] mb-1">
-                    Variant Group Label (e.g. Apartment / House Size, Sofa Seats, Tank Capacity):
-                  </label>
-                  <input
-                    type="text"
-                    value={newServiceForm.variantGroupLabel || ''}
-                    placeholder="e.g. Apartment / House Size"
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, variantGroupLabel: e.target.value })}
-                    className="w-full p-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-semibold text-[#10231D]"
-                  />
-                </div>
-
-                {/* List of Dynamic Variants */}
-                {(!newServiceForm.variants || newServiceForm.variants.length === 0) ? (
-                  <div className="p-4 rounded-xl border-2 border-dashed border-[#E2D9C8] bg-[#ECE5D8]/40 text-center space-y-2">
-                    <p className="text-xs text-[#6B8077]">
-                      No variants added. This service will use a single flat rate unless variants are added.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Apartment / House Size',
-                            variantGroupKey: 'size',
-                            price: 2800,
-                            mrp: 2999,
-                            duration: '4-5 hrs',
-                            variants: [
-                              { key: '1-bhk', label: '1 BHK', price: 2800, mrp: 2999, duration: '4-5 hrs', isDefault: true },
-                              { key: '2-bhk', label: '2 BHK', price: 6000, mrp: 7499, duration: '5-7 hrs', isDefault: false },
-                              { key: '3-bhk', label: '3 BHK', price: 9500, mrp: 10500, duration: '7-9 hrs', isDefault: false },
-                              { key: '4-bhk', label: '4 BHK', price: 12500, mrp: 15000, duration: '2 Days', isDefault: false },
-                              { key: 'villa', label: 'Villa / Kothi (5+ BHK)', price: 18000, mrp: 22000, duration: '2-3 Days', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#E9A23B] px-3 py-1.5 rounded-lg hover:bg-[#D48E28] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load 1 to 5 BHK Apartment Preset</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Seating Configuration',
-                            variantGroupKey: 'seats',
-                            price: 1750,
-                            mrp: 1999,
-                            duration: '2-3 hrs',
-                            variants: [
-                              { key: '5-seater', label: '5 Seater (3+1+1)', price: 1750, mrp: 1999, duration: '2-3 hrs', isDefault: true },
-                              { key: '7-seater', label: '7 Seater (3+2+2)', price: 2450, mrp: 2500, duration: '3-4 hrs', isDefault: false },
-                              { key: '9-seater', label: '9 Seater (L-Shape / Sectional)', price: 3150, mrp: 3500, duration: '4-5 hrs', isDefault: false },
-                              { key: '12-seater', label: '12 Seater Grand Royal', price: 4200, mrp: 4500, duration: '5-6 hrs', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load Sofa Seats Preset</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewServiceForm(prev => ({
-                            ...prev,
-                            variantGroupLabel: 'Water Tank Capacity',
-                            variantGroupKey: 'capacity',
-                            price: 400,
-                            mrp: 499,
-                            duration: '1-1.5 hrs',
-                            variants: [
-                              { key: '500l', label: 'Up to 500 Liters', price: 400, mrp: 499, duration: '1-1.5 hrs', isDefault: true },
-                              { key: '750l', label: '500L – 750 Liters', price: 500, mrp: 699, duration: '1.5-2 hrs', isDefault: false },
-                              { key: '1000l', label: '750L – 1,000 Liters', price: 700, mrp: 1000, duration: '2-2.5 hrs', isDefault: false },
-                              { key: '1500l', label: '1,000L – 1,500 Liters', price: 900, mrp: 1300, duration: '2.5-3 hrs', isDefault: false }
-                            ]
-                          }));
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-[#10231D] bg-[#ECE5D8] border border-[#E2D9C8] px-3 py-1.5 rounded-lg hover:bg-[#E2D9C8] transition-colors"
-                      >
-                        <LuPlus className="w-3.5 h-3.5" />
-                        <span>Load Water Tank Preset</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                    {newServiceForm.variants.map((v, vIdx) => {
-                      const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
-
-                      return (
-                        <div
-                          key={vIdx}
-                          className="p-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2 transition-colors hover:border-[#10231D]/30"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
-                                {vIdx + 1}
-                              </span>
-                              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-[#10231D]">
-                                <input
-                                  type="radio"
-                                  name="newServiceDefaultVariantRadio"
-                                  checked={Boolean(v.isDefault)}
-                                  onChange={() => {
-                                    setNewServiceForm(prev => ({
-                                      ...prev,
-                                      price: v.price,
-                                      mrp: v.mrp,
-                                      duration: v.duration,
-                                      variants: prev.variants.map((varItem, i) => ({
-                                        ...varItem,
-                                        isDefault: i === vIdx
-                                      }))
-                                    }));
-                                  }}
-                                  className="text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
-                                />
-                                <span>Default Selection</span>
-                              </label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {discount > 0 && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1B5E20]/15 text-[#1B5E20]">
-                                  {discount}% OFF
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNewServiceForm(prev => ({
-                                    ...prev,
-                                    variants: prev.variants.filter((_, i) => i !== vIdx)
-                                  }));
-                                }}
-                                className="p-1 text-[#C2512D] hover:bg-[#F9ECE8] rounded-md transition-colors"
-                                title="Delete variant"
-                              >
-                                <LuTrash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                            <div className="sm:col-span-2">
-                              <input
-                                type="text"
-                                placeholder="Variant Label (e.g. 2 BHK)"
-                                value={v.label}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setNewServiceForm(prev => {
-                                    const updated = [...prev.variants];
-                                    updated[vIdx] = {
-                                      ...updated[vIdx],
-                                      label: val,
-                                      key: val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || updated[vIdx].key
-                                    };
-                                    return { ...prev, variants: updated };
-                                  });
-                                }}
-                                className="w-full p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-bold text-[#10231D]"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <div className="relative">
-                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  placeholder="Payable"
-                                  title="Payable Price"
-                                  value={v.price}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setNewServiceForm(prev => {
-                                      const updated = [...prev.variants];
-                                      updated[vIdx] = { ...updated[vIdx], price: val };
-                                      return { ...prev, variants: updated };
-                                    });
-                                  }}
-                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] font-black text-[#10231D] tnum"
-                                  required
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <div className="relative">
-                                <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  placeholder="MRP"
-                                  title="Shown Price (MRP Crossed Out)"
-                                  value={v.mrp}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setNewServiceForm(prev => {
-                                      const updated = [...prev.variants];
-                                      updated[vIdx] = { ...updated[vIdx], mrp: val };
-                                      return { ...prev, variants: updated };
-                                    });
-                                  }}
-                                  className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
-                                  required
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span className="text-[#6B8077] shrink-0">Duration:</span>
-                            <input
-                              type="text"
-                              placeholder="e.g. 4-5 hrs, 2 Days"
-                              value={v.duration || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setNewServiceForm(prev => {
-                                  const updated = [...prev.variants];
-                                  updated[vIdx] = { ...updated[vIdx], duration: val };
-                                  return { ...prev, variants: updated };
-                                });
-                              }}
-                              className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Short Description:
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief summary shown on service cards..."
-                  value={newServiceForm.shortDescription}
-                  onChange={(e) => setNewServiceForm({ ...newServiceForm, shortDescription: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D]"
-                />
-              </div>
-
-              {/* Cloudinary Service Multi-Image Gallery Upload */}
-              {renderImageUploadSection(false)}
+              {/* Step 1 Service Type, Dynamic Unit Pricing & City Availability */}
+              {renderServicePricingConfig(false)}
 
               {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
               <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
@@ -4173,7 +5107,9 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] text-[10px] font-bold flex items-center justify-center">✓</span>
+                      <span className="w-4 h-4 rounded-full bg-[#DDEBE4] text-[#10231D] flex items-center justify-center">
+                        <LuCheck className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
                       <span>What Is Included:</span>
                     </label>
                     <textarea
@@ -4188,7 +5124,9 @@ export default function AdminDashboard() {
 
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] text-[10px] font-bold flex items-center justify-center">✕</span>
+                      <span className="w-4 h-4 rounded-full bg-[#F9ECE8] text-[#C2512D] flex items-center justify-center">
+                        <LuX className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
                       <span>What Is Excluded:</span>
                     </label>
                     <textarea
@@ -4504,6 +5442,259 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </Modal>
+        )}
+
+        {/* Booking Comprehensive Details Modal */}
+        {viewBookingDetails && (
+          <Modal
+            isOpen={Boolean(viewBookingDetails)}
+            onClose={() => setViewBookingDetails(null)}
+            title={`Booking #${viewBookingDetails.bookingCode}`}
+          >
+            <div className="space-y-5 text-xs text-[#10231D]">
+              {/* Header Status & Code Banner */}
+              <div className="p-4 rounded-2xl bg-[#10231D] text-[#F4EFE6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-sm font-black text-[#E9A23B] tracking-wider">
+                      {viewBookingDetails.bookingCode}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      viewBookingDetails.status === 'completed' ? 'bg-emerald-500 text-white' :
+                      viewBookingDetails.status === 'cancelled' ? 'bg-red-500 text-white' :
+                      viewBookingDetails.status === 'in_progress' ? 'bg-blue-500 text-white' :
+                      'bg-[#E9A23B] text-[#10231D]'
+                    }`}>
+                      {viewBookingDetails.status?.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#A3B8B0]">
+                    Booked on: {new Date(viewBookingDetails.createdAt).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short'
+                    })}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <CustomSelect
+                    size="sm"
+                    value={viewBookingDetails.status}
+                    onChange={(val) => {
+                      handleUpdateBookingStatus(viewBookingDetails._id, val);
+                      setViewBookingDetails(prev => ({ ...prev, status: val }));
+                    }}
+                    options={[
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'confirmed', label: 'Confirmed' },
+                      { value: 'in_progress', label: 'In Progress' },
+                      { value: 'completed', label: 'Completed' },
+                      { value: 'cancelled', label: 'Cancelled' }
+                    ]}
+                    placeholder="Update Status..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatBooking(viewBookingDetails);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <LuMessageSquare className="w-3.5 h-3.5" />
+                    <span>Chat</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Two Column: Customer Info & Appointment Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Customer Details */}
+                <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
+                    <LuUsers className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Customer Details</span>
+                  </h4>
+                  <div>
+                    <p className="font-bold text-sm text-[#10231D]">{viewBookingDetails.customer?.name}</p>
+                    <a
+                      href={`tel:${viewBookingDetails.customer?.phone}`}
+                      className="text-xs font-semibold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 mt-1"
+                    >
+                      <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{viewBookingDetails.customer?.phone}</span>
+                    </a>
+                    {viewBookingDetails.customer?.email && (
+                      <a
+                        href={`mailto:${viewBookingDetails.customer?.email}`}
+                        className="text-[11px] text-[#6B8077] hover:underline flex items-center gap-1.5 mt-1"
+                      >
+                        <LuMail className="w-3.5 h-3.5 text-[#6B8077]" />
+                        <span>{viewBookingDetails.customer?.email}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Service Location & Scheduled Slot */}
+                <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
+                    <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Address & Appointment Slot</span>
+                  </h4>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-[#10231D] leading-snug">
+                      {viewBookingDetails.address?.line1}
+                    </p>
+                    {viewBookingDetails.address?.landmark && (
+                      <p className="text-[11px] text-[#6B8077]">Landmark: {viewBookingDetails.address.landmark}</p>
+                    )}
+                    <p className="text-xs font-bold text-[#10231D]">
+                      {viewBookingDetails.cityName} ({viewBookingDetails.address?.pincode})
+                      {viewBookingDetails.address?.isTemporary && (
+                        <span className="ml-2 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          Temporary Address
+                        </span>
+                      )}
+                    </p>
+                    <div className="pt-2 mt-2 border-t border-[#E2D9C8] flex items-center gap-2 text-xs font-mono">
+                      <LuClock className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{viewBookingDetails.slot?.date}</span>
+                      <span className="text-[#6B8077]">({viewBookingDetails.slot?.window})</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Booked Items Breakdown Table */}
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-3">
+                <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
+                  <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
+                  <span>Booked Cleaning Services ({viewBookingDetails.items?.length || 0})</span>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase text-[10px]">
+                        <th className="py-2 px-2">Service</th>
+                        <th className="py-2 px-2">Variant / Area</th>
+                        <th className="py-2 px-2 text-center">Qty</th>
+                        <th className="py-2 px-2 text-right">Unit Rate</th>
+                        <th className="py-2 px-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2D9C8]/60">
+                      {(viewBookingDetails.items || []).map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="py-2.5 px-2 font-bold text-[#10231D]">
+                            {it.titleSnapshot || 'Cleaning Service'}
+                          </td>
+                          <td className="py-2.5 px-2 text-[#3D524A] font-mono">
+                            {it.variantSnapshot || 'Standard'}
+                          </td>
+                          <td className="py-2.5 px-2 text-center font-bold font-mono">
+                            {it.qty || 1}
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-mono text-[#6B8077]">
+                            ₹{(it.priceSnapshot || 0).toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-black text-[#10231D] font-mono">
+                            ₹{((it.priceSnapshot || 0) * (it.qty || 1)).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial & Payment Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
+                    <LuCreditCard className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Payment Method & Status</span>
+                  </h4>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#6B8077]">Mode:</span>
+                      <span className="font-bold text-[#10231D] uppercase font-mono">
+                        {viewBookingDetails.paymentMode?.replace(/_/g, ' ') || 'Cash on Service'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#6B8077]">Payment Status:</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        viewBookingDetails.paymentStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {viewBookingDetails.paymentStatus || 'Pending'}
+                      </span>
+                    </div>
+                    {viewBookingDetails.paymentDetails?.transactionId && (
+                      <div className="flex items-center justify-between pt-1 border-t border-[#E2D9C8]">
+                        <span className="text-[#6B8077]">Ref / Txn ID:</span>
+                        <span className="font-mono text-[10px] text-[#10231D] font-bold">
+                          {viewBookingDetails.paymentDetails.transactionId}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2">
+                  <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider">
+                    Price Breakdown
+                  </h4>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between text-[#6B8077]">
+                      <span>Subtotal:</span>
+                      <span className="font-mono">₹{(viewBookingDetails.totals?.subtotal || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                    {viewBookingDetails.appliedCoupon?.code && (
+                      <div className="flex justify-between text-emerald-700 font-semibold">
+                        <span>Coupon ({viewBookingDetails.appliedCoupon.code}):</span>
+                        <span className="font-mono">-₹{(viewBookingDetails.appliedCoupon.discountAmount || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {viewBookingDetails.totals?.customerSaved > 0 && (
+                      <div className="flex justify-between text-[#E9A23B] font-semibold text-[11px]">
+                        <span>Customer Savings:</span>
+                        <span className="font-mono">₹{viewBookingDetails.totals.customerSaved.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-[#E2D9C8] flex justify-between font-black text-sm text-[#10231D]">
+                      <span>Total Payable:</span>
+                      <span className="font-mono text-[#10231D]">
+                        ₹{(viewBookingDetails.totals?.total ?? viewBookingDetails.total ?? 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Notes */}
+              {viewBookingDetails.notes && (
+                <div className="p-3.5 rounded-2xl bg-white border border-[#E2D9C8]">
+                  <span className="text-[11px] font-bold text-[#6B8077] uppercase block mb-1">
+                    Customer Special Instructions:
+                  </span>
+                  <p className="text-xs text-[#10231D] italic">
+                    "{viewBookingDetails.notes}"
+                  </p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setViewBookingDetails(null)}
+                  className="px-5 py-2.5 rounded-xl bg-[#10231D] text-[#F4EFE6] font-bold text-xs hover:bg-[#3D524A] transition-colors cursor-pointer"
+                >
+                  Close Details
+                </button>
+              </div>
+            </div>
           </Modal>
         )}
 

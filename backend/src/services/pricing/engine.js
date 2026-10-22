@@ -5,10 +5,40 @@
  */
 
 export function calculateItemPrice(service, selections = {}, citySlug = null, qty = 1) {
+  const isMoradabad = !citySlug || citySlug.toLowerCase() === 'moradabad';
   let unitPrice = service.price;
   let unitMrp = service.mrp;
   let duration = service.duration || '1 hr';
   let matchedMatrixRow = null;
+
+  // 0. Dynamic Per Sq. Ft. / Per Unit Calculation
+  if (service.pricingType === 'unit' || (service.pricingUnit && service.pricingUnit !== 'fixed')) {
+    const rateMbd = typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price;
+    const rateOther = typeof service.unitRateOther === 'number'
+      ? service.unitRateOther
+      : (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price);
+    const activeRate = isMoradabad ? rateMbd : rateOther;
+
+    const unitCount = Number(
+      selections.units ??
+      selections.unitCount ??
+      selections.sqFt ??
+      selections.litres ??
+      selections.seats ??
+      selections.chairs ??
+      selections.fans
+    ) || service.minUnitQuantity || 1;
+
+    unitPrice = Math.round(activeRate * unitCount);
+    const mrpFactor = (service.mrp && service.price && service.mrp > service.price) ? (service.mrp / service.price) : 1.25;
+    unitMrp = Math.round(unitPrice * mrpFactor);
+  }
+
+  // City-specific surcharge (e.g. outstation surcharge)
+  if (!isMoradabad && service.cityExtraCharge) {
+    unitPrice += service.cityExtraCharge;
+    unitMrp += service.cityExtraCharge;
+  }
 
   // 1. Matrix match (e.g. size: '2-bhk')
   if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {

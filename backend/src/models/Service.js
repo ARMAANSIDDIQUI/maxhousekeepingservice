@@ -45,6 +45,27 @@ const serviceSchema = new mongoose.Schema({
   duration: { type: String, default: '1 hr' },
   icon: { type: String, default: 'Sparkles', trim: true },
 
+  // Pricing Type (Normal / Tiered vs. Dynamic Per Sq Ft / Unit Calculation)
+  pricingType: { type: String, enum: ['normal', 'unit'], default: 'normal' },
+  pricingUnit: {
+    type: String,
+    enum: ['fixed', 'sq_ft', 'litre', 'seat', 'chair', 'fan', 'unit'],
+    default: 'fixed'
+  },
+  unitRateMoradabad: { type: Number },
+  unitRateOther: { type: Number },
+  unitLabel: { type: String, default: 'Sq. Ft.' },
+  minUnitQuantity: { type: Number, default: 1 },
+  hasCitySpecificRates: { type: Boolean, default: false },
+  cityRates: [{
+    citySlug: { type: String },
+    cityName: { type: String },
+    rate: { type: Number }
+  }],
+  cityExtraCharge: { type: Number, default: 0 },
+  moradabadOnly: { type: Boolean, default: false },
+  videoUrl: { type: String, trim: true },
+
   // Dual Pricing Controls (Shown Price vs Offered Price)
   pricingMode: { type: String, enum: ['fixed', 'tiered', 'combination'], default: 'combination' },
   price: { type: Number, required: true }, // Offered price (discounted)
@@ -80,6 +101,14 @@ const serviceSchema = new mongoose.Schema({
     isSample: { type: Boolean, default: true }
   },
   cityAvailability: [{ type: String, index: true }], // Array of city slugs
+  tags: [{ type: String, trim: true, index: true }], // Scaling tags, SEO keywords & search tokens
+  rankingScore: { type: Number, default: 100, index: true }, // Priority score (e.g. 100-1000) for catalog order & search ranking
+  rankingTier: {
+    type: String,
+    enum: ['top_rated', 'trending', 'bestseller', 'standard', 'budget'],
+    default: 'standard',
+    index: true
+  },
   isPopular: { type: Boolean, default: false, index: true },
   isActive: { type: Boolean, default: true, index: true },
   sortOrder: { type: Number, default: 0 },
