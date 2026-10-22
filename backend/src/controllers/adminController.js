@@ -549,6 +549,9 @@ export async function deleteCoupon(req, res, next) {
  */
 export async function getSettings(req, res, next) {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     let settings = await Settings.findOne();
     if (!settings) {
       settings = await Settings.create({
@@ -573,6 +576,9 @@ export async function getSettings(req, res, next) {
 
 export async function updateSettings(req, res, next) {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     const settings = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true });
     res.status(200).json({ success: true, settings });
   } catch (err) {

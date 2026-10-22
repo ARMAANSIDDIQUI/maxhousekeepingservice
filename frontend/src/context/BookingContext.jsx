@@ -110,6 +110,20 @@ export function BookingProvider({ children }) {
 
   useEffect(() => {
     refreshSettings();
+
+    const handleSync = () => {
+      refreshSettings();
+    };
+
+    window.addEventListener('max_settings_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+
+    return () => {
+      window.removeEventListener('max_settings_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
   }, [refreshSettings]);
 
   useEffect(() => {

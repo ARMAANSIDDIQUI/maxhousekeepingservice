@@ -378,7 +378,7 @@ export default function BookingPage() {
     }
   }, [contextSettings, paymentChoice]);
 
-  // Fetch fresh Public Settings on Mount (always bypass cache to get live DB settings)
+  // Fetch fresh Public Settings on Mount & Sync across tabs or window focus (always bypass cache to get live DB settings)
   useEffect(() => {
     async function loadPublicSettings() {
       try {
@@ -396,6 +396,20 @@ export default function BookingPage() {
       }
     }
     loadPublicSettings();
+
+    const handleSync = () => {
+      loadPublicSettings();
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('max_settings_updated', handleSync);
+
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('max_settings_updated', handleSync);
+    };
   }, [paymentChoice]);
 
   // Pre-fill user data if logged in

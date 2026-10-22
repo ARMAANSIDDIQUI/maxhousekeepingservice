@@ -759,13 +759,22 @@ export async function apiRequest(endpoint, options = {}) {
     }
   }
 
+  // Prevent browser HTTP heuristic caching for noCache or settings requests
+  const requestParams = { ...options.params };
+  if (method === 'get' && (options.noCache || rawUrl.includes('/settings'))) {
+    requestParams._t = Date.now();
+  }
+
   try {
     const response = await api({
       url: rawUrl,
       method,
       data: options.body || options.data,
-      headers: options.headers,
-      params: options.params
+      headers: {
+        ...(options.headers || {}),
+        ...(options.noCache || rawUrl.includes('/settings') ? { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } : {})
+      },
+      params: requestParams
     });
 
     // Check if response is empty or unpopulated when expected
@@ -956,6 +965,12 @@ export const adminAPI = {
     clearCacheByPrefix('/public/settings');
     clearCacheByPrefix('/settings');
     clearCacheByPrefix('/admin/settings');
+    try {
+      localStorage.setItem('max_settings_updated_at', Date.now().toString());
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('max_settings_updated', { detail: res }));
+      }
+    } catch {}
     return res;
   }
 };

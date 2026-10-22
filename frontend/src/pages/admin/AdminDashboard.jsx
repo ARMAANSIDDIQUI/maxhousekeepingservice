@@ -2226,6 +2226,39 @@ export default function AdminDashboard() {
   };
 
   // Settings Handlers
+  const [togglingOnlinePayments, setTogglingOnlinePayments] = useState(false);
+
+  const handleToggleOnlinePayments = async (nextVal) => {
+    setTogglingOnlinePayments(true);
+    const updated = { ...settingsForm, acceptOnlinePayments: nextVal };
+    setSettingsForm(updated);
+
+    try {
+      const res = await adminAPI.updateSettings(updated);
+      if (res && res.success !== false) {
+        if (res.settings) {
+          setSettingsForm(prev => ({ ...prev, ...res.settings }));
+        }
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        toast.success(
+          nextVal
+            ? 'Online payments (Razorpay) activated! Customers can now pay online or choose Cash on Service.'
+            : 'Online payments deactivated. Customer booking checkout set to Cash on Service only.'
+        );
+      } else {
+        throw new Error(res?.message || 'Failed to update payment setting');
+      }
+    } catch (err) {
+      console.error('Failed toggling online payments:', err);
+      toast.error('Failed to update online payment setting. Please check your connection.');
+      setSettingsForm(prev => ({ ...prev, acceptOnlinePayments: !nextVal }));
+    } finally {
+      setTogglingOnlinePayments(false);
+    }
+  };
+
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     setSavingSettings(true);
@@ -4418,13 +4451,20 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
 
               {/* Online Payment Settings */}
-              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-2">
-                    <LuCreditCard className="w-4 h-4 text-[#E9A23B]" />
-                    <span>Online Payments (Razorpay)</span>
-                  </h4>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                  <div className="flex items-center gap-2">
+                    <LuCreditCard className="w-5 h-5 text-[#E9A23B]" />
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Online Payments (Razorpay)
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Controls whether customers can pay online via Cards, UPI & NetBanking during booking.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
                     settingsForm.acceptOnlinePayments
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : 'bg-stone-200 text-stone-700 border border-stone-300'
@@ -4433,17 +4473,35 @@ export default function AdminDashboard() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center justify-between p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8]">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-[#10231D] block">
+                      Accept online payments on booking page
+                    </span>
+                    <p className="text-[11px] text-[#6B8077]">
+                      {settingsForm.acceptOnlinePayments
+                        ? 'Customers can choose to Pay Online Now (Razorpay) or Pay on Service Completion.'
+                        : 'Checkout is locked to Cash / UPI on Service Completion only.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
                     id="acceptOnlinePaymentsToggle"
-                    checked={Boolean(settingsForm.acceptOnlinePayments)}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, acceptOnlinePayments: e.target.checked })}
-                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
-                  />
-                  <label htmlFor="acceptOnlinePaymentsToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
-                    Accept online payments through website (Cards, UPI, NetBanking)
-                  </label>
+                    aria-checked={Boolean(settingsForm.acceptOnlinePayments)}
+                    disabled={togglingOnlinePayments}
+                    onClick={() => handleToggleOnlinePayments(!settingsForm.acceptOnlinePayments)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#E9A23B] focus:ring-offset-2 ${
+                      settingsForm.acceptOnlinePayments ? 'bg-emerald-600' : 'bg-stone-300'
+                    } ${togglingOnlinePayments ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        settingsForm.acceptOnlinePayments ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
 
