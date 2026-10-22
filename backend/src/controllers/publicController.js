@@ -80,13 +80,16 @@ export async function submitContact(req, res, next) {
       message: message.trim()
     });
 
-    // Dispatch automated emails to Admin and User
-    Promise.allSettled([
-      sendContactNotificationToAdmin({ contact }),
-      sendContactConfirmationToUser({ contact })
-    ]).catch(emailErr => {
+    // Dispatch automated emails: 1 to self/admin, 1 to user confirmation
+    try {
+      const emailTasks = [sendContactNotificationToAdmin({ contact })];
+      if (contact.email) {
+        emailTasks.push(sendContactConfirmationToUser({ contact }));
+      }
+      await Promise.allSettled(emailTasks);
+    } catch (emailErr) {
       console.warn('[Contact Email Automation Notice]:', emailErr.message);
-    });
+    }
 
     res.status(201).json({
       success: true,

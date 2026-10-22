@@ -216,6 +216,9 @@ export default function ContactPage() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="w-full p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] outline-none"
                     />
+                    <span className="text-[11px] text-[#6B8077] block mt-1">
+                      Enter email to receive an instant confirmation receipt of your inquiry.
+                    </span>
                   </div>
 
                   <div>

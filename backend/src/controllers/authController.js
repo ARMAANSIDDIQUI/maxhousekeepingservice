@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import OtpVerification from '../models/OtpVerification.js';
 import { sendOtpEmail } from '../config/email.js';
-import { sendWelcomeEmail } from '../services/emailService.js';
+import { sendWelcomeEmail, sendPasswordResetSuccessEmail } from '../services/emailService.js';
 
 // Helper to sign JWT token (strictly valid for 7 days)
 function generateToken(user) {
@@ -91,7 +91,7 @@ export async function sendSignupOtp(req, res, next) {
       { upsert: true, new: true }
     );
 
-    await sendOtpEmail(cleanEmail, otp, name || 'Customer');
+    await sendOtpEmail(cleanEmail, otp, name || 'Customer', 'signup');
 
     res.status(200).json({
       success: true,
@@ -312,7 +312,7 @@ export async function requestOtp(req, res, next) {
     await user.save();
 
     // Send email via Nodemailer
-    await sendOtpEmail(cleanEmail, otp);
+    await sendOtpEmail(cleanEmail, otp, user.name || 'Customer', 'login');
 
     res.status(200).json({
       success: true,
@@ -775,7 +775,7 @@ export async function forgotPassword(req, res, next) {
     };
     await user.save();
 
-    await sendOtpEmail(cleanEmail, otp, user.name);
+    await sendOtpEmail(cleanEmail, otp, user.name || 'Valued Customer', 'password_reset');
 
     res.status(200).json({
       success: true,
@@ -846,6 +846,11 @@ export async function resetPassword(req, res, next) {
     user.passwordHash = newPassword; // Pre-save hook will hash it with bcrypt
     user.otpSecret = { code: null, expiresAt: null, attempts: 0 };
     await user.save();
+
+    // Send confirmation email asynchronously
+    sendPasswordResetSuccessEmail({ toEmail: cleanEmail, userName: user.name }).catch(err => {
+      console.warn('[Password Reset Confirmation Email Notice]:', err.message);
+    });
 
     res.status(200).json({
       success: true,

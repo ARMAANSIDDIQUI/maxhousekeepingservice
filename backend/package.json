@@ -13,6 +13,7 @@
     "seed:reset": "node scripts/seed.js --reset",
     "make-admin": "node scripts/makeAdmin.js",
     "test:pricing": "node scripts/testPricing.js",
+    "test:email": "node scripts/testFunctions.js",
     "generate-hash": "node scripts/generateHashOrSecret.js"
   },
   "dependencies": {

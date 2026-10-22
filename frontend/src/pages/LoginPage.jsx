@@ -62,6 +62,7 @@ export default function LoginPage() {
   const [forgotOtpSent, setForgotOtpSent] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Authenticating...');
 
   const {
     user,
@@ -104,12 +105,15 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Verifying credentials & signing in...');
     setLoading(true);
-    const res = await login(identifier.trim(), password);
-    setLoading(false);
-
-    if (res?.success && res?.user) {
-      handlePostLoginRedirect(res.user.role);
+    try {
+      const res = await login(identifier.trim(), password);
+      if (res?.success && res?.user) {
+        handlePostLoginRedirect(res.user.role);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -144,17 +148,20 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Sending 6-digit verification code to your email...');
     setLoading(true);
-    const res = await sendSignupOtp({
-      name: name.trim(),
-      phone: cleanPhone,
-      email: email.trim().toLowerCase()
-    });
-    setLoading(false);
-
-    if (res?.success) {
-      setSignupStep(2);
-      setSignupOtpSent(true);
+    try {
+      const res = await sendSignupOtp({
+        name: name.trim(),
+        phone: cleanPhone,
+        email: email.trim().toLowerCase()
+      });
+      if (res?.success) {
+        setSignupStep(2);
+        setSignupOtpSent(true);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -170,18 +177,21 @@ export default function LoginPage() {
 
     const cleanPhone = phone.trim().replace(/\D/g, '');
 
+    setLoadingMessage('Verifying code & creating your verified account...');
     setLoading(true);
-    const res = await register({
-      name: name.trim(),
-      phone: cleanPhone,
-      email: email.trim().toLowerCase(),
-      password: pw,
-      otp: signupOtp.trim()
-    });
-    setLoading(false);
-
-    if (res?.success && res?.user) {
-      handlePostLoginRedirect(res.user.role);
+    try {
+      const res = await register({
+        name: name.trim(),
+        phone: cleanPhone,
+        email: email.trim().toLowerCase(),
+        password: pw,
+        otp: signupOtp.trim()
+      });
+      if (res?.success && res?.user) {
+        handlePostLoginRedirect(res.user.role);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -193,12 +203,15 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Sending one-time login code to your email...');
     setLoading(true);
-    const res = await requestOtp(otpEmail.trim());
-    setLoading(false);
-
-    if (res?.success) {
-      setOtpSent(true);
+    try {
+      const res = await requestOtp(otpEmail.trim());
+      if (res?.success) {
+        setOtpSent(true);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -210,12 +223,15 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Verifying code & securing session...');
     setLoading(true);
-    const res = await verifyOtp(otpEmail.trim(), otpCode.trim(), otpName, otpPhone);
-    setLoading(false);
-
-    if (res?.success && res?.user) {
-      handlePostLoginRedirect(res.user.role);
+    try {
+      const res = await verifyOtp(otpEmail.trim(), otpCode.trim(), otpName, otpPhone);
+      if (res?.success && res?.user) {
+        handlePostLoginRedirect(res.user.role);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,12 +243,15 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Sending password reset code to your email...');
     setLoading(true);
-    const res = await forgotPassword(forgotEmail.trim());
-    setLoading(false);
-
-    if (res?.success) {
-      setForgotOtpSent(true);
+    try {
+      const res = await forgotPassword(forgotEmail.trim());
+      if (res?.success) {
+        setForgotOtpSent(true);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,22 +273,25 @@ export default function LoginPage() {
       return;
     }
 
+    setLoadingMessage('Verifying code & updating password...');
     setLoading(true);
-    const res = await resetPassword(
-      forgotEmail.trim(),
-      forgotCode.trim(),
-      forgotNewPassword
-    );
-    setLoading(false);
-
-    if (res?.success) {
-      setIdentifier(forgotEmail.trim());
-      setForgotOtpSent(false);
-      setForgotCode('');
-      setForgotNewPassword('');
-      setForgotConfirmPassword('');
-      setMode('signin');
-      setAuthMethod('password');
+    try {
+      const res = await resetPassword(
+        forgotEmail.trim(),
+        forgotCode.trim(),
+        forgotNewPassword
+      );
+      if (res?.success) {
+        setIdentifier(forgotEmail.trim());
+        setForgotOtpSent(false);
+        setForgotCode('');
+        setForgotNewPassword('');
+        setForgotConfirmPassword('');
+        setMode('signin');
+        setAuthMethod('password');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -304,11 +326,15 @@ export default function LoginPage() {
             client_id: googleClientId,
             callback: async (response) => {
               if (response?.credential) {
+                setLoadingMessage('Authorizing with Google & securing session...');
                 setLoading(true);
-                const res = await googleLogin({ credential: response.credential });
-                setLoading(false);
-                if (res?.success && res?.user) {
-                  handlePostLoginRedirect(res.user.role);
+                try {
+                  const res = await googleLogin({ credential: response.credential });
+                  if (res?.success && res?.user) {
+                    handlePostLoginRedirect(res.user.role);
+                  }
+                } finally {
+                  setLoading(false);
                 }
               }
             }
@@ -437,12 +463,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4">
+    <div className="bg-[#F4EFE6] min-h-screen py-16 flex items-center justify-center px-4 relative">
       <SEO
         title={mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
         description="Secure sign in and account access for Max Housekeeping Service customers and staff."
       />
-      <div className="w-full max-w-md bg-[#ECE5D8] px-5 py-7 sm:p-8 rounded-2xl sm:rounded-3xl border-2 border-[#10231D] shadow-2xl">
+
+      {/* Modern High-End Loading Screen with Backdrop Blur Overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-50 bg-[#10231D]/70 backdrop-blur-md flex flex-col items-center justify-center p-4 transition-all duration-300">
+          <div className="bg-[#F4EFE6] border-2 border-[#10231D] rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Top Amber Accent Animated Gradient Bar */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#E9A23B] via-[#10231D] to-[#E9A23B] animate-pulse" />
+
+            {/* Glowing Brand Spinner */}
+            <div className="relative w-16 h-16 mx-auto mb-5">
+              <div className="absolute inset-0 rounded-full border-4 border-[#10231D]/15" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#E9A23B] border-t-transparent animate-spin" />
+              <div className="absolute inset-3 rounded-full bg-[#10231D] flex items-center justify-center text-[#E9A23B] shadow-inner">
+                <LuShieldCheck className="w-5 h-5 animate-pulse" />
+              </div>
+            </div>
+
+            <h3 className="font-display font-black text-lg text-[#10231D] mb-2 tracking-tight">
+              Processing Securely
+            </h3>
+            <p className="text-sm font-bold text-[#10231D] mb-1">
+              {loadingMessage || 'Authenticating...'}
+            </p>
+            <p className="text-xs text-[#6B8077] mt-2">
+              Please wait a moment while we communicate with the secure server.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className={`w-full max-w-md bg-[#ECE5D8] px-5 py-7 sm:p-8 rounded-2xl sm:rounded-3xl border-2 border-[#10231D] shadow-2xl transition-all duration-300 ${
+        loading ? 'opacity-40 filter blur-[1px] pointer-events-none select-none' : ''
+      }`}>
         {/* Header */}
         <div className="text-center mb-6">
           <img
@@ -474,11 +532,12 @@ export default function LoginPage() {
           <div className="mb-6">
             <button
               type="button"
+              disabled={loading}
               onClick={() => {
                 setMode('signin');
                 setForgotOtpSent(false);
               }}
-              className="text-xs font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
+              className="text-xs font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <LuArrowLeft className="w-4 h-4" />
               <span>Back to Login</span>
@@ -488,11 +547,12 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 rounded-2xl bg-[#F4EFE6] p-1 border border-[#E2D9C8] mb-6">
             <button
               type="button"
+              disabled={loading}
               onClick={() => {
                 setMode('signin');
                 setSignupStep(1);
               }}
-              className={`py-2.5 text-xs font-black rounded-xl transition-all ${
+              className={`py-2.5 text-xs font-black rounded-xl transition-all disabled:opacity-50 ${
                 mode === 'signin'
                   ? 'bg-[#10231D] text-[#F4EFE6] shadow'
                   : 'text-[#10231D] hover:bg-[#ECE5D8]'
@@ -502,8 +562,9 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
+              disabled={loading}
               onClick={() => setMode('signup')}
-              className={`py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              className={`py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                 mode === 'signup'
                   ? 'bg-[#E9A23B] text-[#10231D] shadow'
                   : 'text-[#10231D] hover:bg-[#ECE5D8]'
@@ -528,10 +589,11 @@ export default function LoginPage() {
                 <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                 <input
                   type="text"
+                  disabled={loading}
                   placeholder="admin@dummy.com or mobile"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                   required
                 />
               </div>
@@ -544,6 +606,7 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => {
                     if (identifier.includes('@')) {
                       setForgotEmail(identifier.trim());
@@ -551,7 +614,7 @@ export default function LoginPage() {
                     setMode('forgot');
                     setForgotOtpSent(false);
                   }}
-                  className="text-xs font-bold text-[#E9A23B] hover:text-[#D48E28] transition-colors"
+                  className="text-xs font-bold text-[#E9A23B] hover:text-[#D48E28] transition-colors disabled:opacity-50"
                 >
                   Forgot password?
                 </button>
@@ -560,16 +623,18 @@ export default function LoginPage() {
                 <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                 <input
                   type={showLoginPassword ? 'text' : 'password'}
+                  disabled={loading}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                   required
                 />
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors disabled:opacity-50"
                   title={showLoginPassword ? 'Hide password' : 'Show password'}
                 >
                   {showLoginPassword ? (
@@ -649,10 +714,11 @@ export default function LoginPage() {
                     <LuUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type="text"
+                      disabled={loading}
                       placeholder="e.g. Rahul Sharma"
                       value={signupForm.name}
                       onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                   </div>
@@ -667,11 +733,12 @@ export default function LoginPage() {
                       <LuPhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                       <input
                         type="tel"
+                        disabled={loading}
                         maxLength={10}
                         placeholder="9876543210"
                         value={signupForm.phone}
                         onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none font-mono"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none font-mono disabled:opacity-60"
                         required
                       />
                     </div>
@@ -685,10 +752,11 @@ export default function LoginPage() {
                       <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                       <input
                         type="email"
+                        disabled={loading}
                         placeholder="you@gmail.com"
                         value={signupForm.email}
                         onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                         required
                       />
                     </div>
@@ -703,16 +771,18 @@ export default function LoginPage() {
                     <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type={showSignupPassword ? 'text' : 'password'}
+                      disabled={loading}
                       placeholder="••••••••••••"
                       value={signupForm.password}
                       onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setShowSignupPassword(!showSignupPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors disabled:opacity-50"
                       title={showSignupPassword ? 'Hide password' : 'Show password'}
                     >
                       {showSignupPassword ? (
@@ -732,16 +802,18 @@ export default function LoginPage() {
                     <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type={showSignupConfirmPassword ? 'text' : 'password'}
+                      disabled={loading}
                       placeholder="••••••••••••"
                       value={signupForm.confirmPassword}
                       onChange={(e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors disabled:opacity-50"
                       title={showSignupConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showSignupConfirmPassword ? (
@@ -774,8 +846,9 @@ export default function LoginPage() {
                     <span>Verification code sent to:</span>
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setSignupStep(1)}
-                      className="font-bold text-[#10231D] hover:underline flex items-center gap-1"
+                      className="font-bold text-[#10231D] hover:underline flex items-center gap-1 disabled:opacity-50"
                     >
                       <span>Edit Details</span>
                     </button>
@@ -791,11 +864,12 @@ export default function LoginPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={loading}
                     maxLength={6}
                     placeholder="123456"
                     value={signupOtp}
                     onChange={(e) => setSignupOtp(e.target.value)}
-                    className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                     required
                     autoFocus
                   />
@@ -843,10 +917,11 @@ export default function LoginPage() {
                     <LuMail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type="email"
+                      disabled={loading}
                       placeholder="you@example.com"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                   </div>
@@ -867,11 +942,12 @@ export default function LoginPage() {
                 <div className="text-center pt-2">
                   <button
                     type="button"
+                    disabled={loading}
                     onClick={() => {
                       setMode('signin');
                       setForgotOtpSent(false);
                     }}
-                    className="text-xs font-bold text-[#6B8077] hover:text-[#10231D] transition-colors"
+                    className="text-xs font-bold text-[#6B8077] hover:text-[#10231D] transition-colors disabled:opacity-50"
                   >
                     Remember your password? Sign In
                   </button>
@@ -889,11 +965,12 @@ export default function LoginPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={loading}
                     maxLength={6}
                     placeholder="123456"
                     value={forgotCode}
                     onChange={(e) => setForgotCode(e.target.value)}
-                    className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                     required
                   />
                 </div>
@@ -906,16 +983,18 @@ export default function LoginPage() {
                     <LuLock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type={showForgotNewPassword ? 'text' : 'password'}
+                      disabled={loading}
                       placeholder="••••••••••••"
                       value={forgotNewPassword}
                       onChange={(e) => setForgotNewPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors disabled:opacity-50"
                       title={showForgotNewPassword ? 'Hide password' : 'Show password'}
                     >
                       {showForgotNewPassword ? (
@@ -935,16 +1014,18 @@ export default function LoginPage() {
                     <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
                     <input
                       type={showForgotConfirmPassword ? 'text' : 'password'}
+                      disabled={loading}
                       placeholder="••••••••••••"
                       value={forgotConfirmPassword}
                       onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                       required
                     />
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors disabled:opacity-50"
                       title={showForgotConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showForgotConfirmPassword ? (
@@ -959,8 +1040,9 @@ export default function LoginPage() {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"
+                    disabled={loading}
                     onClick={() => setForgotOtpSent(false)}
-                    className="px-3 py-3 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#6B8077] hover:bg-[#F4EFE6]"
+                    className="px-3 py-3 rounded-xl border border-[#E2D9C8] text-xs font-bold text-[#6B8077] hover:bg-[#F4EFE6] disabled:opacity-50"
                   >
                     Resend Code
                   </button>

@@ -12,6 +12,13 @@ function getFrontendUrl(path = '') {
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function getSenderEmail(isSystem = false) {
+  if (process.env.EMAIL_FROM) return process.env.EMAIL_FROM;
+  const brand = isSystem ? `${BRAND_NAME} System` : BRAND_NAME;
+  const user = process.env.EMAIL_USER || SUPPORT_EMAIL;
+  return `"${brand}" <${user}>`;
+}
+
 /**
  * Standard Email Shell Template with Brand Styling
  */
@@ -375,7 +382,7 @@ export async function sendContactConfirmationToUser({ contact }) {
 
   try {
     const info = await mailer.sendMail({
-      from: `"${BRAND_NAME}" <${process.env.EMAIL_USER}>`,
+      from: getSenderEmail(false),
       to: contact.email,
       subject,
       html
@@ -446,8 +453,9 @@ export async function sendContactNotificationToAdmin({ contact }) {
 
   try {
     const info = await mailer.sendMail({
-      from: `"${BRAND_NAME} System" <${process.env.EMAIL_USER}>`,
+      from: getSenderEmail(true),
       to: adminEmail,
+      replyTo: contact.email || undefined,
       subject,
       html
     });
@@ -514,7 +522,7 @@ export async function sendWelcomeEmail(user) {
 
   try {
     const info = await mailer.sendMail({
-      from: `"${BRAND_NAME}" <${process.env.EMAIL_USER}>`,
+      from: getSenderEmail(false),
       to: user.email,
       subject,
       html
@@ -527,11 +535,77 @@ export async function sendWelcomeEmail(user) {
   }
 }
 
+/**
+ * Send Password Reset Success Security Notification
+ */
+export async function sendPasswordResetSuccessEmail({ toEmail, userName }) {
+  if (!toEmail) return { success: false, message: 'No email provided' };
+
+  const content = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span class="badge" style="background-color: #DDEBE4; color: #10231D; font-weight: 800;">
+        SECURITY NOTIFICATION
+      </span>
+      <h2 style="margin: 14px 0 6px; font-size: 20px; color: #10231D;">
+        Password Changed Successfully
+      </h2>
+      <p style="color: #6B8077; font-size: 14px; margin: 0;">
+        Hello ${userName || 'there'}, your Max Housekeeping account password was successfully updated.
+      </p>
+    </div>
+
+    <div class="highlight-box">
+      <p style="margin: 0; font-size: 13px; color: #3D524A;">
+        If you completed this action, no further steps are needed. You can now use your updated password whenever signing in.
+      </p>
+    </div>
+
+    <p style="font-size: 13px; line-height: 1.6; color: #B91C1C; font-weight: 600;">
+      If you did not perform this password change, please contact our emergency hotline immediately at <a href="tel:9897766002" style="color: #B91C1C; text-decoration: underline;">+91 98977 66002</a> or reply to this email to freeze your account.
+    </p>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${getFrontendUrl('/login')}" class="btn">
+        Sign In With New Password
+      </a>
+    </div>
+  `;
+
+  const html = emailShell({
+    title: `Security Notice: Password Reset Successful`,
+    preheader: `Your account password has been updated successfully.`,
+    content
+  });
+
+  const mailer = getEmailTransporter();
+  const subject = `Your Max Housekeeping Password Has Been Changed`;
+
+  if (!mailer) {
+    console.log(`[Email Simulator] Password Reset Success Notice to ${toEmail}`);
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const info = await mailer.sendMail({
+      from: getSenderEmail(false),
+      to: toEmail,
+      subject,
+      html
+    });
+    console.log(`[Email] Password reset success notice sent to ${toEmail}: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Email Error] Failed password reset success notice:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   sendBookingConfirmationEmail,
   sendAdminNewBookingNotification,
   sendBookingStatusUpdateEmail,
   sendContactConfirmationToUser,
   sendContactNotificationToAdmin,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendPasswordResetSuccessEmail
 };
