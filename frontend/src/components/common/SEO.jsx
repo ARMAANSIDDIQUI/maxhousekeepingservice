@@ -1,40 +1,82 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useBooking } from '../../context/BookingContext';
 
 export default function SEO({
-  title = 'Max Housekeeping Service | Professional Cleaning in Western UP',
-  description = 'Top-rated home deep cleaning, bathroom sanitisation, kitchen degreasing, sofa shampooing & commercial cleaning across Moradabad, Rampur, Amroha, Sambhal, and Western Uttar Pradesh.',
-  keywords = 'home cleaning, deep cleaning, sofa dry cleaning, floor cleaning, bathroom sanitization, kitchen cleaning, Moradabad cleaning, Rampur cleaning, Sambhal cleaning, Amroha cleaning, housekeeping service Western UP',
+  title,
+  description,
+  keywords,
   image = '/favicon.png',
-  url = typeof window !== 'undefined' ? window.location.href : 'https://maxhousekeeping.in',
-  type = 'website'
+  url,
+  type = 'website',
+  customSchema = null
 }) {
-  const fullTitle = title.includes('Max Housekeeping') ? title : `${title} | Max Housekeeping Service`;
+  const bookingCtx = useBooking();
+  const settings = bookingCtx?.settings || {};
+
+  const brand = settings.brandName || settings.businessName || 'Max Housekeeping Service';
+  const defaultDesc = settings.tagline || settings.heroCopy || 'Professional housekeeping and cleaning services.';
+  const currentPhone = settings.phone || settings.primaryPhone || '';
+  const currentEmail = settings.email || settings.supportEmail || '';
+  const currentAddress = settings.address || '';
+  const currentInstagram = settings.instagramUrl || '';
+
+  const pageTitle = title
+    ? (title.includes(brand) ? title : `${title} | ${brand}`)
+    : `${brand} | Professional Cleaning Services`;
+
+  const metaDesc = description || defaultDesc;
+  const currentUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+
+  // Schema.org LocalBusiness structured data strictly using actual database settings
+  const defaultSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    'name': brand,
+    ...(currentPhone ? { 'telephone': currentPhone } : {}),
+    ...(currentEmail ? { 'email': currentEmail } : {}),
+    ...(currentAddress ? {
+      'address': {
+        '@type': 'PostalAddress',
+        'streetAddress': currentAddress
+      }
+    } : {}),
+    ...(currentInstagram ? {
+      'sameAs': [currentInstagram]
+    } : {})
+  };
+
+  const schemaToInject = customSchema || defaultSchema;
 
   return (
     <Helmet>
-      <title>{fullTitle}</title>
-      <meta name="description" content={description} />
-      <meta name="keywords" content={keywords} />
-      <link rel="canonical" href={url} />
+      <title>{pageTitle}</title>
+      <meta name="description" content={metaDesc} />
+      {keywords && <meta name="keywords" content={keywords} />}
+      {currentUrl && <link rel="canonical" href={currentUrl} />}
 
       {/* Open Graph / Social Sharing */}
       <meta property="og:type" content={type} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:image" content={image} />
-      <meta property="og:url" content={url} />
-      <meta property="og:site_name" content="Max Housekeeping Service" />
+      <meta property="og:title" content={pageTitle} />
+      <meta property="og:description" content={metaDesc} />
+      {image && <meta property="og:image" content={image} />}
+      {currentUrl && <meta property="og:url" content={currentUrl} />}
+      <meta property="og:site_name" content={brand} />
 
       {/* Twitter Cards */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={image} />
+      <meta name="twitter:title" content={pageTitle} />
+      <meta name="twitter:description" content={metaDesc} />
+      {image && <meta name="twitter:image" content={image} />}
 
       {/* Search Engine Crawlers */}
       <meta name="robots" content="index, follow" />
-      <meta name="author" content="Max Housekeeping Service" />
+      <meta name="author" content={brand} />
+
+      {/* Schema.org Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify(schemaToInject)}
+      </script>
     </Helmet>
   );
 }

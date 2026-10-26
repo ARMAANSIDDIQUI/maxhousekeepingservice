@@ -12,6 +12,7 @@ import {
   LuVideo,
   LuPlay
 } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
@@ -84,7 +85,7 @@ export default function ServiceDetailPage() {
   const [selectedVariant, setSelectedVariant] = useState('');
   const [sliderPosition, setSliderPosition] = useState(50); // Before/After slider
 
-  const { addItem } = useBooking();
+  const { addItem, settings } = useBooking();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -155,6 +156,26 @@ export default function ServiceDetailPage() {
         description={service?.shortDescription || service?.description?.slice(0, 160) || 'Book professional doorstep cleaning with Max Housekeeping Service.'}
         keywords={`${service?.title || ''}, cleaning, housekeeping, ${service?.categoryName || ''}, Moradabad, Rampur, Sambhal`}
         image={service?.media?.hero?.url || service?.imageUrl || '/favicon.png'}
+        customSchema={{
+          '@context': 'https://schema.org',
+          '@type': 'Service',
+          'name': service.title,
+          'serviceType': service.categoryName || 'Housekeeping',
+          'description': service.shortDescription || service.description || '',
+          'provider': {
+            '@type': 'LocalBusiness',
+            'name': settings?.brandName || 'Max Housekeeping Service',
+            ...(settings?.phone ? { 'telephone': settings.phone } : {}),
+            ...(settings?.email ? { 'email': settings.email } : {}),
+            ...(settings?.instagramUrl ? { 'sameAs': [settings.instagramUrl] } : {})
+          },
+          'offers': {
+            '@type': 'Offer',
+            'price': currentPrice,
+            'priceCurrency': 'INR',
+            'availability': 'https://schema.org/InStock'
+          }
+        }}
       />
       <div className="container mx-auto px-4 max-w-5xl">
         {/* Breadcrumb Back */}
@@ -425,6 +446,35 @@ export default function ServiceDetailPage() {
               aria-label="Before after comparison slider"
             />
           </div>
+        </div>
+
+        {/* Instagram Reel Transformation Callout */}
+        <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#F77737] flex items-center justify-center shrink-0 shadow-lg">
+              <FaInstagram className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1C3A30] text-[#E9A23B] text-[10px] font-bold uppercase tracking-wider mb-1">
+                <span>Live Action Reels</span>
+              </div>
+              <h3 className="font-display font-bold text-lg sm:text-xl text-[#F4EFE6]">
+                Watch {service.title} In Action
+              </h3>
+              <p className="text-xs sm:text-sm text-[#A3B8B0] mt-0.5">
+                Catch our certified crews operating German extractors & rotary scrubbers on our Instagram reels.
+              </p>
+            </div>
+          </div>
+          <a
+            href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] hover:opacity-95 text-white font-bold text-sm text-center shrink-0 shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            <FaInstagram className="w-4 h-4" />
+            <span>@maxhousekeepingservice</span>
+          </a>
         </div>
       </div>
     </div>

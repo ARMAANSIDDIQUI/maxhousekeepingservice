@@ -9,8 +9,10 @@ import {
   LuCheck,
   LuCalendar,
   LuAward,
-  LuMapPin
+  LuMapPin,
+  LuPlay
 } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
@@ -463,6 +465,120 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Instagram Transformation Showcase & Social CTA Section */}
+      <section className="py-16 md:py-24 bg-[#10231D] text-[#F4EFE6] relative overflow-hidden border-t border-[#2C4A3E]">
+        {/* Subtle decorative glow */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#E9A23B]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-80 h-80 bg-[#833AB4]/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1C3A30] border border-[#2C4A3E] text-[#E9A23B] text-xs font-bold tracking-wider uppercase mb-3">
+                <FaInstagram className="w-3.5 h-3.5 text-[#FD1D1D]" />
+                <span>Follow Our Journey · @maxhousekeepingservice</span>
+              </div>
+              <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[#F4EFE6] tracking-tight">
+                Real Homes. Dramatic Transformations.
+              </h2>
+              <p className="text-[#A3B8B0] text-sm sm:text-base mt-2 max-w-xl">
+                Watch our verified supervisors and mechanized crews in action. We post daily deep-cleaning reels, sofa extraction videos, and spotless home reveals across Western UP.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] hover:opacity-95 text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <FaInstagram className="w-5 h-5" />
+                <span>Follow on Instagram</span>
+              </a>
+              <Link
+                to="/book"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#ECE5D8] hover:bg-[#F4EFE6] text-[#10231D] font-bold text-sm transition-all duration-300 shadow-md"
+              >
+                <span>Book This Quality</span>
+                <LuArrowRight className="w-4 h-4 text-[#E9A23B]" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Reel Highlight Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                title: 'Full Villa Deep Clean & Buffing',
+                city: 'Moradabad',
+                tag: 'Deep Clean',
+                views: '18.4K Views',
+                gradient: 'from-[#10231D] to-[#1C3A30]',
+                border: 'border-[#2C4A3E]'
+              },
+              {
+                title: '7-Stage Sofa Extraction & Foam Wash',
+                city: 'Rampur',
+                tag: 'Upholstery',
+                views: '24.1K Views',
+                gradient: 'from-[#1C3A30] to-[#25453A]',
+                border: 'border-[#2C4A3E]'
+              },
+              {
+                title: 'Kitchen Degreasing & Chimney Steam',
+                city: 'Sambhal',
+                tag: 'Kitchen Hygiene',
+                views: '15.9K Views',
+                gradient: 'from-[#10231D] to-[#1C3A30]',
+                border: 'border-[#2C4A3E]'
+              },
+              {
+                title: 'Anti-Bacterial Bathroom Sanitisation',
+                city: 'Amroha',
+                tag: 'Sanitisation',
+                views: '12.8K Views',
+                gradient: 'from-[#1C3A30] to-[#25453A]',
+                border: 'border-[#2C4A3E]'
+              }
+            ].map((reel, rIdx) => (
+              <a
+                key={rIdx}
+                href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`group p-5 rounded-2xl bg-gradient-to-br ${reel.gradient} border ${reel.border} hover:border-[#E9A23B] transition-all duration-300 flex flex-col justify-between h-48 hover:-translate-y-1 hover:shadow-xl`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#E9A23B] bg-[#10231D] px-2.5 py-1 rounded-full border border-[#2C4A3E]">
+                      {reel.tag}
+                    </span>
+                    <span className="flex items-center gap-1 text-[11px] text-[#A3B8B0] font-mono">
+                      <LuPlay className="w-3 h-3 text-[#E9A23B] fill-[#E9A23B]" />
+                      {reel.views}
+                    </span>
+                  </div>
+                  <h3 className="font-display font-bold text-sm text-[#F4EFE6] group-hover:text-[#E9A23B] transition-colors leading-snug">
+                    {reel.title}
+                  </h3>
+                </div>
+
+                <div className="pt-3 border-t border-[#2C4A3E]/60 flex items-center justify-between text-xs text-[#A3B8B0]">
+                  <span className="flex items-center gap-1">
+                    <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    {reel.city}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[#F4EFE6] font-semibold group-hover:underline">
+                    Watch <LuArrowRight className="w-3 h-3 text-[#E9A23B]" />
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

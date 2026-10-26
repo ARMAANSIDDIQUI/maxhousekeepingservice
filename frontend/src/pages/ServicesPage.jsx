@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { LuSearch, LuFilter, LuCheck, LuArrowRight, LuCalendar, LuMapPin, LuRotateCcw } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
@@ -27,7 +28,7 @@ export default function ServicesPage() {
   const [sortBy, setSortBy] = useState('recommended');
   const [loading, setLoading] = useState(false);
 
-  const { addItem, selectedCity, setSelectedCity, cities: contextCities } = useBooking();
+  const { addItem, selectedCity, setSelectedCity, cities: contextCities, settings } = useBooking();
   const [citiesList, setCitiesList] = useState(contextCities || []);
 
   // Fetch cities if not yet loaded in context
@@ -558,6 +559,35 @@ export default function ServicesPage() {
             })}
           </div>
         )}
+
+        {/* Instagram Reel Consultation Banner */}
+        <div className="mt-16 p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#F77737] flex items-center justify-center shrink-0 shadow-lg">
+              <FaInstagram className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#E9A23B] bg-[#1C3A30] px-2.5 py-0.5 rounded-full">
+                Video Demos & Reels
+              </span>
+              <h3 className="font-display font-bold text-lg sm:text-xl text-[#F4EFE6] mt-1">
+                See Our Cleaning Results Before You Book
+              </h3>
+              <p className="text-xs sm:text-sm text-[#A3B8B0] mt-0.5">
+                Watch unfiltered before/after videos and equipment walk-throughs on our official Instagram channel.
+              </p>
+            </div>
+          </div>
+          <a
+            href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] hover:opacity-95 text-white font-bold text-sm text-center shrink-0 shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            <FaInstagram className="w-4 h-4" />
+            <span>@maxhousekeepingservice</span>
+          </a>
+        </div>
       </div>
     </div>
   );

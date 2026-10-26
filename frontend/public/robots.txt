@@ -1,0 +1,13 @@
+# Max Housekeeping Service - Search Engine Directives
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /supervisor
+Disallow: /supervisor/
+Disallow: /customer
+Disallow: /customer/
+Disallow: /api/
+
+# Sitemaps
+Sitemap: https://maxhousekeeping.in/sitemap.xml

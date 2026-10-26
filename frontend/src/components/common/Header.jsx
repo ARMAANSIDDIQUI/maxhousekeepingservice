@@ -10,6 +10,7 @@ import {
   LuMenu,
   LuX
 } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext';
 import { useBooking } from '../../context/BookingContext';
 import { apiRequest } from '../../api';
@@ -112,6 +113,16 @@ export default function Header() {
 
           <div className="flex items-center gap-2 sm:gap-4 text-[11px] text-[#E2D9C8]/70 shrink-0">
             <span className="hidden md:inline">{settings?.workingHours || '8:00 AM – 8:00 PM (Monday – Sunday)'}</span>
+            <a
+              href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow Max Housekeeping on Instagram"
+              className="hidden lg:flex items-center gap-1.5 text-[#E2D9C8] hover:text-[#E9A23B] transition-colors"
+            >
+              <FaInstagram className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span className="font-semibold">@maxhousekeepingservice</span>
+            </a>
             {/* City Quick Selector */}
             <button
               type="button"
@@ -450,6 +461,22 @@ export default function Header() {
                 Log in
               </Link>
             )}
+
+            {/* Mobile Instagram Quick Touchpoint */}
+            <a
+              href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 mt-3 rounded-xl bg-gradient-to-r from-[#833AB4]/10 via-[#FD1D1D]/10 to-[#F77737]/10 border border-[#E9A23B]/30 text-xs font-bold text-[#10231D] hover:opacity-90 transition-opacity"
+            >
+              <span className="flex items-center gap-2">
+                <FaInstagram className="w-4 h-4 text-[#FD1D1D]" />
+                <span>Follow @maxhousekeepingservice</span>
+              </span>
+              <span className="text-[10px] bg-[#E9A23B] text-[#10231D] px-2 py-0.5 rounded-full font-black">
+                Reels
+              </span>
+            </a>
           </div>
         )}
       </header>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck, LuDownload, LuCheck } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { apiRequest } from '../../api';
 import { useBooking } from '../../context/BookingContext';
 import { usePWA } from '../../context/PWAContext';
@@ -113,6 +114,22 @@ export default function Footer() {
             <div className="flex items-center gap-2 text-xs text-[#E9A23B] font-semibold">
               <LuShieldCheck className="w-4 h-4" />
               <span>Verified Professional Crews</span>
+            </div>
+
+            {/* Official Instagram Handle */}
+            <div className="mt-4 pt-3 border-t border-[#3D524A]/50">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#E9A23B] block mb-1.5 font-bold">
+                Official Instagram Channel
+              </span>
+              <a
+                href="https://www.instagram.com/maxhousekeepingservice/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+              >
+                <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
+                <span>@maxhousekeepingservice</span>
+              </a>
             </div>
           </div>
 
@@ -231,6 +248,17 @@ export default function Footer() {
                 <LuMapPin className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
                 <span>{settings.address}</span>
               </li>
+              <li className="flex items-center gap-2.5 pt-2 border-t border-[#3D524A]/40">
+                <FaInstagram className="w-4 h-4 text-[#E9A23B] shrink-0" />
+                <a
+                  href="https://www.instagram.com/maxhousekeepingservice/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs hover:text-[#E9A23B] text-[#DDEBE4] font-medium"
+                >
+                  Follow on Instagram for Real Videos
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -259,6 +287,15 @@ export default function Footer() {
             )}
             <Link to="/track" className="hover:text-[#F4EFE6]">Track Order</Link>
             <Link to="/login" className="hover:text-[#F4EFE6]">Login Page</Link>
+            <a
+              href="https://www.instagram.com/maxhousekeepingservice/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
+            >
+              <FaInstagram className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span>Instagram</span>
+            </a>
           </div>
         </div>
       </div>

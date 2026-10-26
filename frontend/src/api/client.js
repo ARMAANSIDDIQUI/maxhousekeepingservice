@@ -999,10 +999,14 @@ export const adminAPI = {
  */
 export const supervisorAPI = {
   getStats: (supervisorId) => apiRequest('/supervisor/stats', { method: 'GET', params: supervisorId ? { supervisorId } : {} }),
-  getSchedule: (date) => apiRequest('/supervisor/schedule', { method: 'GET', params: date ? { date } : {} }),
+  getSchedule: (date, supervisorId) => apiRequest('/supervisor/schedule', { method: 'GET', params: { ...(date ? { date } : {}), ...(supervisorId ? { supervisorId } : {}) } }),
   getBookings: (params = {}) => apiRequest('/supervisor/bookings', { method: 'GET', params }),
   getBookingDetails: (id) => apiRequest(`/supervisor/bookings/${id}`, { method: 'GET' }),
   verifyOtp: (id, otp) => apiRequest(`/supervisor/bookings/${id}/verify-otp`, { method: 'POST', body: { otp } }),
+  getSupervisors: () => apiRequest('/supervisor/supervisors', { method: 'GET' }),
+  getPool: () => apiRequest('/supervisor/pool', { method: 'GET' }),
+  claimBooking: (id) => apiRequest(`/supervisor/bookings/${id}/claim`, { method: 'POST' }),
+  createQuickTestBooking: () => apiRequest('/supervisor/quick-test-booking', { method: 'POST' }),
   uploadPhoto: async (id, file, type = 'before', notes = '') => {
     const formData = new FormData();
     formData.append('photo', file);

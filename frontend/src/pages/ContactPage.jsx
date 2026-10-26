@@ -8,12 +8,13 @@ import {
   LuShieldCheck,
   LuMessageSquare
 } from 'react-icons/lu';
-import { FaWhatsapp } from 'react-icons/fa6';
+import { FaWhatsapp, FaInstagram } from 'react-icons/fa6';
 import { useToast } from '../context/ToastContext';
 
 import { publicAPI } from '../api';
 import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
+import SEO from '../components/common/SEO';
 
 export default function ContactPage() {
   const { toast } = useToast();
@@ -73,6 +74,11 @@ export default function ContactPage() {
 
   return (
     <div className="py-12 md:py-20 bg-[#F4EFE6] text-[#10231D]">
+      <SEO
+        title="Contact Field Operations & Support"
+        description="Connect with Max Housekeeping Service dispatch desk in Moradabad. Call our hotline +91 98977 66002, WhatsApp, or send an inquiry for home and commercial cleaning."
+        keywords="contact max housekeeping, cleaning service phone number, Moradabad cleaning contact, housekeeping dispatch Western UP, cleaning booking enquiry"
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -123,6 +129,24 @@ export default function ContactPage() {
                   <FaWhatsapp className="w-4 h-4" />
                   <span>Chat on WhatsApp ({settings.whatsappNumber})</span>
                 </a>
+              </div>
+
+              <div className="pt-4 border-t border-[#E2D9C8]/10">
+                <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
+                  Official Instagram Channel
+                </span>
+                <a
+                  href="https://www.instagram.com/maxhousekeepingservice/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+                >
+                  <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
+                  <span>Follow @maxhousekeepingservice</span>
+                </a>
+                <p className="text-[11px] text-[#DDEBE4]/70 mt-1.5 leading-relaxed">
+                  Watch live cleaning transformation reels, before & after video proofs, and direct message us for instant estimates.
+                </p>
               </div>
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">

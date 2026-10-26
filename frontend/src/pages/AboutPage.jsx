@@ -9,7 +9,9 @@ import {
   LuPhone,
   LuAward
 } from 'react-icons/lu';
+import { FaInstagram } from 'react-icons/fa6';
 import { useBooking } from '../context/BookingContext';
+import SEO from '../components/common/SEO';
 
 export default function AboutPage() {
   const { cities, settings } = useBooking();
@@ -18,6 +20,11 @@ export default function AboutPage() {
     : ['Moradabad', 'Rampur', 'Amroha', 'Sambhal', 'Chandausi', 'Noorpur', 'Dhampur', 'Bijnor', 'Kanth'];
   return (
     <div className="py-12 md:py-20 bg-[#F4EFE6] text-[#10231D]">
+      <SEO
+        title="About Max Housekeeping Service"
+        description="Learn about Max Housekeeping Service: Western Uttar Pradesh's leading mechanized home cleaning, sofa shampooing, and commercial housekeeping corporation headquartered in Moradabad."
+        keywords="about max housekeeping, Moradabad cleaning company, professional cleaners Western UP, mechanized cleaning team, verified cleaners Moradabad"
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Hero Section */}
@@ -46,6 +53,15 @@ export default function AboutPage() {
               >
                 <LuPhone className="w-4 h-4 text-[#E9A23B]" />
                 <span>Call {settings?.phone || '+91 98977 66002'}</span>
+              </a>
+              <a
+                href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] hover:opacity-95 text-white font-bold text-sm transition-all shadow-md flex items-center gap-2"
+              >
+                <FaInstagram className="w-4 h-4" />
+                <span>@maxhousekeepingservice</span>
               </a>
             </div>
           </div>

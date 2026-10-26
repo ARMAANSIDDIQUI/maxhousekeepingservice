@@ -8,7 +8,11 @@ import {
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
   addSupervisorBookingMessage,
-  getSupervisorSchedule
+  getSupervisorSchedule,
+  getSupervisorsList,
+  getUnassignedPool,
+  claimSupervisorBooking,
+  createQuickTestBooking
 } from '../controllers/supervisorController.js';
 import { uploadPhoto } from '../middleware/upload.js';
 import { verifyAuth, roleGuard } from '../middleware/auth.js';
@@ -21,6 +25,8 @@ router.use(verifyAuth, roleGuard('supervisor', 'admin'));
 // Stats & Overview
 router.get('/stats', getSupervisorStats);
 router.get('/schedule', getSupervisorSchedule);
+router.get('/supervisors', getSupervisorsList);
+router.get('/pool', getUnassignedPool);
 
 // Assigned Bookings
 router.get('/bookings', getSupervisorBookings);
@@ -28,6 +34,10 @@ router.get('/bookings/:id', getSupervisorBookingById);
 
 // OTP Verification on Visit
 router.post('/bookings/:id/verify-otp', verifyBookingOtp);
+
+// Self-Claiming & Quick Dispatch Creation
+router.post('/bookings/:id/claim', claimSupervisorBooking);
+router.post('/quick-test-booking', createQuickTestBooking);
 
 // Before and After Service Photo Uploads
 router.post('/bookings/:id/photos', uploadPhoto.single('photo'), uploadBookingPhoto);

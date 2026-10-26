@@ -18,6 +18,8 @@ import {
 import { apiRequest } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { useBooking } from '../context/BookingContext';
+import { FaInstagram } from 'react-icons/fa6';
+import SEO from '../components/common/SEO';
 
 export default function TrackBookingPage() {
   const { settings } = useBooking();
@@ -73,6 +75,10 @@ export default function TrackBookingPage() {
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-12">
+      <SEO
+        title="Track Your Cleaning Order"
+        description="Track your real-time booking status, supervisor allotment, OTP verification, and inspection photos with Max Housekeeping Service."
+      />
       <div className="container mx-auto px-4 max-w-3xl">
         {/* Title */}
         <div className="text-center mb-8">
@@ -453,15 +459,25 @@ export default function TrackBookingPage() {
               </div>
             )}
 
-            {/* Support Callout */}
-            <div className="pt-4 border-t border-[#E2D9C8] flex items-center justify-between text-xs text-[#3D524A]">
+            {/* Support Callout & Instagram */}
+            <div className="pt-4 border-t border-[#E2D9C8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#3D524A]">
               <span>Need help or rescheduling?</span>
-              <a
-                href={`tel:${(settings?.phone || '+919897766002').replace(/[^0-9+]/g, '')}`}
-                className="font-bold text-[#10231D] hover:underline flex items-center gap-1"
-              >
-                <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" /> Call {settings?.phone || '+91 98977 66002'}
-              </a>
+              <div className="flex items-center gap-4">
+                <a
+                  href={settings?.instagramUrl || "https://www.instagram.com/maxhousekeepingservice/"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-[#833AB4] hover:text-[#FD1D1D] flex items-center gap-1 transition-colors"
+                >
+                  <FaInstagram className="w-3.5 h-3.5" /> @maxhousekeepingservice
+                </a>
+                <a
+                  href={`tel:${(settings?.phone || '+919897766002').replace(/[^0-9+]/g, '')}`}
+                  className="font-bold text-[#10231D] hover:underline flex items-center gap-1"
+                >
+                  <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" /> Call {settings?.phone || '+91 98977 66002'}
+                </a>
+              </div>
             </div>
           </div>
         )}

@@ -25,8 +25,16 @@ import {
   LuLayoutGrid,
   LuEye,
   LuLogOut,
-  LuUser
+  LuUser,
+  LuZap,
+  LuNavigation,
+  LuListChecks,
+  LuPlus,
+  LuKey,
+  LuSlidersHorizontal,
+  LuCompass
 } from 'react-icons/lu';
+import { FaWhatsapp } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { supervisorAPI } from '../../api';
@@ -41,6 +49,39 @@ function formatToday() {
   return `${year}-${month}-${day}`;
 }
 
+function getCurrentSlotWindow(dateObj = new Date()) {
+  const h = dateObj.getHours();
+  if (h >= 8 && h < 10) return '08:00 AM - 10:00 AM';
+  if (h >= 10 && h < 12) return '10:00 AM - 12:00 PM';
+  if (h >= 12 && h < 14) return '12:00 PM - 02:00 PM';
+  if (h >= 14 && h < 16) return '02:00 PM - 04:00 PM';
+  if (h >= 16 && h < 18) return '04:00 PM - 06:00 PM';
+  if (h >= 18 && h < 20) return '06:00 PM - 08:00 PM';
+  return null;
+}
+
+function getWhatsAppUrl(phone, customerName, bookingCode, serviceTitle) {
+  const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+  const target = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+  const msg = encodeURIComponent(`Hello ${customerName || 'Sir/Ma\'am'}! I am your Max Housekeeping field supervisor on my way to your location for service #${bookingCode || ''} (${serviceTitle || 'Cleaning Service'}). Please keep your 4-digit Service OTP ready for on-site verification.`);
+  return `https://wa.me/${target}?text=${msg}`;
+}
+
+function getMapsUrl(address, cityName) {
+  const query = `${address?.line1 || ''} ${address?.line2 || ''} ${cityName || ''} ${address?.pincode || ''}`.trim();
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query || 'Moradabad')}`;
+}
+
+const SOP_ITEMS = [
+  { id: 'uniform', title: 'Uniform & ID Badges', desc: 'Crew wears clean Max Housekeeping uniform and official photo ID card.' },
+  { id: 'machinery', title: 'Industrial Scrubbers & Equipment', desc: 'Inspect single-disc scrubber, wet vacuum, and microfiber mop heads.' },
+  { id: 'chemicals', title: 'Certified Safe Chemistry', desc: 'Diversey/Taski eco-safe degreasers and descalers stocked & unexpired.' },
+  { id: 'greeting_otp', title: 'Customer Greeting & PIN', desc: 'Polite customer greeting and 4-digit arrival OTP verified before start.' },
+  { id: 'before_photos', title: 'Pre-Service Condition Photos', desc: 'Capture minimum 2 photos of dust, stains, and tiles before cleaning.' },
+  { id: 'after_inspection', title: 'Post-Cleaning Walk-Through', desc: 'Conduct room-by-room review with customer to guarantee 100% satisfaction.' },
+  { id: 'after_photos', title: 'Post-Service Proof Photos', desc: 'Capture shiny, restored surfaces and upload to job report.' }
+];
+
 export default function SupervisorDashboard() {
   const { user, isSupervisor, isAdmin, logout } = useAuth();
   const { toast } = useToast();
@@ -51,13 +92,80 @@ export default function SupervisorDashboard() {
     todayBookings: 0,
     inProgress: 0,
     completed: 0,
-    pendingOtp: 0
+    pendingOtp: 0,
+    openPoolCount: 0
   });
 
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'today' | 'pending_otp' | 'in_progress' | 'completed'
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'today' | 'pending_otp' | 'in_progress' | 'completed' | 'pool'
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Real-Time Live Clock
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Supervisor Shift Duty Status
+  const [dutyStatus, setDutyStatus] = useState(() => {
+    return localStorage.getItem('max_supervisor_duty') || 'active';
+  });
+
+  const handleDutyStatusChange = (status) => {
+    setDutyStatus(status);
+    localStorage.setItem('max_supervisor_duty', status);
+    toast.success(`Duty status: ${status === 'active' ? 'Active on Duty' : status === 'onsite' ? 'On Site Inspection' : status === 'break' ? 'On Break' : 'Off Duty'}`);
+  };
+
+  // Admin Fleet Switcher
+  const [supervisorsList, setSupervisorsList] = useState([]);
+  const [selectedSupervisorFilter, setSelectedSupervisorFilter] = useState('all');
+
+  useEffect(() => {
+    if (isAdmin) {
+      supervisorAPI.getSupervisors()
+        .then(res => {
+          if (res?.success) {
+            setSupervisorsList(res.supervisors || []);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAdmin]);
+
+  // Unassigned Open Dispatches Pool
+  const [poolBookings, setPoolBookings] = useState([]);
+  const [loadingPool, setLoadingPool] = useState(false);
+  const [claimingId, setClaimingId] = useState(null);
+
+  // Quick Test Dispatch Generator
+  const [creatingTestJob, setCreatingTestJob] = useState(false);
+
+  // Quick Inline OTP Verification Modal
+  const [quickOtpBooking, setQuickOtpBooking] = useState(null);
+  const [quickOtpInput, setQuickOtpInput] = useState('');
+  const [verifyingQuickOtp, setVerifyingQuickOtp] = useState(false);
+
+  // Standard Operating Procedure (SOP) Checklist
+  const [sopModalOpen, setSopModalOpen] = useState(false);
+  const [sopChecks, setSopChecks] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`max_sop_${formatToday()}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleToggleSop = (id) => {
+    setSopChecks(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      localStorage.setItem(`max_sop_${formatToday()}`, JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Selected Booking Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -81,17 +189,18 @@ export default function SupervisorDashboard() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusNote, setStatusNote] = useState('');
 
-  // Daily Time Slot Allotment Run-Sheet & Schedule State (Urban Company / Pronto Dispatch)
+  // Daily Time Slot Allotment Run-Sheet & Schedule State
   const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'cards'
   const [scheduleDate, setScheduleDate] = useState(formatToday());
   const [scheduleData, setScheduleData] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   // Fetch Supervisor Daily Schedule
-  const loadSchedule = async (date = scheduleDate) => {
+  const loadSchedule = async (date = scheduleDate, supId = selectedSupervisorFilter) => {
     setLoadingSchedule(true);
     try {
-      const res = await supervisorAPI.getSchedule(date);
+      const filterParam = supId !== 'all' ? supId : undefined;
+      const res = await supervisorAPI.getSchedule(date, filterParam);
       if (res?.success) {
         setScheduleData(res);
       }
@@ -113,14 +222,104 @@ export default function SupervisorDashboard() {
     setScheduleDate(newDateStr);
   };
 
+  // Fetch Pool Bookings
+  const loadPool = async () => {
+    setLoadingPool(true);
+    try {
+      const res = await supervisorAPI.getPool();
+      if (res?.success) {
+        setPoolBookings(res.bookings || []);
+      }
+    } catch (err) {
+      console.warn('Failed to load pool:', err);
+    } finally {
+      setLoadingPool(false);
+    }
+  };
+
+  // Claim Booking from Open Pool
+  const handleClaimBooking = async (bookingId) => {
+    setClaimingId(bookingId);
+    try {
+      const res = await supervisorAPI.claimBooking(bookingId);
+      if (res?.success) {
+        toast.success(res.message || 'Booking claimed and added to your schedule!');
+        await loadData();
+        await loadPool();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to claim booking.');
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  // Create Quick Test Booking for Immediate Demonstration
+  const handleCreateTestBooking = async () => {
+    setCreatingTestJob(true);
+    try {
+      const res = await supervisorAPI.createQuickTestBooking();
+      if (res?.success) {
+        toast.success(res.message || 'Test appointment generated with OTP 4921!');
+        await loadData();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to create test appointment.');
+    } finally {
+      setCreatingTestJob(false);
+    }
+  };
+
+  // Quick OTP Modal Verification Submit
+  const handleQuickOtpSubmit = async (e) => {
+    e?.preventDefault();
+    if (!quickOtpBooking || !quickOtpInput.trim()) {
+      toast.error('Please enter the 4-digit verification code.');
+      return;
+    }
+    setVerifyingQuickOtp(true);
+    try {
+      const res = await supervisorAPI.verifyOtp(quickOtpBooking._id, quickOtpInput.trim());
+      if (res?.success) {
+        toast.success(`OTP Verified! Booking #${quickOtpBooking.bookingCode} is now In-Progress.`);
+        setQuickOtpBooking(null);
+        setQuickOtpInput('');
+        await loadData();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Invalid verification OTP.');
+    } finally {
+      setVerifyingQuickOtp(false);
+    }
+  };
+
+  // Direct Photo Upload Trigger from Run-Sheet
+  const handleDirectPhotoUpload = async (e, bookingId, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      toast.info(`Uploading ${type === 'before' ? 'Before' : 'After'} photo to Cloudinary...`);
+      const res = await supervisorAPI.uploadPhoto(bookingId, file, type, 'Quick camera upload from field console');
+      if (res?.success) {
+        toast.success(`${type === 'before' ? 'Before' : 'After'} photo saved!`);
+        await loadData();
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload photo.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   // Fetch Stats & Bookings
-  const loadData = async () => {
+  const loadData = async (supId = selectedSupervisorFilter) => {
     setLoading(true);
     try {
+      const filterParam = supId !== 'all' ? supId : undefined;
       const [statsRes, bookingsRes] = await Promise.all([
-        supervisorAPI.getStats(),
-        supervisorAPI.getBookings({ filter: activeFilter }),
-        loadSchedule(scheduleDate)
+        supervisorAPI.getStats(filterParam),
+        supervisorAPI.getBookings({ filter: activeFilter, supervisorId: filterParam }),
+        loadSchedule(scheduleDate, supId)
       ]);
 
       if (statsRes?.success && statsRes.stats) {
@@ -128,6 +327,9 @@ export default function SupervisorDashboard() {
       }
       if (bookingsRes?.success && bookingsRes.bookings) {
         setBookings(bookingsRes.bookings);
+      }
+      if (activeFilter === 'pool') {
+        loadPool();
       }
     } catch (err) {
       console.error('[Supervisor Dashboard Fetch Error]:', err);
@@ -142,21 +344,21 @@ export default function SupervisorDashboard() {
       navigate('/login');
       return;
     }
-    loadData();
-  }, [activeFilter, isSupervisor, isAdmin]);
+    loadData(selectedSupervisorFilter);
+  }, [activeFilter, isSupervisor, isAdmin, selectedSupervisorFilter]);
 
   useEffect(() => {
     if (isSupervisor || isAdmin) {
-      loadSchedule(scheduleDate);
+      loadSchedule(scheduleDate, selectedSupervisorFilter);
     }
-  }, [scheduleDate]);
+  }, [scheduleDate, selectedSupervisorFilter]);
 
   // Open modal and sync latest details
-  const handleOpenBooking = async (b) => {
+  const handleOpenBooking = async (b, initialTab) => {
     setSelectedBooking(b);
     setOtpInput('');
     setPhotoNotes('');
-    setActiveModalTab(b.otpVerified ? 'before_photos' : 'otp');
+    setActiveModalTab(initialTab || (b.otpVerified ? 'before_photos' : 'otp'));
     setModalOpen(true);
 
     try {
@@ -208,7 +410,8 @@ export default function SupervisorDashboard() {
     }
 
     // Type validation
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(file.mimetype)) {
+    const fileType = file.type || '';
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(fileType)) {
       toast.error('Only JPEG, PNG, and WebP images are supported.');
       e.target.value = '';
       return;
@@ -325,20 +528,20 @@ export default function SupervisorDashboard() {
       />
 
       {/* Top Operations Header */}
-      <div className="bg-[#10231D] text-[#F4EFE6] border-b border-[#2C4A3E] px-4 py-4 sm:px-8">
-        <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#10231D] text-[#F4EFE6] border-b border-[#2C4A3E] px-4 py-3 sm:px-8">
+        <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-black text-lg shadow-md">
+            <div className="w-10 h-10 rounded-xl bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-black text-lg shadow-md shrink-0">
               <LuShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-mono tracking-widest uppercase bg-[#E9A23B]/20 text-[#E9A23B] px-2 py-0.5 rounded-full border border-[#E9A23B]/30 font-bold">
                   FIELD OPERATIONS CONSOLE
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Active on Duty
+                  {currentTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} • {currentTime.toLocaleTimeString('en-IN')}
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-display font-black text-[#F4EFE6] mt-0.5">
@@ -348,41 +551,248 @@ export default function SupervisorDashboard() {
           </div>
 
           {/* Quick Actions & Profile */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Duty Status Selector */}
+            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/20">
+              {[
+                { id: 'active', label: 'On Duty', color: 'bg-emerald-500' },
+                { id: 'onsite', label: 'On Site', color: 'bg-amber-500' },
+                { id: 'break', label: 'Break', color: 'bg-blue-500' },
+                { id: 'off', label: 'Off Duty', color: 'bg-stone-500' }
+              ].map(st => (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => handleDutyStatusChange(st.id)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    dutyStatus === st.id
+                      ? 'bg-white text-[#10231D] shadow-xs'
+                      : 'text-[#F4EFE6]/70 hover:text-white'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${st.color}`} />
+                  <span className="hidden sm:inline">{st.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Admin Fleet Switcher */}
+            {isAdmin && supervisorsList.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/20">
+                <LuCompass className="w-3.5 h-3.5 text-[#E9A23B]" />
+                <span className="text-[11px] font-bold text-[#E9A23B] hidden sm:inline">Fleet:</span>
+                <select
+                  value={selectedSupervisorFilter}
+                  onChange={(e) => setSelectedSupervisorFilter(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-[#F4EFE6] focus:outline-none cursor-pointer"
+                >
+                  <option value="all" className="bg-[#10231D] text-[#F4EFE6]">All Fleet Dispatches</option>
+                  {supervisorsList.map(s => (
+                    <option key={s._id} value={s._id} className="bg-[#10231D] text-[#F4EFE6]">
+                      {s.name} ({s.city || 'Moradabad'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Quick Test Booking Shortcut */}
             <button
               type="button"
-              onClick={loadData}
+              onClick={handleCreateTestBooking}
+              disabled={creatingTestJob}
+              className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              title="Create an on-demand test appointment in the current slot"
+            >
+              <LuPlus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{creatingTestJob ? 'Creating...' : '+ Test Job'}</span>
+            </button>
+
+            {/* Field SOP Checklist Button */}
+            <button
+              type="button"
+              onClick={() => setSopModalOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Open Daily Quality & Safety SOP Checklist"
+            >
+              <LuListChecks className="w-4 h-4 text-[#E9A23B]" />
+              <span className="hidden lg:inline">SOP</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loadData()}
               disabled={loading}
-              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
               title="Refresh Assignments"
             >
-              <LuRotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <LuRotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => navigate('/admin')}
-                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#E9A23B] transition-colors"
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#E9A23B] transition-colors"
               >
-                Admin Panel
+                Admin
               </button>
             )}
 
             <button
               type="button"
               onClick={logout}
-              className="px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 text-xs font-bold transition-colors cursor-pointer"
+              title="Sign Out"
             >
               <LuLogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
             </button>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 sm:px-8 mt-6 max-w-7xl">
+        {/* Real-Time Live Slot & Shift Dispatch Command Banner */}
+        {(() => {
+          const liveSlot = getCurrentSlotWindow(currentTime);
+          const isToday = scheduleDate === formatToday();
+          const liveSlotData = scheduleData?.schedule?.find(s => s.timeWindow === liveSlot);
+          const activeBooking = liveSlotData?.bookings?.[0];
+
+          return (
+            <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#10231D] via-[#162D25] to-[#1C3A30] text-[#F4EFE6] border border-[#2C4A3E] shadow-lg">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-black shrink-0 shadow-md">
+                    <LuClock className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] font-mono font-bold uppercase flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
+                        LIVE SHIFT · {currentTime.toLocaleTimeString('en-IN')}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#E9A23B]/20 text-[#E9A23B] border border-[#E9A23B]/30 text-[10px] font-mono font-bold">
+                        ACTIVE WINDOW: {liveSlot || 'After Hours / Standby'}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                        DUTY: {dutyStatus.toUpperCase()}
+                      </span>
+                    </div>
+
+                    {activeBooking ? (
+                      <div>
+                        <h3 className="font-display font-bold text-base sm:text-lg text-[#F4EFE6] flex items-center gap-2">
+                          <span>Active Job: #{activeBooking.bookingCode}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            activeBooking.otpVerified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {activeBooking.otpVerified ? 'OTP Verified · In-Progress' : 'Arrival OTP Pending'}
+                          </span>
+                        </h3>
+                        <p className="text-xs text-[#A3B8B0] mt-0.5">
+                          {activeBooking.customer?.name} ({activeBooking.customer?.phone}) · {activeBooking.address?.line1}, {activeBooking.cityName}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="font-display font-bold text-sm sm:text-base text-[#F4EFE6]">
+                          {liveSlot ? `Current Slot (${liveSlot}) Is Open & Free` : 'Shift Concluded / Standby'}
+                        </h3>
+                        <p className="text-xs text-[#A3B8B0] mt-0.5">
+                          {isToday
+                            ? 'Ready for urgent calls or claim available unassigned jobs from the dispatch pool.'
+                            : `Inspecting schedule for ${scheduleDate}. Switch to "Today" for live routing.`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Actions in Live Banner */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {activeBooking ? (
+                    <>
+                      {activeBooking.customer?.phone && (
+                        <a
+                          href={`tel:${activeBooking.customer.phone}`}
+                          className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1"
+                        >
+                          <LuPhone className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Call</span>
+                        </a>
+                      )}
+                      {activeBooking.customer?.phone && (
+                        <a
+                          href={getWhatsAppUrl(activeBooking.customer.phone, activeBooking.customer?.name, activeBooking.bookingCode, activeBooking.serviceTitle)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                        >
+                          <FaWhatsapp className="w-3.5 h-3.5" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+                      <a
+                        href={getMapsUrl(activeBooking.address, activeBooking.cityName)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                      >
+                        <LuNavigation className="w-3.5 h-3.5" />
+                        <span>Directions</span>
+                      </a>
+                      {!activeBooking.otpVerified && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickOtpBooking(activeBooking);
+                            setQuickOtpInput('');
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1 shadow-md cursor-pointer animate-pulse"
+                        >
+                          <LuKey className="w-3.5 h-3.5" />
+                          <span>Enter Customer OTP</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBooking(activeBooking)}
+                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Manage
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveFilter('pool');
+                          loadPool();
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <LuZap className="w-3.5 h-3.5" />
+                        <span>Dispatch Pool ({stats.openPoolCount || 0})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateTestBooking}
+                        disabled={creatingTestJob}
+                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <LuPlus className="w-3.5 h-3.5 text-[#E9A23B]" />
+                        <span>{creatingTestJob ? 'Creating...' : '+ Test Appointment'}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Enterprise Metrics Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           {/* Total Assigned */}
@@ -455,7 +865,8 @@ export default function SupervisorDashboard() {
               { id: 'today', label: "Today's Schedule" },
               { id: 'pending_otp', label: 'Pending OTP' },
               { id: 'in_progress', label: 'In-Progress' },
-              { id: 'completed', label: 'Completed' }
+              { id: 'completed', label: 'Completed' },
+              { id: 'pool', label: `⚡ Dispatch Pool (${stats.openPoolCount || 0})` }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -463,6 +874,7 @@ export default function SupervisorDashboard() {
                 onClick={() => {
                   setActiveFilter(tab.id);
                   if (tab.id === 'today') setViewMode('timeline');
+                  if (tab.id === 'pool') loadPool();
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   activeFilter === tab.id
@@ -529,8 +941,133 @@ export default function SupervisorDashboard() {
           </div>
         </div>
 
+        {/* VIEW 0: UNASSIGNED DISPATCH POOL */}
+        {activeFilter === 'pool' && (
+          <div className="space-y-4 mb-8">
+            <div className="p-5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D] text-[10px] font-mono font-black uppercase">
+                    ⚡ Live Dispatch Pool
+                  </span>
+                  <span className="text-xs text-[#E9A23B] font-bold">
+                    {poolBookings.length} Unclaimed Cleaning Appointment{poolBookings.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <h3 className="font-display font-black text-lg text-[#F4EFE6]">
+                  Real-Time Open Dispatches
+                </h3>
+                <p className="text-xs text-[#F4EFE6]/70 max-w-xl">
+                  These verified customer appointments require an on-site field supervisor. Claiming an appointment automatically assigns it to your daily run-sheet and unlocks customer OTP authentication.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={loadPool}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <LuRotateCcw className="w-3.5 h-3.5 text-[#E9A23B]" />
+                  <span>Refresh Pool</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateTestBooking}
+                  disabled={creatingTestJob}
+                  className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <LuPlus className="w-4 h-4 stroke-[3]" />
+                  <span>{creatingTestJob ? 'Creating...' : '+ Quick Test Job (OTP 4921)'}</span>
+                </button>
+              </div>
+            </div>
+
+            {loadingPool ? (
+              <div className="py-20 text-center font-mono text-xs text-[#6B8077] bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8]">
+                <div className="w-8 h-8 rounded-full border-2 border-[#E9A23B] border-t-transparent animate-spin mx-auto mb-3" />
+                SCANNING ACTIVE UNASSIGNED DISPATCH POOL...
+              </div>
+            ) : poolBookings.length === 0 ? (
+              <div className="py-20 text-center bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8] p-6 space-y-3">
+                <LuZap className="w-12 h-12 text-[#E9A23B] mx-auto opacity-70" />
+                <h3 className="font-display font-bold text-lg text-[#10231D]">Dispatch Pool is Clear</h3>
+                <p className="text-xs text-[#6B8077] max-w-md mx-auto">
+                  All verified customer appointments are currently assigned to active supervisors. Generate a simulation appointment to test on-site OTP verification.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCreateTestBooking}
+                  disabled={creatingTestJob}
+                  className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <LuPlus className="w-3.5 h-3.5" />
+                  <span>Create Test Simulation Booking</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {poolBookings.map((b) => (
+                  <div
+                    key={b._id}
+                    className="p-5 rounded-2xl bg-white border border-[#E2D9C8] hover:border-[#E9A23B] transition-all flex flex-col justify-between shadow-xs hover:shadow-md"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="font-mono text-xs font-black text-[#10231D]">
+                          #{b.bookingCode}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-mono text-[9px] font-black uppercase">
+                          UNASSIGNED
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-sm text-[#10231D] mb-2">
+                        {b.serviceTitle || 'Deep Cleaning Service'}
+                      </h4>
+
+                      <div className="space-y-1.5 text-xs text-[#6B8077] mb-3">
+                        <div className="flex items-center gap-1.5 text-[#10231D] font-medium">
+                          <span>{b.customer?.name}</span>
+                          {b.customer?.phone && (
+                            <span className="font-mono text-[11px] text-[#6B8077]">({b.customer.phone})</span>
+                          )}
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2 text-[11px] leading-tight">
+                            {b.address?.line1}, {b.cityName} ({b.address?.pincode})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                          <LuClock className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
+                          <span>{b.slot?.date || 'Today'} • {b.slot?.window || 'Standard Window'}</span>
+                        </div>
+                        <div className="pt-2 border-t border-[#E2D9C8]/60 flex items-center justify-between text-xs font-bold text-[#10231D]">
+                          <span>Total Amount:</span>
+                          <span className="font-mono text-[#E9A23B]">₹{(b.totals?.total || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleClaimBooking(b._id)}
+                      disabled={claimingId === b._id}
+                      className="w-full py-2.5 px-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      <LuZap className="w-4 h-4 fill-current" />
+                      <span>{claimingId === b._id ? 'Claiming & Assigning...' : 'Claim & Assign to Me'}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* VIEW 1: DAILY TIME SLOT RUN-SHEET TIMELINE */}
-        {viewMode === 'timeline' && (
+        {activeFilter !== 'pool' && viewMode === 'timeline' && (
           <div className="space-y-4 mb-8">
             {/* Date Navigator Header */}
             <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -708,13 +1245,72 @@ export default function SupervisorDashboard() {
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                                {b.customer?.phone && (
+                                  <a
+                                    href={`tel:${b.customer.phone}`}
+                                    className="p-2 rounded-xl bg-white border border-[#E2D9C8] hover:bg-[#ECE5D8] text-[#10231D] transition-colors"
+                                    title="Call Customer"
+                                  >
+                                    <LuPhone className="w-3.5 h-3.5 text-emerald-600" />
+                                  </a>
+                                )}
+                                {b.customer?.phone && (
+                                  <a
+                                    href={getWhatsAppUrl(b.customer.phone, b.customer?.name, b.bookingCode, b.serviceTitle)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] transition-colors"
+                                    title="WhatsApp Customer"
+                                  >
+                                    <FaWhatsapp className="w-3.5 h-3.5 text-[#25D366]" />
+                                  </a>
+                                )}
+                                <a
+                                  href={getMapsUrl(b.address, b.cityName)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-colors"
+                                  title="Google Maps Navigation"
+                                >
+                                  <LuNavigation className="w-3.5 h-3.5 text-blue-600" />
+                                </a>
+
+                                {!b.otpVerified && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuickOtpBooking(b);
+                                      setQuickOtpInput('');
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1 shadow-xs cursor-pointer animate-pulse"
+                                    title="Verify Customer Arrival OTP"
+                                  >
+                                    <LuKey className="w-3.5 h-3.5" />
+                                    <span>Verify OTP</span>
+                                  </button>
+                                )}
+
+                                <label
+                                  className="p-2 rounded-xl bg-white border border-[#E2D9C8] hover:bg-[#ECE5D8] text-[#10231D] transition-colors cursor-pointer"
+                                  title="Quick Camera Photo Upload"
+                                >
+                                  <LuCamera className="w-3.5 h-3.5 text-[#10231D]" />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    className="hidden"
+                                    onChange={(e) => handleDirectPhotoUpload(e, b._id, b.status === 'in_progress' ? 'after' : 'before')}
+                                  />
+                                </label>
+
                                 <button
                                   type="button"
                                   onClick={() => handleOpenBooking(b)}
-                                  className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  className="px-3 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                                 >
-                                  <span>Manage Visit</span>
+                                  <span>Manage</span>
                                   <LuChevronRight className="w-3.5 h-3.5 text-[#E9A23B]" />
                                 </button>
                               </div>
@@ -745,13 +1341,33 @@ export default function SupervisorDashboard() {
                             </span>
                             <p className="text-xs font-bold text-[#10231D]">{cs.booking.customer?.name} ({cs.booking.serviceTitle})</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenBooking(cs.booking)}
-                            className="px-3 py-1.5 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer"
-                          >
-                            Open
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {cs.booking.customer?.phone && (
+                              <a
+                                href={`tel:${cs.booking.customer.phone}`}
+                                className="p-1.5 rounded-lg bg-[#ECE5D8] text-[#10231D]"
+                                title="Call"
+                              >
+                                <LuPhone className="w-3 h-3 text-emerald-600" />
+                              </a>
+                            )}
+                            <a
+                              href={getMapsUrl(cs.booking.address, cs.booking.cityName)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg bg-blue-50 text-blue-700"
+                              title="Directions"
+                            >
+                              <LuNavigation className="w-3 h-3 text-blue-600" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenBooking(cs.booking)}
+                              className="px-3 py-1.5 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer"
+                            >
+                              Manage
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -763,7 +1379,7 @@ export default function SupervisorDashboard() {
         )}
 
         {/* VIEW 2: ASSIGNED BOOKINGS CARDS GRID */}
-        {viewMode === 'cards' && (
+        {activeFilter !== 'pool' && viewMode === 'cards' && (
           loading ? (
             <div className="py-20 text-center font-mono text-xs text-[#6B8077] bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8]">
               <div className="w-8 h-8 rounded-full border-2 border-[#E9A23B] border-t-transparent animate-spin mx-auto mb-3" />
@@ -826,20 +1442,48 @@ export default function SupervisorDashboard() {
                       </span>
                     </div>
 
-                    {/* Customer & Call Section */}
-                    <div className="p-3 rounded-xl bg-[#ECE5D8]/60 border border-[#E2D9C8]/70 mb-3 space-y-1">
+                    {/* Customer & Quick Communication Section */}
+                    <div className="p-3 rounded-xl bg-[#ECE5D8]/60 border border-[#E2D9C8]/70 mb-3 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-[#10231D]">{b.customer?.name}</span>
-                        <a
-                          href={`tel:${b.customer?.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-2.5 py-1 rounded-lg bg-[#10231D] text-[#E9A23B] text-[11px] font-bold flex items-center gap-1 hover:bg-[#3D524A] transition-colors"
-                        >
-                          <LuPhone className="w-3 h-3" />
-                          <span>Call</span>
-                        </a>
+                        <div>
+                          <span className="font-bold text-xs text-[#10231D] block">{b.customer?.name}</span>
+                          <span className="text-[11px] text-[#6B8077] font-mono">{b.customer?.phone}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {b.customer?.phone && (
+                            <a
+                              href={`tel:${b.customer.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-lg bg-white border border-[#E2D9C8] hover:bg-[#ECE5D8] text-[#10231D] transition-colors"
+                              title="Call Customer"
+                            >
+                              <LuPhone className="w-3.5 h-3.5 text-emerald-600" />
+                            </a>
+                          )}
+                          {b.customer?.phone && (
+                            <a
+                              href={getWhatsAppUrl(b.customer.phone, b.customer?.name, b.bookingCode, b.serviceTitle)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-lg bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] transition-colors"
+                              title="WhatsApp Customer"
+                            >
+                              <FaWhatsapp className="w-3.5 h-3.5 text-[#25D366]" />
+                            </a>
+                          )}
+                          <a
+                            href={getMapsUrl(b.address, b.cityName)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-colors"
+                            title="Navigate"
+                          >
+                            <LuNavigation className="w-3.5 h-3.5 text-blue-600" />
+                          </a>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-[#6B8077] font-mono">{b.customer?.phone}</p>
                     </div>
 
                     {/* Address & Slot */}
@@ -886,15 +1530,45 @@ export default function SupervisorDashboard() {
                     </div>
                   </div>
 
-                  {/* Primary Action Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenBooking(b)}
-                    className="mt-4 w-full py-2.5 px-4 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                  >
-                    <span>Inspect & Manage Visit</span>
-                    <LuChevronRight className="w-4 h-4 text-[#E9A23B]" />
-                  </button>
+                  {/* Action Toolbar on Card */}
+                  <div className="mt-4 pt-3 border-t border-[#E2D9C8] flex items-center gap-2">
+                    {!b.otpVerified && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickOtpBooking(b);
+                          setQuickOtpInput('');
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer animate-pulse shrink-0"
+                      >
+                        <LuKey className="w-3.5 h-3.5" />
+                        <span>Verify OTP</span>
+                      </button>
+                    )}
+
+                    <label
+                      className="p-2.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] transition-colors cursor-pointer shrink-0"
+                      title="Quick Camera Photo Upload"
+                    >
+                      <LuCamera className="w-4 h-4" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handleDirectPhotoUpload(e, b._id, b.status === 'in_progress' ? 'after' : 'before')}
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenBooking(b)}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <span>Manage Visit</span>
+                      <LuChevronRight className="w-4 h-4 text-[#E9A23B]" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1376,6 +2050,127 @@ export default function SupervisorDashboard() {
             className="max-w-full max-h-[90vh] object-contain rounded-xl"
           />
         </div>
+      )}
+
+      {/* QUICK OTP MODAL (1-TAP DIRECT FIELD VERIFICATION) */}
+      {quickOtpBooking && (
+        <Modal
+          isOpen={Boolean(quickOtpBooking)}
+          onClose={() => setQuickOtpBooking(null)}
+          title="On-Site Customer OTP Verification"
+          subtitle={`Booking #${quickOtpBooking.bookingCode} • ${quickOtpBooking.customer?.name || 'Customer'}`}
+          maxWidth="max-w-md"
+        >
+          <form onSubmit={handleQuickOtpSubmit} className="space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-[#E9A23B]/40 text-center space-y-1">
+              <div className="w-10 h-10 rounded-full bg-[#10231D] text-[#E9A23B] flex items-center justify-center mx-auto mb-2 shadow-xs">
+                <LuKey className="w-5 h-5" />
+              </div>
+              <h4 className="font-display font-bold text-base text-[#10231D]">
+                Enter Customer's 4-Digit Security Code
+              </h4>
+              <p className="text-xs text-[#6B8077] max-w-sm mx-auto">
+                Ask {quickOtpBooking.customer?.name} for the 4-digit verification code sent via SMS or displayed on their live Track Booking screen.
+              </p>
+            </div>
+
+            <div className="flex justify-center py-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                autoFocus
+                placeholder="••••"
+                value={quickOtpInput}
+                onChange={(e) => setQuickOtpInput(e.target.value.replace(/\D/g, ''))}
+                className="w-48 text-center text-3xl font-mono font-black tracking-[0.4em] py-3 rounded-2xl border-2 border-[#10231D] bg-white text-[#10231D] focus:outline-none focus:border-[#E9A23B] shadow-inner"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setQuickOtpBooking(null)}
+                className="flex-1 py-2.5 rounded-xl border border-[#E2D9C8] bg-white hover:bg-[#ECE5D8] text-xs font-bold text-[#6B8077] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={verifyingQuickOtp || quickOtpInput.length !== 4}
+                className="flex-1 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] text-xs font-black disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                {verifyingQuickOtp ? (
+                  <span>Verifying...</span>
+                ) : (
+                  <>
+                    <LuCheck className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                    <span>Verify & Start Job</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* FIELD QUALITY & SAFETY SOP CHECKLIST MODAL */}
+      {sopModalOpen && (
+        <Modal
+          isOpen={sopModalOpen}
+          onClose={() => setSopModalOpen(false)}
+          title="Daily Quality & Safety SOP Checklist"
+          subtitle="Urban Company & Max Housekeeping Field Excellence"
+          maxWidth="max-w-lg"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-[#10231D] block">Daily Shift Compliance:</span>
+                <span className="text-[11px] text-[#6B8077]">Standard operating checklist for quality and safety</span>
+              </div>
+              <span className="font-mono font-black text-sm text-[#E9A23B] px-2.5 py-1 rounded-xl bg-[#10231D]">
+                {Object.values(sopChecks).filter(Boolean).length} / {SOP_ITEMS.length}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+              {SOP_ITEMS.map((item) => {
+                const isChecked = Boolean(sopChecks[item.id]);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleToggleSop(item.id)}
+                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all select-none ${
+                      isChecked
+                        ? 'bg-emerald-500/10 border-emerald-300'
+                        : 'bg-white border-[#E2D9C8] hover:bg-[#F4EFE6]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {}}
+                      className="w-4 h-4 accent-[#10231D] rounded cursor-pointer"
+                    />
+                    <span className={`text-xs font-medium leading-relaxed ${isChecked ? 'text-emerald-950 font-bold line-through opacity-85' : 'text-[#10231D]'}`}>
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSopModalOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] font-bold text-xs transition-colors cursor-pointer shadow-sm"
+            >
+              Done & Return to Operations
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

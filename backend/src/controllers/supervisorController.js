@@ -1,5 +1,7 @@
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
+import Service from '../models/Service.js';
+import City from '../models/City.js';
 import cloudinary, { deleteCloudinaryAsset } from '../config/cloudinary.js';
 
 function getTodayString() {
@@ -20,32 +22,42 @@ function escapeRegex(str) {
  */
 export async function getSupervisorStats(req, res, next) {
   try {
-    const supervisorId = req.user.role === 'admin' && req.query.supervisorId
-      ? req.query.supervisorId
-      : req.user._id;
+    let queryFilter = {};
+    if (req.user.role === 'supervisor') {
+      queryFilter = { supervisor: req.user._id };
+    } else if (req.user.role === 'admin') {
+      if (req.query.supervisorId && req.query.supervisorId !== 'all') {
+        queryFilter = { supervisor: req.query.supervisorId };
+      }
+    }
 
     const todayStr = getTodayString();
 
-    const totalAssigned = await Booking.countDocuments({ supervisor: supervisorId });
+    const totalAssigned = await Booking.countDocuments(queryFilter);
     const todayBookings = await Booking.countDocuments({
-      supervisor: supervisorId,
+      ...queryFilter,
       $or: [
         { 'assignedSlot.date': todayStr },
         { 'slot.date': todayStr }
       ]
     });
     const inProgress = await Booking.countDocuments({
-      supervisor: supervisorId,
+      ...queryFilter,
       status: 'in_progress'
     });
     const completed = await Booking.countDocuments({
-      supervisor: supervisorId,
+      ...queryFilter,
       status: 'completed'
     });
     const pendingOtp = await Booking.countDocuments({
-      supervisor: supervisorId,
+      ...queryFilter,
       otpVerified: false,
       status: { $in: ['confirmed', 'assigned', 'in_progress'] }
+    });
+
+    const openPoolCount = await Booking.countDocuments({
+      $or: [{ supervisor: null }, { supervisor: { $exists: false } }],
+      status: { $nin: ['completed', 'cancelled'] }
     });
 
     res.status(200).json({
@@ -55,7 +67,8 @@ export async function getSupervisorStats(req, res, next) {
         todayBookings,
         inProgress,
         completed,
-        pendingOtp
+        pendingOtp,
+        openPoolCount
       }
     });
   } catch (err) {
@@ -69,11 +82,20 @@ export async function getSupervisorStats(req, res, next) {
  */
 export async function getSupervisorSchedule(req, res, next) {
   try {
-    const supervisorId = req.user.role === 'admin' && req.query.supervisorId
-      ? req.query.supervisorId
-      : req.user._id;
-
     const targetDate = req.query.date || getTodayString();
+
+    let scheduleFilter = {
+      $or: [
+        { 'assignedSlot.date': targetDate },
+        { 'slot.date': targetDate }
+      ]
+    };
+
+    if (req.user.role === 'supervisor') {
+      scheduleFilter.supervisor = req.user._id;
+    } else if (req.user.role === 'admin' && req.query.supervisorId && req.query.supervisorId !== 'all') {
+      scheduleFilter.supervisor = req.query.supervisorId;
+    }
 
     const STANDARD_SLOTS = [
       '08:00 AM - 10:00 AM',
@@ -84,14 +106,9 @@ export async function getSupervisorSchedule(req, res, next) {
       '06:00 PM - 08:00 PM'
     ];
 
-    const bookings = await Booking.find({
-      supervisor: supervisorId,
-      $or: [
-        { 'assignedSlot.date': targetDate },
-        { 'slot.date': targetDate }
-      ]
-    })
-      .select('bookingCode serviceTitle customer address status slot assignedSlot serviceOtp otpVerified photos messages totalAmount')
+    const bookings = await Booking.find(scheduleFilter)
+      .select('bookingCode serviceTitle customer address status slot assignedSlot serviceOtp otpVerified photos messages totalAmount supervisor')
+      .populate('supervisor', 'name phone email')
       .sort({ createdAt: 1 })
       .lean();
 
@@ -139,12 +156,14 @@ export async function getSupervisorSchedule(req, res, next) {
  */
 export async function getSupervisorBookings(req, res, next) {
   try {
-    const supervisorId = req.user.role === 'admin' && req.query.supervisorId
-      ? req.query.supervisorId
-      : req.user._id;
-
     const { filter, search, page = 1, limit = 50 } = req.query;
-    const query = { supervisor: supervisorId };
+    let query = {};
+    if (req.user.role === 'supervisor') {
+      query.supervisor = req.user._id;
+    } else if (req.user.role === 'admin' && req.query.supervisorId && req.query.supervisorId !== 'all') {
+      query.supervisor = req.query.supervisorId;
+    }
+
     const todayStr = getTodayString();
 
     if (filter === 'today') {
@@ -159,6 +178,9 @@ export async function getSupervisorBookings(req, res, next) {
       query.status = 'in_progress';
     } else if (filter === 'completed') {
       query.status = 'completed';
+    } else if (filter === 'pool') {
+      query.supervisor = null;
+      query.status = { $nin: ['completed', 'cancelled'] };
     } else if (filter && filter !== 'all') {
       query.status = filter;
     }
@@ -536,6 +558,199 @@ export async function addSupervisorBookingMessage(req, res, next) {
   }
 }
 
+/**
+ * Get Active Supervisors List (for Fleet Switcher)
+ * GET /api/v1/supervisor/supervisors
+ */
+export async function getSupervisorsList(req, res, next) {
+  try {
+    const supervisors = await User.find({ role: 'supervisor' })
+      .select('name email phone status city avatar')
+      .lean();
+    res.status(200).json({ success: true, supervisors });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get Open Unassigned Bookings Pool
+ * GET /api/v1/supervisor/pool
+ */
+export async function getUnassignedPool(req, res, next) {
+  try {
+    const pool = await Booking.find({
+      $or: [{ supervisor: null }, { supervisor: { $exists: false } }],
+      status: { $nin: ['completed', 'cancelled'] }
+    })
+      .select('bookingCode serviceTitle customer address status slot totals cityName createdAt items')
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    res.status(200).json({ success: true, count: pool.length, bookings: pool });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Claim an Unassigned Booking
+ * POST /api/v1/supervisor/bookings/:id/claim
+ */
+export async function claimSupervisorBooking(req, res, next) {
+  try {
+    const { id } = req.params;
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    const todayStr = getTodayString();
+    booking.supervisor = req.user._id;
+    booking.status = 'assigned';
+    booking.assignedSlot = {
+      date: booking.slot?.date || todayStr,
+      timeWindow: booking.slot?.window || '10:00 AM - 12:00 PM',
+      notes: `Claimed from open dispatch pool by supervisor ${req.user.name}.`
+    };
+
+    if (!booking.serviceOtp) {
+      const generatedOtp = String(Math.floor(1000 + Math.random() * 9000));
+      booking.serviceOtp = generatedOtp;
+    }
+
+    booking.statusHistory.push({
+      status: 'assigned',
+      timestamp: new Date(),
+      note: `Self-claimed by supervisor ${req.user.name} from operational dispatch queue.`,
+      updatedBy: req.user._id
+    });
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Booking #${booking.bookingCode} claimed and added to your active schedule!`,
+      booking
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Create a Quick Test / Simulated Booking for Rapid Field Demonstration
+ * POST /api/v1/supervisor/quick-test-booking
+ */
+export async function createQuickTestBooking(req, res, next) {
+  try {
+    const todayStr = getTodayString();
+    const currentHour = new Date().getHours();
+    let currentSlot = '10:00 AM - 12:00 PM';
+    if (currentHour < 10) currentSlot = '08:00 AM - 10:00 AM';
+    else if (currentHour < 12) currentSlot = '10:00 AM - 12:00 PM';
+    else if (currentHour < 14) currentSlot = '12:00 PM - 02:00 PM';
+    else if (currentHour < 16) currentSlot = '02:00 PM - 04:00 PM';
+    else if (currentHour < 18) currentSlot = '04:00 PM - 06:00 PM';
+    else currentSlot = '06:00 PM - 08:00 PM';
+
+    let city = await City.findOne({ slug: 'moradabad' });
+    if (!city) {
+      city = await City.findOne() || await City.create({
+        name: 'Moradabad',
+        slug: 'moradabad',
+        state: 'Uttar Pradesh',
+        status: 'active'
+      });
+    }
+
+    let service = await Service.findOne();
+    if (!service) {
+      service = await Service.create({
+        title: 'Full Home Deep Cleaning & Sanitisation',
+        slug: 'full-home-deep-cleaning',
+        price: 2499,
+        mrp: 3499,
+        duration: '2.5 hrs'
+      });
+    }
+
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const testCode = `MH-${new Date().getFullYear()}-${randomSuffix}`;
+    const testOtp = '4921';
+
+    const testBooking = new Booking({
+      bookingCode: testCode,
+      serviceTitle: service.title || 'Full Home Deep Cleaning & Sanitisation',
+      categoryName: 'Home Deep Cleaning',
+      customer: {
+        name: 'Vikram Malhotra (VIP Homeowner)',
+        email: 'vikram.test@maxhousekeeping.in',
+        phone: '+91 98977 66002'
+      },
+      city: city._id,
+      cityName: city.name || 'Moradabad',
+      address: {
+        line1: 'B-14 Civil Lines, Near Asian Vivekanand Hospital',
+        cityText: city.name || 'Moradabad',
+        stateText: 'Uttar Pradesh',
+        pincode: '244001',
+        isTemporary: false
+      },
+      slot: {
+        date: todayStr,
+        window: currentSlot
+      },
+      assignedSlot: {
+        date: todayStr,
+        timeWindow: currentSlot,
+        notes: 'Priority field inspection with industrial vacuum & single-disc scrubber.'
+      },
+      supervisor: req.user._id,
+      serviceOtp: testOtp,
+      otpVerified: false,
+      status: 'assigned',
+      items: [
+        {
+          service: service._id,
+          titleSnapshot: service.title || 'Full Home Deep Cleaning',
+          variantSnapshot: '2 BHK Villa',
+          priceSnapshot: 2499,
+          mrpSnapshot: 3499,
+          qty: 1
+        }
+      ],
+      totals: {
+        subtotal: 2499,
+        mrpTotal: 3499,
+        discount: 1000,
+        couponDiscount: 0,
+        total: 2499,
+        customerSaved: 1000
+      },
+      statusHistory: [
+        {
+          status: 'assigned',
+          timestamp: new Date(),
+          note: `Quick dispatch test appointment generated for supervisor ${req.user.name}. Customer PIN is 4921.`,
+          updatedBy: req.user._id
+        }
+      ]
+    });
+
+    await testBooking.save();
+
+    res.status(201).json({
+      success: true,
+      message: `Test appointment #${testCode} created for slot ${currentSlot}! Use OTP 4921 to verify on visit.`,
+      booking: testBooking
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getSupervisorStats,
   getSupervisorBookings,
@@ -545,5 +760,9 @@ export default {
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
   addSupervisorBookingMessage,
-  getSupervisorSchedule
+  getSupervisorSchedule,
+  getSupervisorsList,
+  getUnassignedPool,
+  claimSupervisorBooking,
+  createQuickTestBooking
 };
