@@ -34,7 +34,12 @@ import {
   LuRuler,
   LuCalculator,
   LuVideo,
-  LuTag
+  LuTag,
+  LuCamera,
+  LuKey,
+  LuUserCheck,
+  LuCopy,
+  LuTriangleAlert
 } from 'react-icons/lu';
 import {
   apiRequest,
@@ -66,6 +71,38 @@ export default function AdminDashboard() {
   const [confirmModalConfig, setConfirmModalConfig] = useState(null);
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
+  // Supervisors State (Urban Company / Pronto supervisor management)
+  const [supervisors, setSupervisors] = useState([]);
+  const [supervisorModalOpen, setSupervisorModalOpen] = useState(false);
+  const [editingSupervisor, setEditingSupervisor] = useState(null);
+  const [supervisorSearch, setSupervisorSearch] = useState('');
+  const [supervisorStatusFilter, setSupervisorStatusFilter] = useState('all');
+  const [supervisorForm, setSupervisorForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    city: 'moradabad',
+    status: 'active'
+  });
+  const [savingSupervisor, setSavingSupervisor] = useState(false);
+
+  // Supervisor Booking Assignment Modal State
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignBooking, setAssignBooking] = useState(null);
+  const [assignSupervisorId, setAssignSupervisorId] = useState('');
+  const [assignDate, setAssignDate] = useState('');
+  const [assignTimeWindow, setAssignTimeWindow] = useState('');
+  const [assignNote, setAssignNote] = useState('');
+  const [assignAllowConflict, setAssignAllowConflict] = useState(false);
+  const [slotAvailability, setSlotAvailability] = useState([]);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [slotConflictWarning, setSlotConflictWarning] = useState(null);
+  const [assigningSupervisor, setAssigningSupervisor] = useState(false);
+
+  // Service Video Upload State (<50MB Cloudinary video)
+  const [uploadingServiceVideo, setUploadingServiceVideo] = useState(false);
+
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -1469,19 +1506,81 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#10231D] mb-1">
-                YouTube Video Demo URL (optional):
-              </label>
-              <input
-                type="url"
-                placeholder="https://youtu.be/yCkBXdzwjic"
-                value={form.videoUrl || ''}
-                onChange={(e) => setter(prev => ({ ...prev, videoUrl: e.target.value }))}
-                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D]"
-              />
-              <p className="text-[10px] text-[#6B8077] mt-1">
-                Demonstration link embedded on the service detail page.
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#10231D]">
+                  Demonstration Video (Cloudinary Upload / YouTube URL):
+                </label>
+                <span className="text-[10px] font-mono text-[#6B8077] bg-white px-2 py-0.5 rounded-md border border-[#E2D9C8]">
+                  Max 50MB • MP4 / WebM / MOV
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 items-center">
+                <div className="relative flex-1 w-full">
+                  <input
+                    type="url"
+                    placeholder="https://youtu.be/... or Cloudinary video link"
+                    value={form.videoUrl || ''}
+                    onChange={(e) => setter(prev => ({ ...prev, videoUrl: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-mono"
+                  />
+                  {form.videoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setter(prev => ({ ...prev, videoUrl: '' }))}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#C2512D] hover:text-red-700 font-bold cursor-pointer"
+                      title="Clear video"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <label className={`shrink-0 w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  uploadingServiceVideo
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none'
+                    : 'bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] shadow-sm'
+                }`}>
+                  <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                  <span>{uploadingServiceVideo ? 'Uploading (50MB max)...' : 'Upload Video (<50MB)'}</span>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/ogg"
+                    onChange={(e) => handleServiceVideoUpload(e, setter)}
+                    disabled={uploadingServiceVideo}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {form.videoUrl && (
+                <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0">
+                      <LuVideo className="w-4 h-4" />
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-[#10231D] truncate">
+                        {form.videoUrl.includes('cloudinary') ? 'Cloudinary Hosted HD Video' : form.videoUrl.includes('youtu') ? 'YouTube Showcase Stream' : 'Video Source'}
+                      </p>
+                      <p className="text-[10px] text-[#6B8077] font-mono truncate">{form.videoUrl}</p>
+                    </div>
+                  </div>
+                  <a
+                    href={form.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-[11px] font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <LuEye className="w-3 h-3 text-[#E9A23B]" />
+                    <span>Watch Preview</span>
+                  </a>
+                </div>
+              )}
+
+              <p className="text-[10px] text-[#6B8077]">
+                Urban Company / Pronto standard: Video appears as an HD walkthrough on the customer service detail page.
               </p>
             </div>
           </div>
@@ -1565,7 +1664,7 @@ export default function AdminDashboard() {
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [statsRes, bookingsRes, servicesRes, categoriesRes, citiesRes, usersRes, testsRes, msgsRes, couponsRes, settingsRes] = await Promise.allSettled([
+      const [statsRes, bookingsRes, servicesRes, categoriesRes, citiesRes, usersRes, testsRes, msgsRes, couponsRes, settingsRes, supervisorsRes] = await Promise.allSettled([
         apiRequest('/admin/stats'),
         apiRequest('/admin/bookings?limit=50'),
         apiRequest('/admin/services'),
@@ -1575,7 +1674,8 @@ export default function AdminDashboard() {
         adminAPI.getTestimonials(),
         adminAPI.getContactMessages(),
         adminAPI.getCoupons(),
-        adminAPI.getSettings()
+        adminAPI.getSettings(),
+        adminAPI.getSupervisors()
       ]);
 
       if (statsRes.status === 'fulfilled' && statsRes.value?.stats) {
@@ -1607,6 +1707,9 @@ export default function AdminDashboard() {
       }
       if (settingsRes.status === 'fulfilled' && settingsRes.value?.settings) {
         setSettingsForm(prev => ({ ...prev, ...settingsRes.value.settings }));
+      }
+      if (supervisorsRes.status === 'fulfilled' && Array.isArray(supervisorsRes.value?.supervisors)) {
+        setSupervisors(supervisorsRes.value.supervisors);
       }
     } catch (err) {
       console.warn('Failed loading live admin data from MongoDB:', err);
@@ -2720,8 +2823,241 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  // Filtered Supervisors (Search by name, email, phone, city & status filter)
+  const filteredSupervisorsList = supervisors.filter(s => {
+    const q = supervisorSearch.trim().toLowerCase();
+    const matchesSearch = !q || (
+      s.name?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.phone?.includes(q) ||
+      s.city?.toLowerCase().includes(q)
+    );
+    const matchesStatus = supervisorStatusFilter === 'all' || s.status === supervisorStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Supervisor CRUD Handlers (Admin creates & manages supervisor credentials)
+  const handleOpenCreateSupervisor = () => {
+    setEditingSupervisor(null);
+    setSupervisorForm({
+      name: '',
+      email: '',
+      password: '',
+      phone: '',
+      city: cities[0]?.slug || 'moradabad',
+      status: 'active'
+    });
+    setSupervisorModalOpen(true);
+  };
+
+  const handleOpenEditSupervisor = (sup) => {
+    setEditingSupervisor(sup);
+    setSupervisorForm({
+      name: sup.name || '',
+      email: sup.email || '',
+      password: '',
+      phone: sup.phone || '',
+      city: sup.city || 'moradabad',
+      status: sup.status || 'active'
+    });
+    setSupervisorModalOpen(true);
+  };
+
+  const handleSaveSupervisor = async (e) => {
+    e.preventDefault();
+    if (!supervisorForm.name.trim() || !supervisorForm.email.trim()) {
+      toast.error('Name and email are required.');
+      return;
+    }
+    if (!editingSupervisor && (!supervisorForm.password || supervisorForm.password.length < 6)) {
+      toast.error('Password must be at least 6 characters for a new supervisor.');
+      return;
+    }
+    setSavingSupervisor(true);
+    try {
+      if (editingSupervisor) {
+        const payload = { ...supervisorForm };
+        if (!payload.password) delete payload.password;
+        const res = await adminAPI.updateSupervisor(editingSupervisor._id, payload);
+        if (res.success && res.supervisor) {
+          toast.success(`Supervisor "${res.supervisor.name}" updated successfully.`);
+          setSupervisors(prev => prev.map(s => s._id === res.supervisor._id ? { ...s, ...res.supervisor } : s));
+          setSupervisorModalOpen(false);
+        }
+      } else {
+        const res = await adminAPI.createSupervisor(supervisorForm);
+        if (res.success && res.supervisor) {
+          toast.success(`Supervisor "${res.supervisor.name}" created successfully.`);
+          setSupervisors(prev => [res.supervisor, ...prev]);
+          setSupervisorModalOpen(false);
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to save supervisor.');
+    } finally {
+      setSavingSupervisor(false);
+    }
+  };
+
+  const handleDeleteSupervisor = (sup) => {
+    setConfirmModalConfig({
+      title: `Delete Supervisor ${sup.name}?`,
+      message: `Are you sure you want to delete supervisor ${sup.name} (${sup.email})? Any pending reservations assigned to them will be unlinked.`,
+      confirmText: 'Delete Supervisor',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          const res = await adminAPI.deleteSupervisor(sup._id);
+          if (res.success) {
+            toast.success(`Supervisor ${sup.name} deleted successfully.`);
+            setSupervisors(prev => prev.filter(s => s._id !== sup._id));
+          }
+        } catch (err) {
+          toast.error(err.message || 'Failed to delete supervisor.');
+        } finally {
+          setConfirmModalConfig(null);
+        }
+      }
+    });
+  };
+
+  const handleToggleSupervisorStatus = async (sup) => {
+    const newStatus = sup.status === 'active' ? 'suspended' : 'active';
+    try {
+      const res = await adminAPI.updateSupervisor(sup._id, { status: newStatus });
+      if (res.success && res.supervisor) {
+        toast.success(`Supervisor ${sup.name} status updated to ${newStatus}.`);
+        setSupervisors(prev => prev.map(s => s._id === sup._id ? { ...s, status: newStatus } : s));
+      }
+    } catch (err) {
+      toast.error('Failed to update supervisor status.');
+    }
+  };
+
+  // Supervisor Booking Assignment Handlers
+  const handleOpenAssignModal = (b) => {
+    setAssignBooking(b);
+    setAssignSupervisorId(b.supervisor?._id || b.supervisor || (b.assignedSupervisor?.id || ''));
+    setAssignDate(b.assignedSlot?.date || (b.slot?.date ? b.slot.date : ''));
+    setAssignTimeWindow(b.assignedSlot?.timeWindow || (b.slot?.window ? b.slot.window : '10:00 AM - 12:00 PM'));
+    setAssignNote(b.assignedSlot?.notes || '');
+    setAssignAllowConflict(false);
+    setSlotConflictWarning(null);
+    setAssignModalOpen(true);
+  };
+
+  // Real-time slot availability check whenever modal is open and date/slot/supervisor changes
+  useEffect(() => {
+    if (!assignModalOpen || !assignDate) {
+      setSlotAvailability([]);
+      setSlotConflictWarning(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchAvailability = async () => {
+      setCheckingAvailability(true);
+      try {
+        const res = await adminAPI.getSupervisorSlotAvailability({
+          date: assignDate,
+          timeWindow: assignTimeWindow,
+          excludeBookingId: assignBooking?._id
+        });
+        if (isMounted && res?.success && res.supervisors) {
+          setSlotAvailability(res.supervisors);
+          if (assignSupervisorId) {
+            const currentSup = res.supervisors.find(s => s._id === assignSupervisorId);
+            if (currentSup && !currentSup.isAvailableInSlot && currentSup.conflictBooking) {
+              setSlotConflictWarning(currentSup.conflictBooking);
+            } else {
+              setSlotConflictWarning(null);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Slot Availability Check Error]:', err);
+      } finally {
+        if (isMounted) setCheckingAvailability(false);
+      }
+    };
+
+    fetchAvailability();
+    return () => { isMounted = false; };
+  }, [assignModalOpen, assignDate, assignTimeWindow, assignSupervisorId, assignBooking?._id]);
+
+  const handleSaveAssignment = async (e) => {
+    e.preventDefault();
+    if (!assignSupervisorId) {
+      toast.error('Please select a supervisor to assign.');
+      return;
+    }
+    setAssigningSupervisor(true);
+    try {
+      const payload = {
+        supervisorId: assignSupervisorId,
+        assignedSlot: {
+          date: assignDate,
+          timeWindow: assignTimeWindow,
+          notes: assignNote
+        },
+        allowConflict: assignAllowConflict
+      };
+      const res = await adminAPI.assignBookingSupervisor(assignBooking._id, payload);
+      if (res.success && res.booking) {
+        toast.success(res.message || 'Supervisor and slot assigned successfully!');
+        setBookings(prev => prev.map(b => b._id === res.booking._id ? { ...b, ...res.booking } : b));
+        if (viewBookingDetails && viewBookingDetails._id === res.booking._id) {
+          setViewBookingDetails(prev => ({ ...prev, ...res.booking }));
+        }
+        setAssignModalOpen(false);
+      }
+    } catch (err) {
+      if (err.conflict || err.status === 409 || err.message?.includes('Conflict')) {
+        toast.error(err.message || 'Time slot conflict detected!');
+        setSlotConflictWarning(err.conflictingBooking || { bookingCode: 'Conflict', timeWindow: assignTimeWindow });
+      } else {
+        toast.error(err.message || 'Failed to assign supervisor.');
+      }
+    } finally {
+      setAssigningSupervisor(false);
+    }
+  };
+
+  // Cloudinary Service Video Upload Handler
+  const handleServiceVideoUpload = async (e, setter) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Enforce 50MB enterprise limit
+    const MAX_SIZE_MB = 50;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      toast.error(`Video exceeds ${MAX_SIZE_MB}MB limit. Selected video is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Please select or compress under 50MB.`);
+      e.target.value = '';
+      return;
+    }
+
+    setUploadingServiceVideo(true);
+    try {
+      const res = await adminAPI.uploadVideo(file, 'max-housekeeping/services/videos');
+      if (res && (res.url || res.data?.url)) {
+        const videoUrl = res.url || res.data?.url;
+        setter(prev => ({ ...prev, videoUrl }));
+        toast.success('Demonstration video uploaded to Cloudinary successfully!');
+      } else {
+        toast.error('Upload succeeded, but video URL was missing.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload video to Cloudinary.');
+    } finally {
+      setUploadingServiceVideo(false);
+      e.target.value = '';
+    }
+  };
+
   const adminTabs = [
     { id: 'bookings', label: 'Bookings & Dispatch', icon: LuCalendar, count: bookings.length },
+    { id: 'supervisors', label: 'Supervisors & Staff', icon: LuShieldCheck, count: supervisors.length },
     { id: 'services', label: 'Services & Dual-Pricing', icon: LuSparkles, count: services.length },
     { id: 'categories', label: 'Category Management', icon: LuLayers, count: categories.length },
     { id: 'cities', label: 'Cities & Regions', icon: LuMapPin, count: cities.length },
@@ -3110,7 +3446,17 @@ export default function AdminDashboard() {
                     filteredBookings.map((b) => (
                       <tr key={b._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3 font-mono font-bold text-[#10231D]">
-                          {b.bookingCode}
+                          <p>{b.bookingCode}</p>
+                          {b.serviceOtp && (
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded-md mt-1 ${
+                              b.otpVerified
+                                ? 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}>
+                              <LuKey className="w-2.5 h-2.5" />
+                              <span>{b.otpVerified ? 'OTP Verified' : `OTP: ${b.serviceOtp}`}</span>
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <p className="font-bold text-[#10231D]">{b.customer?.name}</p>
@@ -3123,7 +3469,24 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-[#10231D]">{b.cityName}</span>: {b.address?.line1}
                         </td>
                         <td className="py-3 px-3 font-mono text-[#3D524A]">
-                          {b.slot?.date} ({b.slot?.window?.split(' ')[0] || 'Scheduled'})
+                          <p>{b.assignedSlot?.date || b.slot?.date} ({b.assignedSlot?.timeWindow?.split(' ')[0] || b.slot?.window?.split(' ')[0] || 'Scheduled'})</p>
+                          <div className="mt-1">
+                            {b.assignedSupervisor?.name || b.supervisor?.name ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                <LuShieldCheck className="w-3 h-3 text-emerald-700" />
+                                <span>{b.assignedSupervisor?.name || b.supervisor?.name}</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignModal(b)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-full cursor-pointer transition-colors"
+                              >
+                                <LuUserCheck className="w-3 h-3" />
+                                <span>+ Assign Supervisor</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-3 font-black text-[#10231D] tnum">
                           ₹{(b.totals?.total ?? b.total ?? 0).toLocaleString('en-IN')}
@@ -3144,6 +3507,15 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAssignModal(b)}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Assign Supervisor & Slot"
+                            >
+                              <LuShieldCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                              <span>{b.assignedSupervisor?.name || b.supervisor?.name ? 'Reassign' : 'Assign'}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => setViewBookingDetails(b)}
@@ -3177,6 +3549,250 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            TAB: FIELD SUPERVISORS & DISPATCH MANAGEMENT
+        ======================================================== */}
+        {activeTab === 'supervisors' && (
+          <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm space-y-6">
+            {/* Header with Title and Create Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E9A23B] bg-[#10231D] px-2.5 py-0.5 rounded-full">
+                    URBAN COMPANY / PRONTO DISPATCH
+                  </span>
+                  <span className="text-xs font-mono text-[#6B8077]">
+                    {supervisors.length} Field Personnel
+                  </span>
+                </div>
+                <h3 className="font-display font-bold text-2xl text-[#10231D]">
+                  Field Supervisors & On-Site Dispatch
+                </h3>
+                <p className="text-xs text-[#6B8077] mt-0.5 max-w-2xl">
+                  Create secure supervisor login credentials, assign supervisors to service reservations, and monitor on-site customer OTP verifications and before/after inspection photos.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOpenCreateSupervisor}
+                className="px-4 py-2.5 rounded-2xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-2 shadow-md transition-all self-start sm:self-auto cursor-pointer"
+              >
+                <LuPlus className="w-4 h-4 text-[#E9A23B]" />
+                <span>+ Create Supervisor Account</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] shadow-2xs">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase block mb-1">Total Supervisors</span>
+                <p className="font-display text-2xl font-black text-[#10231D]">{supervisors.length}</p>
+                <p className="text-[10px] text-[#6B8077] mt-0.5">Admin-authorized IDs</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] shadow-2xs">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase block mb-1">Active On-Duty</span>
+                <p className="font-display text-2xl font-black text-emerald-700">
+                  {supervisors.filter(s => s.status === 'active').length}
+                </p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Available for dispatch</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] shadow-2xs">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase block mb-1">Assigned Bookings</span>
+                <p className="font-display text-2xl font-black text-[#10231D]">
+                  {bookings.filter(b => b.assignedSupervisor?.name || b.supervisor).length}
+                </p>
+                <p className="text-[10px] text-[#6B8077] mt-0.5">Reservations covered</p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] shadow-2xs">
+                <span className="text-[10px] font-mono text-[#6B8077] uppercase block mb-1">OTP Verified Visits</span>
+                <p className="font-display text-2xl font-black text-[#E9A23B]">
+                  {bookings.filter(b => b.otpVerified).length}
+                </p>
+                <p className="text-[10px] text-[#6B8077] mt-0.5">Secure arrival handshakes</p>
+              </div>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8]">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                <div className="relative flex-1 min-w-[200px]">
+                  <LuSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
+                  <input
+                    type="text"
+                    value={supervisorSearch}
+                    onChange={(e) => setSupervisorSearch(e.target.value)}
+                    placeholder="Search supervisors by name, email, phone, city..."
+                    className="w-full pl-9 pr-7 py-2 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] placeholder-[#6B8077] focus:outline-none focus:border-[#E9A23B]"
+                  />
+                  {supervisorSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setSupervisorSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#6B8077] hover:text-[#10231D] cursor-pointer"
+                    >
+                      <LuX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { val: 'all', label: 'All Status' },
+                    { val: 'active', label: 'Active' },
+                    { val: 'suspended', label: 'Suspended' }
+                  ].map(st => (
+                    <button
+                      key={st.val}
+                      type="button"
+                      onClick={() => setSupervisorStatusFilter(st.val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all capitalize cursor-pointer ${
+                        supervisorStatusFilter === st.val
+                          ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#3D524A] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(supervisorSearch || supervisorStatusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSupervisorSearch('');
+                    setSupervisorStatusFilter('all');
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#C2512D] text-xs font-bold transition-colors self-start md:self-auto cursor-pointer"
+                >
+                  <LuRotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Filter</span>
+                </button>
+              )}
+            </div>
+
+            {/* Supervisors Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[#E2D9C8] text-[#6B8077] font-mono uppercase">
+                    <th className="py-3 px-3">Supervisor Name</th>
+                    <th className="py-3 px-3">Contact Email & Phone</th>
+                    <th className="py-3 px-3">City Region</th>
+                    <th className="py-3 px-3 text-center">Assigned Jobs</th>
+                    <th className="py-3 px-3 text-center">Completed</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2D9C8]/60">
+                  {filteredSupervisorsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-xs text-[#6B8077]">
+                        <p className="font-bold text-[#10231D] mb-1">No supervisor accounts found.</p>
+                        <p>Click "+ Create Supervisor Account" above to register field supervisors.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSupervisorsList.map((sup) => {
+                      const supBookings = bookings.filter(b =>
+                        String(b.supervisor?._id || b.supervisor || b.assignedSupervisor?.id) === String(sup._id)
+                      );
+                      const completedCount = supBookings.filter(b => b.status === 'completed').length;
+                      return (
+                        <tr key={sup._id} className="hover:bg-[#F4EFE6]/50">
+                          <td className="py-3 px-3 font-bold text-[#10231D]">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-xs shrink-0">
+                                {sup.name?.charAt(0)?.toUpperCase() || 'S'}
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs text-[#10231D]">{sup.name}</p>
+                                <span className="text-[10px] font-mono text-[#6B8077]">ID: {sup._id?.slice(-6)}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <p className="font-medium text-[#10231D] flex items-center gap-1.5">
+                              <LuMail className="w-3 h-3 text-[#E9A23B]" />
+                              <span>{sup.email}</span>
+                            </p>
+                            {sup.phone && (
+                              <p className="text-[11px] text-[#6B8077] flex items-center gap-1.5 mt-0.5">
+                                <LuPhone className="w-3 h-3 text-[#6B8077]" />
+                                <span>{sup.phone}</span>
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="capitalize font-mono px-2 py-0.5 rounded-full bg-white border border-[#E2D9C8] text-[#10231D] text-[10px] font-bold">
+                              {sup.city || 'moradabad'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-xs text-[#10231D]">
+                            {supBookings.length}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-xs text-emerald-700">
+                            {completedCount}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              sup.status === 'active'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {sup.status || 'active'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditSupervisor(sup)}
+                                className="px-2.5 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Edit supervisor details"
+                              >
+                                <LuSquarePen className="w-3.5 h-3.5 text-[#E9A23B]" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSupervisorStatus(sup)}
+                                className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer ${
+                                  sup.status === 'active'
+                                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                                    : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                                }`}
+                                title="Toggle active status"
+                              >
+                                <LuShieldCheck className="w-3.5 h-3.5" />
+                                <span>{sup.status === 'active' ? 'Suspend' : 'Activate'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSupervisor(sup)}
+                                className="p-1.5 rounded-lg border border-[#C2512D]/40 text-[#C2512D] hover:bg-[#C2512D] hover:text-white transition-colors cursor-pointer"
+                                title="Delete supervisor account"
+                              >
+                                <LuTrash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -5668,6 +6284,186 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Supervisor & On-Site OTP Verification Card */}
+              <div className="p-4 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-[#E2D9C8] gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center">
+                      <LuShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-[#10231D] tracking-wider">
+                        Field Supervisor & Arrival Verification OTP
+                      </h4>
+                      <p className="text-[10px] text-[#6B8077]">
+                        Urban Company / Pronto on-site handshake protocol
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAssignModal(viewBookingDetails)}
+                    className="px-3 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <LuShieldCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>{viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor ? 'Reassign Supervisor' : 'Assign Supervisor & Slot'}</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Supervisor Profile */}
+                  <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] space-y-1">
+                    <span className="text-[10px] font-mono text-[#6B8077] uppercase block">Assigned Supervisor</span>
+                    {viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name ? (
+                      <div>
+                        <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                          <span>{viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-100 text-emerald-800 font-bold uppercase">Dispatched</span>
+                        </p>
+                        {(viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone) && (
+                          <a
+                            href={`tel:${viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone}`}
+                            className="text-xs font-semibold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1.5 mt-1"
+                          >
+                            <LuPhone className="w-3 h-3 text-[#E9A23B]" />
+                            <span>{viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone}</span>
+                          </a>
+                        )}
+                        {(viewBookingDetails.assignedSupervisor?.email || viewBookingDetails.supervisor?.email) && (
+                          <p className="text-[10px] text-[#6B8077] flex items-center gap-1.5 mt-0.5">
+                            <LuMail className="w-3 h-3 text-[#6B8077]" />
+                            <span>{viewBookingDetails.assignedSupervisor?.email || viewBookingDetails.supervisor?.email}</span>
+                          </p>
+                        )}
+                        {viewBookingDetails.assignedSlot?.timeWindow && (
+                          <p className="text-[10px] font-mono text-[#3D524A] mt-1 pt-1 border-t border-[#E2D9C8]/60">
+                            Slot: {viewBookingDetails.assignedSlot?.date || viewBookingDetails.slot?.date} • {viewBookingDetails.assignedSlot?.timeWindow}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-2">
+                        <p className="text-xs font-bold text-amber-800">No supervisor assigned yet</p>
+                        <p className="text-[10px] text-[#6B8077] mt-0.5">Click "Assign Supervisor & Slot" to allocate this job to a supervisor.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Customer Service Verification OTP */}
+                  <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] space-y-1.5">
+                    <span className="text-[10px] font-mono text-[#6B8077] uppercase block">Customer Service Verification OTP</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-2xl font-black tracking-widest text-[#10231D] px-3 py-1 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                        {viewBookingDetails.serviceOtp || '----'}
+                      </span>
+                      {viewBookingDetails.serviceOtp && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(viewBookingDetails.serviceOtp);
+                            toast.success('Service verification OTP copied to clipboard!');
+                          }}
+                          className="p-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] transition-colors cursor-pointer"
+                          title="Copy OTP"
+                        >
+                          <LuCopy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      {viewBookingDetails.otpVerified ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full mt-1">
+                          <LuCheck className="w-3 h-3 text-emerald-700" />
+                          <span>Verified at visit {viewBookingDetails.otpVerifiedAt ? new Date(viewBookingDetails.otpVerifiedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full mt-1">
+                          <LuClock className="w-3 h-3 text-amber-700" />
+                          <span>Pending arrival OTP verification</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-[#6B8077]">
+                      The customer shares this code with the supervisor upon physical arrival to verify authenticity.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Before & After Inspection Photos Gallery */}
+              <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+                  <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
+                    <LuCamera className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Inspection Photos: Before & After ({((viewBookingDetails.photos?.before?.length || 0) + (viewBookingDetails.photos?.after?.length || 0))})</span>
+                  </h4>
+                  <span className="text-[10px] font-mono text-[#6B8077]">Cloudinary Verified</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Before Service Photos */}
+                  <div className="space-y-2 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-[#10231D] flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span>Before Cleaning ({viewBookingDetails.photos?.before?.length || 0})</span>
+                      </span>
+                    </div>
+                    {viewBookingDetails.photos?.before && viewBookingDetails.photos.before.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {viewBookingDetails.photos.before.map((p, idx) => (
+                          <a
+                            key={idx}
+                            href={p.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group relative aspect-square rounded-lg overflow-hidden bg-white border border-[#E2D9C8] block shadow-xs"
+                          >
+                            <img src={p.url} alt={`Before ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] font-bold">
+                              <LuEye className="w-3.5 h-3.5" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-[#6B8077] italic py-3 text-center">No "before" photos uploaded yet.</p>
+                    )}
+                  </div>
+
+                  {/* After Service Photos */}
+                  <div className="space-y-2 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-[#10231D] flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span>After Cleaning ({viewBookingDetails.photos?.after?.length || 0})</span>
+                      </span>
+                    </div>
+                    {viewBookingDetails.photos?.after && viewBookingDetails.photos.after.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {viewBookingDetails.photos.after.map((p, idx) => (
+                          <a
+                            key={idx}
+                            href={p.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group relative aspect-square rounded-lg overflow-hidden bg-white border border-[#E2D9C8] block shadow-xs"
+                          >
+                            <img src={p.url} alt={`After ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] font-bold">
+                              <LuEye className="w-3.5 h-3.5" />
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-[#6B8077] italic py-3 text-center">No "after" photos uploaded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Booked Items Breakdown Table */}
               <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-3">
                 <h4 className="text-[11px] font-black uppercase text-[#6B8077] tracking-wider flex items-center gap-1.5">
@@ -5967,6 +6763,317 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </Modal>
+        )}
+
+        {/* Supervisor Create / Edit Modal */}
+        {supervisorModalOpen && (
+          <Modal
+            isOpen={supervisorModalOpen}
+            onClose={() => setSupervisorModalOpen(false)}
+            title={editingSupervisor ? `Edit Supervisor: ${editingSupervisor.name}` : 'Create Field Supervisor ID'}
+            subtitle="Authorizes supervisor login access to the dedicated supervisor dispatch console."
+            maxWidth="max-w-lg"
+          >
+            <form onSubmit={handleSaveSupervisor} className="space-y-4 text-xs text-[#10231D]">
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Full Name: <span className="text-[#C2512D]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={supervisorForm.name}
+                  onChange={(e) => setSupervisorForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-medium text-[#10231D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Login Email: <span className="text-[#C2512D]">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. supervisor.rahul@maxhousekeeping.com"
+                  value={supervisorForm.email}
+                  onChange={(e) => setSupervisorForm(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-medium text-[#10231D]"
+                />
+                <p className="text-[10px] text-[#6B8077] mt-0.5">Used by supervisor to log into the /supervisor console.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  {editingSupervisor ? 'Change Password (leave blank to keep current):' : 'Password (min. 6 chars):'} {!editingSupervisor && <span className="text-[#C2512D]">*</span>}
+                </label>
+                <input
+                  type="password"
+                  placeholder={editingSupervisor ? '••••••••' : 'Enter strong password'}
+                  required={!editingSupervisor}
+                  value={supervisorForm.password}
+                  onChange={(e) => setSupervisorForm(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-medium text-[#10231D]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Phone Number:
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +91 98765 43210"
+                    value={supervisorForm.phone}
+                    onChange={(e) => setSupervisorForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-medium text-[#10231D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Operating City:
+                  </label>
+                  <select
+                    value={supervisorForm.city}
+                    onChange={(e) => setSupervisorForm(prev => ({ ...prev, city: e.target.value }))}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
+                  >
+                    {cities.map(c => (
+                      <option key={c._id || c.slug} value={c.slug || c.name.toLowerCase()}>{c.name}</option>
+                    ))}
+                    {cities.length === 0 && (
+                      <option value="moradabad">Moradabad</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Account Status:
+                </label>
+                <select
+                  value={supervisorForm.status}
+                  onChange={(e) => setSupervisorForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
+                >
+                  <option value="active">Active (Permitted to log in and accept jobs)</option>
+                  <option value="suspended">Suspended (Access temporarily revoked)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setSupervisorModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSupervisor}
+                  className="px-5 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  <LuCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                  <span>{savingSupervisor ? 'Saving...' : editingSupervisor ? 'Save Updates' : 'Create Supervisor'}</span>
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* Booking Supervisor Assignment & Time Slot Modal */}
+        {assignModalOpen && assignBooking && (
+          <Modal
+            isOpen={assignModalOpen}
+            onClose={() => setAssignModalOpen(false)}
+            title={`Assign Supervisor & Slot (Order #${assignBooking.bookingCode})`}
+            subtitle="Urban Company / Pronto style dispatch. Customer is issued a 4-digit OTP for arrival handshake."
+            maxWidth="max-w-lg"
+          >
+            <form onSubmit={handleSaveAssignment} className="space-y-4 text-xs text-[#10231D]">
+              <div className="p-3.5 rounded-xl bg-[#10231D] text-[#F4EFE6] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-[#E9A23B] block">CUSTOMER & CITY</span>
+                  <p className="font-bold text-sm text-[#F4EFE6]">{assignBooking.customer?.name} ({assignBooking.cityName})</p>
+                  <p className="text-[11px] text-[#A3B8B0]">{assignBooking.customer?.phone}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-mono text-[#A3B8B0] block">CURRENT STATUS</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#E9A23B] text-[#10231D] uppercase">
+                    {assignBooking.status}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Select Field Supervisor: <span className="text-[#C2512D]">*</span>
+                </label>
+                <select
+                  required
+                  value={assignSupervisorId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAssignSupervisorId(val);
+                    const supAvail = slotAvailability.find(s => s._id === val);
+                    if (supAvail && !supAvail.isAvailableInSlot && supAvail.conflictBooking) {
+                      setSlotConflictWarning(supAvail.conflictBooking);
+                    } else {
+                      setSlotConflictWarning(null);
+                    }
+                  }}
+                  className={`w-full p-2.5 rounded-xl bg-white border text-xs font-bold text-[#10231D] ${
+                    slotConflictWarning ? 'border-[#C2512D] ring-2 ring-[#C2512D]/20' : 'border-[#E2D9C8]'
+                  }`}
+                >
+                  <option value="">-- Choose an active supervisor --</option>
+                  {supervisors.map(s => {
+                    const avail = slotAvailability.find(a => a._id === s._id);
+                    let tag = '';
+                    if (avail) {
+                      if (!avail.isAvailableInSlot) {
+                        tag = `⚠️ [Busy in Slot: #${avail.conflictBooking?.bookingCode || 'Active Booking'}]`;
+                      } else {
+                        tag = `✓ [Available • ${avail.dayBookingsCount} job${avail.dayBookingsCount === 1 ? '' : 's'} on date]`;
+                      }
+                    }
+                    return (
+                      <option key={s._id} value={s._id} disabled={s.status === 'suspended'}>
+                        {s.name} ({s.city || 'Moradabad'}) {tag} {s.status === 'suspended' ? '[Suspended]' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+                {supervisors.length === 0 && (
+                  <p className="text-[10px] text-[#C2512D] mt-1">
+                    No supervisors registered yet. Please create a supervisor account in the Supervisors tab first.
+                  </p>
+                )}
+              </div>
+
+              {/* Real-time Time Slot Conflict Warning Banner */}
+              {slotConflictWarning && (
+                <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#F87171] text-xs text-[#991B1B] space-y-2 animate-fadeIn">
+                  <div className="flex items-start gap-2">
+                    <LuTriangleAlert className="w-4 h-4 text-[#C2512D] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-bold block text-[#B91C1C]">Time Slot Double-Booking Conflict</strong>
+                      <p className="text-[11px] leading-relaxed text-[#7F1D1D]">
+                        Supervisor is already allotted to Booking <strong>#{slotConflictWarning.bookingCode}</strong> ({slotConflictWarning.serviceTitle || 'Service'}) on this date during <strong>{slotConflictWarning.timeWindow || assignTimeWindow}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 pt-2 border-t border-[#FCA5A5] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={assignAllowConflict}
+                      onChange={(e) => setAssignAllowConflict(e.target.checked)}
+                      className="w-4 h-4 text-[#C2512D] rounded accent-[#C2512D] cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-[#991B1B]">
+                      Force Overlap Override (Admin Emergency / Multi-Crew Allotment)
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Scheduled Date:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={assignDate}
+                    onChange={(e) => setAssignDate(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Time Window Slot:
+                  </label>
+                  <select
+                    value={assignTimeWindow}
+                    onChange={(e) => setAssignTimeWindow(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
+                  >
+                    <option value="08:00 AM - 10:00 AM">08:00 AM - 10:00 AM (Early Morning)</option>
+                    <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM (Morning)</option>
+                    <option value="12:00 PM - 02:00 PM">12:00 PM - 02:00 PM (Noon)</option>
+                    <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM (Afternoon)</option>
+                    <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM (Late Afternoon)</option>
+                    <option value="06:00 PM - 08:00 PM">06:00 PM - 08:00 PM (Evening)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Slot Availability Helper Status */}
+              <div className="flex items-center justify-between text-[11px] text-[#6B8077] px-1">
+                {checkingAvailability ? (
+                  <span className="flex items-center gap-1.5 text-[#E9A23B] font-mono">
+                    <LuClock className="w-3.5 h-3.5 animate-spin" /> Checking slot availability...
+                  </span>
+                ) : slotAvailability.length > 0 ? (
+                  <span>
+                    Available in {assignTimeWindow}: <strong className="text-[#10231D]">{slotAvailability.filter(s => s.isAvailableInSlot).length} / {slotAvailability.length}</strong> supervisors
+                  </span>
+                ) : (
+                  <span>Select date & time slot to check live supervisor capacity</span>
+                )}
+                {assignAllowConflict && (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#FEE2E2] text-[#B91C1C]">
+                    OVERRIDE ACTIVE
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Dispatch Instructions / Equipment Notes:
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Bring industrial vacuum cleaner and sofa fabric shampoo. Customer requests quiet entry."
+                  value={assignNote}
+                  onChange={(e) => setAssignNote(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D]"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-[11px] text-[#6B8077] flex items-center gap-2">
+                <LuKey className="w-4 h-4 text-[#E9A23B] shrink-0" />
+                <span>
+                  <strong>On-Site OTP Security:</strong> A 4-digit verification OTP ({assignBooking.serviceOtp || 'auto-generated on save'}) will be active. Supervisor must collect and enter this OTP on arrival before starting the job.
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => setAssignModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigningSupervisor}
+                  className="px-5 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  <LuShieldCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                  <span>{assigningSupervisor ? 'Dispatching...' : 'Confirm Assignment'}</span>
+                </button>
+              </div>
+            </form>
           </Modal>
         )}
 

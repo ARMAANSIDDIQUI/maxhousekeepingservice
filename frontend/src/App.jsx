@@ -22,6 +22,7 @@ import BookingPage from './pages/BookingPage';
 import TrackBookingPage from './pages/TrackBookingPage';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import SupervisorDashboard from './pages/supervisor/SupervisorDashboard';
 import CustomerDashboard from './pages/CustomerDashboard';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -98,6 +99,8 @@ export default function App() {
                           <Route path="/login" element={<LoginPage />} />
                           <Route path="/dashboard" element={<CustomerDashboard />} />
                           <Route path="/my-bookings" element={<CustomerDashboard />} />
+                          <Route path="/supervisor" element={<SupervisorDashboard />} />
+                          <Route path="/supervisor/*" element={<SupervisorDashboard />} />
                           <Route path="/admin/*" element={<AdminDashboard />} />
                           {/* Broken / Non-existent links redirect to Home */}
                           <Route path="*" element={<Navigate to="/" replace />} />

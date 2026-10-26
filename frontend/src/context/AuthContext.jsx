@@ -316,6 +316,7 @@ export function AuthProvider({ children }) {
         user,
         isLoading,
         isAdmin: user?.role === 'admin',
+        isSupervisor: user?.role === 'supervisor',
         updateProfile,
         sendSignupOtp,
         register,

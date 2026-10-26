@@ -65,6 +65,8 @@ const serviceSchema = new mongoose.Schema({
   cityExtraCharge: { type: Number, default: 0 },
   moradabadOnly: { type: Boolean, default: false },
   videoUrl: { type: String, trim: true },
+  videoPublicId: { type: String, trim: true },
+  videoDuration: { type: Number },
 
   // Dual Pricing Controls (Shown Price vs Offered Price)
   pricingMode: { type: String, enum: ['fixed', 'tiered', 'combination'], default: 'combination' },

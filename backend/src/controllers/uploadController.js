@@ -209,8 +209,99 @@ export async function uploadMultipleImages(req, res, next) {
   }
 }
 
+/**
+ * Upload Video to Cloudinary (for Service Form)
+ * POST /api/v1/admin/upload-video
+ */
+export async function uploadVideo(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No video file was provided. Please choose an MP4, WebM, or MOV file.'
+      });
+    }
+
+    // Explicit 50MB size constraint validation
+    const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
+    if (req.file.size > MAX_VIDEO_BYTES) {
+      return res.status(400).json({
+        success: false,
+        message: `Video size exceeds the 50MB limit. Your file is ${(req.file.size / (1024 * 1024)).toFixed(1)}MB.`
+      });
+    }
+
+    const folder = sanitizeFolder(req.body.folder, 'max-housekeeping/services/videos');
+    const hasCloudinaryKeys = Boolean(
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+    );
+
+    if (hasCloudinaryKeys) {
+      const uploadPromise = new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder,
+            resource_type: 'video',
+            chunk_size: 6000000
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+
+      const result = await uploadPromise;
+
+      try {
+        await Media.create({
+          publicId: result.public_id,
+          url: result.secure_url,
+          resourceType: 'video',
+          bytes: result.bytes,
+          folder,
+          createdBy: req.user?._id
+        });
+      } catch (dbErr) {
+        console.warn('[Media Video DB Notice]:', dbErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Service video uploaded successfully to Cloudinary',
+        url: result.secure_url,
+        publicId: result.public_id,
+        duration: result.duration,
+        format: result.format,
+        bytes: result.bytes
+      });
+    }
+
+    // Dev Fallback when Cloudinary credentials are not configured
+    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const mockPublicId = `local_video_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    console.log('[Cloudinary Video Simulator] Cloudinary credentials not configured. Serving data URI for development.');
+
+    return res.status(200).json({
+      success: true,
+      simulated: true,
+      message: 'Video uploaded in development mode. Configured in Service details.',
+      url: base64,
+      publicId: mockPublicId,
+      format: (req.file.originalname || '').split('.').pop() || 'mp4'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   uploadImage,
   uploadMultipleImages,
+  uploadVideo,
   deleteImage
 };

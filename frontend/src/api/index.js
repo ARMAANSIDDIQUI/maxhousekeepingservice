@@ -15,6 +15,7 @@ export {
   bookingsAPI,
   authAPI,
   adminAPI,
+  supervisorAPI,
   publicAPI,
   FALLBACK_CATEGORIES,
   FALLBACK_CITIES,

@@ -10,7 +10,10 @@ import {
   LuCircleAlert,
   LuCheck,
   LuCreditCard,
-  LuBanknote
+  LuBanknote,
+  LuCamera,
+  LuSparkles,
+  LuCopy
 } from 'react-icons/lu';
 import { apiRequest } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -22,6 +25,7 @@ export default function TrackBookingPage() {
   const [searchCode, setSearchCode] = useState(code || '');
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [copiedOtp, setCopiedOtp] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -49,6 +53,13 @@ export default function TrackBookingPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     lookupBooking(searchCode);
+  };
+
+  const handleCopyOtp = (otp) => {
+    navigator.clipboard.writeText(otp);
+    setCopiedOtp(true);
+    toast.success('Verification OTP copied to clipboard!');
+    setTimeout(() => setCopiedOtp(false), 2500);
   };
 
   const steps = [
@@ -89,7 +100,7 @@ export default function TrackBookingPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-3.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-sm shadow-md"
+            className="px-6 py-3.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-sm shadow-md cursor-pointer"
           >
             {loading ? 'Searching...' : 'Track'}
           </button>
@@ -137,6 +148,99 @@ export default function TrackBookingPage() {
                 )}
               </div>
             </div>
+
+            {/* CUSTOMER SERVICE VERIFICATION OTP CARD (URBAN COMPANY / PRONTO SAFETY GATE) */}
+            {booking.serviceOtp && (
+              <div className="p-5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B] shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <LuShieldCheck className="w-4 h-4 text-[#E9A23B]" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#E9A23B] font-bold">
+                      VISIT VERIFICATION OTP
+                    </span>
+                  </div>
+                  <h4 className="font-display font-black text-lg text-[#F4EFE6]">
+                    Share with Supervisor Upon Arrival
+                  </h4>
+                  <p className="text-xs text-[#A3B8B0] max-w-md">
+                    To authenticate our visiting supervisor and begin your cleaning safely, share this security code.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="px-5 py-2.5 rounded-xl bg-white text-[#10231D] font-mono font-black text-2xl tracking-[0.3em] shadow-md border-2 border-[#E9A23B]">
+                      {booking.serviceOtp}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyOtp(booking.serviceOtp)}
+                      className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-[#E9A23B] transition-colors cursor-pointer"
+                      title="Copy OTP"
+                    >
+                      <LuCopy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <span className={`text-[10px] font-bold mt-1.5 uppercase ${
+                    booking.otpVerified ? 'text-emerald-400' : 'text-[#E9A23B]'
+                  }`}>
+                    {booking.otpVerified ? '✓ Verified on Visit' : 'Pending Verification at Visit'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ASSIGNED SUPERVISOR & TIME SLOT */}
+            {Boolean(booking.assignedSupervisor?.name || booking.supervisor?.name) ? (() => {
+              const sup = booking.assignedSupervisor?.name ? booking.assignedSupervisor : booking.supervisor;
+              return (
+                <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                      <LuShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase text-[#6B8077] font-bold">
+                          ASSIGNED SUPERVISOR & LEAD
+                        </span>
+                        <span className="px-2 py-0.2 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 uppercase">
+                          Dispatched
+                        </span>
+                      </div>
+                      <p className="font-bold text-sm text-[#10231D]">{sup.name}</p>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Scheduled Window: <span className="font-semibold text-[#10231D]">{booking.assignedSlot?.date || booking.slot?.date} ({booking.assignedSlot?.timeWindow || booking.slot?.window})</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {sup.phone && (
+                    <a
+                      href={`tel:${sup.phone}`}
+                      className="px-3.5 py-2 rounded-xl bg-[#10231D] text-[#E9A23B] text-xs font-bold flex items-center gap-1.5 hover:bg-[#3D524A] transition-colors shadow-xs"
+                    >
+                      <LuPhone className="w-3.5 h-3.5" />
+                      <span>Call Supervisor</span>
+                    </a>
+                  )}
+                </div>
+              );
+            })() : (
+              booking.status !== 'cancelled' && (
+                <div className="p-3.5 rounded-2xl bg-white border border-[#E2D9C8] flex items-center gap-3 shadow-2xs">
+                  <div className="w-9 h-9 rounded-xl bg-[#ECE5D8] text-[#10231D] flex items-center justify-center shrink-0">
+                    <LuClock className="w-4 h-4 text-[#E9A23B]" />
+                  </div>
+                  <div className="text-xs">
+                    <p className="font-bold text-[#10231D]">Field Supervisor Allocation in Progress</p>
+                    <p className="text-[#6B8077] text-[11px]">
+                      Our operations dispatch team is currently allocating an area supervisor for your reserved slot ({booking.slot?.date} • {booking.slot?.window}).
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
 
             {/* Cancelled Notice Banner */}
             {booking.status === 'cancelled' ? (
@@ -277,6 +381,77 @@ export default function TrackBookingPage() {
                 </div>
               )}
             </div>
+
+            {/* INSPECTION PHOTOS GALLERY (BEFORE & AFTER PROOF) */}
+            {((booking.photos?.before?.length || 0) > 0 || (booking.photos?.after?.length || 0) > 0) && (
+              <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
+                <div className="flex items-center gap-2">
+                  <LuCamera className="w-4 h-4 text-[#E9A23B]" />
+                  <h4 className="font-display font-bold text-sm text-[#10231D]">
+                    Supervisor Inspection Proof & Photos
+                  </h4>
+                </div>
+
+                {/* Before Photos */}
+                {booking.photos?.before?.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[#6B8077] font-bold block mb-1.5">
+                      Pre-Service Inspection ({booking.photos.before.length})
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {booking.photos.before.map((p, idx) => (
+                        <a
+                          key={idx}
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative aspect-square rounded-xl overflow-hidden border border-[#E2D9C8] bg-black block group"
+                        >
+                          <img
+                            src={p.url}
+                            alt={`Before inspection ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-mono text-white">
+                            Before
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* After Photos */}
+                {booking.photos?.after?.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 font-bold block mb-1.5 flex items-center gap-1">
+                      <LuSparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Post-Service Result Proof ({booking.photos.after.length})</span>
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {booking.photos.after.map((p, idx) => (
+                        <a
+                          key={idx}
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative aspect-square rounded-xl overflow-hidden border border-emerald-300 bg-black block group"
+                        >
+                          <img
+                            src={p.url}
+                            alt={`After inspection ${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-emerald-950/80 text-[9px] font-mono text-emerald-300">
+                            After (Restored)
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Support Callout */}
             <div className="pt-4 border-t border-[#E2D9C8] flex items-center justify-between text-xs text-[#3D524A]">

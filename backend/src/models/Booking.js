@@ -41,7 +41,7 @@ const bookingSchema = new mongoose.Schema({
     index: true
   },
   messages: [{
-    sender: { type: String, enum: ['customer', 'admin'], required: true },
+    sender: { type: String, enum: ['customer', 'admin', 'supervisor'], required: true },
     senderName: { type: String, required: true },
     text: { type: String, required: true, trim: true },
     timestamp: { type: Date, default: Date.now }
@@ -83,6 +83,52 @@ const bookingSchema = new mongoose.Schema({
   assignedCrew: {
     name: String,
     phone: String
+  },
+  supervisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true
+  },
+  assignedSupervisor: {
+    id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    name: { type: String, trim: true },
+    phone: { type: String, trim: true },
+    email: { type: String, trim: true },
+    assignedAt: { type: Date }
+  },
+  assignedSlot: {
+    date: { type: String },
+    timeWindow: { type: String },
+    notes: { type: String }
+  },
+  serviceOtp: {
+    type: String,
+    trim: true,
+    index: true
+  },
+  otpVerified: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  otpVerifiedAt: {
+    type: Date
+  },
+  photos: {
+    before: [{
+      url: { type: String, required: true },
+      publicId: { type: String },
+      notes: { type: String },
+      uploadedAt: { type: Date, default: Date.now },
+      uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+    after: [{
+      url: { type: String, required: true },
+      publicId: { type: String },
+      notes: { type: String },
+      uploadedAt: { type: Date, default: Date.now },
+      uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }]
   },
   statusHistory: [{
     status: { type: String, required: true },

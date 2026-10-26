@@ -31,10 +31,16 @@ import {
   deleteCity,
   getAdminUsers,
   updateUserRole,
-  deleteUser
+  deleteUser,
+  getAdminSupervisors,
+  createSupervisor,
+  updateSupervisor,
+  deleteSupervisor,
+  assignSupervisorToBooking,
+  getSupervisorSlotAvailability
 } from '../controllers/adminController.js';
-import { uploadImage, uploadMultipleImages, deleteImage } from '../controllers/uploadController.js';
-import { upload } from '../middleware/upload.js';
+import { uploadImage, uploadMultipleImages, uploadVideo, deleteImage } from '../controllers/uploadController.js';
+import { upload, uploadVideo as multerUploadVideo } from '../middleware/upload.js';
 import { verifyAuth, roleGuard } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -48,7 +54,15 @@ router.get('/stats', getStats);
 // Bookings
 router.get('/bookings', getAdminBookings);
 router.put('/bookings/:id', updateBooking);
+router.put('/bookings/:id/assign', assignSupervisorToBooking);
 router.delete('/bookings/:id', deleteBooking);
+
+// Supervisor ID Management (Created & Managed by Admins)
+router.get('/supervisors/slot-availability', getSupervisorSlotAvailability);
+router.get('/supervisors', getAdminSupervisors);
+router.post('/supervisors', createSupervisor);
+router.put('/supervisors/:id', updateSupervisor);
+router.delete('/supervisors/:id', deleteSupervisor);
 
 // Services (Shown Price vs Offered Price Management)
 router.get('/services', getAdminServices);
@@ -73,9 +87,10 @@ router.get('/users', getAdminUsers);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 
-// Cloudinary Image Uploads (Services, Testimonials, Brands, Media)
+// Cloudinary Image & Video Uploads
 router.post('/upload', upload.single('image'), uploadImage);
 router.post('/upload-multiple', upload.array('images', 15), uploadMultipleImages);
+router.post('/upload-video', multerUploadVideo.single('video'), uploadVideo);
 router.delete('/upload/:publicId', deleteImage);
 
 // Testimonials Management (Form uploads & Table Management)

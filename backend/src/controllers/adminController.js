@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
 import Booking from '../models/Booking.js';
@@ -109,7 +110,7 @@ function escapeRegex(str) {
 export async function updateBooking(req, res, next) {
   try {
     const { id } = req.params;
-    const { status, assignedCrew, note } = req.body;
+    const { status, assignedCrew, note, supervisorId, assignedSlot, serviceOtp } = req.body;
 
     const booking = await Booking.findById(id);
     if (!booking) {
@@ -134,6 +135,55 @@ export async function updateBooking(req, res, next) {
     if (assignedCrew) {
       booking.assignedCrew = assignedCrew;
       crewChanged = true;
+    }
+
+    if (supervisorId !== undefined) {
+      if (supervisorId) {
+        const sup = await User.findById(supervisorId);
+        if (sup && sup.role === 'supervisor') {
+          booking.supervisor = sup._id;
+          booking.assignedSupervisor = {
+            id: sup._id,
+            name: sup.name,
+            phone: sup.phone,
+            email: sup.email,
+            assignedAt: new Date()
+          };
+          if (!booking.serviceOtp) {
+            booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
+          }
+          booking.statusHistory.push({
+            status: booking.status,
+            timestamp: new Date(),
+            note: `Supervisor ${sup.name} assigned to booking`,
+            updatedBy: req.user?._id
+          });
+        }
+      } else {
+        booking.supervisor = undefined;
+        booking.assignedSupervisor = undefined;
+      }
+    }
+
+    if (assignedSlot) {
+      booking.assignedSlot = {
+        date: assignedSlot.date || booking.slot?.date,
+        timeWindow: assignedSlot.timeWindow || assignedSlot.window || booking.slot?.window,
+        notes: assignedSlot.notes || ''
+      };
+      if (assignedSlot.date) booking.slot.date = assignedSlot.date;
+      if (assignedSlot.timeWindow || assignedSlot.window) {
+        booking.slot.window = assignedSlot.timeWindow || assignedSlot.window;
+      }
+    }
+
+    if (serviceOtp && typeof serviceOtp === 'string') {
+      booking.serviceOtp = serviceOtp.trim();
+    }
+
+    // Ensure booking always has a serviceOtp
+    if (!booking.serviceOtp) {
+      booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
     }
 
     await booking.save();
@@ -856,7 +906,7 @@ export async function updateUserRole(req, res, next) {
     const { id } = req.params;
     const { role } = req.body;
 
-    if (!['customer', 'admin', 'cleaner'].includes(role)) {
+    if (!['customer', 'admin', 'cleaner', 'supervisor'].includes(role)) {
       return res.status(400).json({ success: false, message: 'Invalid role specified.' });
     }
 
@@ -912,6 +962,394 @@ export async function deleteUser(req, res, next) {
     res.status(200).json({
       success: true,
       message: 'User removed from MongoDB database.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Get All Supervisors (Admin)
+ * GET /api/v1/admin/supervisors
+ */
+export async function getAdminSupervisors(req, res, next) {
+  try {
+    const supervisors = await User.find({ role: 'supervisor' })
+      .select('-passwordHash -otpSecret')
+      .sort({ createdAt: -1 });
+
+    // Aggregate booking counts per supervisor
+    const supervisorIds = supervisors.map(s => s._id);
+    const bookingCounts = await Booking.aggregate([
+      { $match: { supervisor: { $in: supervisorIds } } },
+      {
+        $group: {
+          _id: '$supervisor',
+          totalAssigned: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+          inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } }
+        }
+      }
+    ]);
+
+    const countMap = new Map(bookingCounts.map(b => [String(b._id), b]));
+
+    const supervisorsWithStats = supervisors.map(s => {
+      const stats = countMap.get(String(s._id)) || { totalAssigned: 0, completed: 0, inProgress: 0 };
+      return {
+        ...s.toObject(),
+        status: s.isActive ? 'active' : 'suspended',
+        totalAssigned: stats.totalAssigned,
+        completed: stats.completed,
+        inProgress: stats.inProgress
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: supervisorsWithStats.length,
+      supervisors: supervisorsWithStats
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Create Supervisor Account (Admin)
+ * POST /api/v1/admin/supervisors
+ */
+export async function createSupervisor(req, res, next) {
+  try {
+    const { name, email, phone, password } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Supervisor name is required.' });
+    }
+
+    if (!email && !phone) {
+      return res.status(400).json({ success: false, message: 'Either email or phone is required.' });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email ? email.trim().toLowerCase() : undefined;
+    const cleanPhone = phone ? phone.trim().replace(/\D/g, '') : '';
+
+    // Check duplicate email or phone
+    const orConditions = [];
+    if (cleanEmail) orConditions.push({ email: cleanEmail });
+    if (cleanPhone) orConditions.push({ phone: cleanPhone });
+
+    if (orConditions.length > 0) {
+      const existing = await User.findOne({ $or: orConditions });
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email or phone number already exists.'
+        });
+      }
+    }
+
+    const avatarUrl = User.generateDefaultAvatar ? User.generateDefaultAvatar(name) : '';
+
+    const supervisor = new User({
+      name: name.trim(),
+      email: cleanEmail,
+      phone: cleanPhone,
+      passwordHash: password, // Mongoose pre-save hook will hash this securely
+      role: 'supervisor',
+      authProvider: 'local',
+      avatarUrl,
+      emailVerified: true,
+      isActive: true
+    });
+
+    await supervisor.save();
+
+    const safeSupervisor = supervisor.toObject();
+    delete safeSupervisor.passwordHash;
+    delete safeSupervisor.otpSecret;
+    safeSupervisor.status = safeSupervisor.isActive ? 'active' : 'suspended';
+
+    res.status(201).json({
+      success: true,
+      message: `Supervisor ${supervisor.name} created successfully.`,
+      supervisor: safeSupervisor
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Update Supervisor Details (Admin)
+ * PUT /api/v1/admin/supervisors/:id
+ */
+export async function updateSupervisor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, password, isActive, status } = req.body;
+
+    const supervisor = await User.findById(id);
+    if (!supervisor || supervisor.role !== 'supervisor') {
+      return res.status(404).json({ success: false, message: 'Supervisor account not found.' });
+    }
+
+    if (name) supervisor.name = name.trim();
+    if (email !== undefined) supervisor.email = email ? email.trim().toLowerCase() : undefined;
+    if (phone !== undefined) supervisor.phone = phone ? phone.trim().replace(/\D/g, '') : '';
+    if (status !== undefined) supervisor.isActive = (status === 'active');
+    if (isActive !== undefined) supervisor.isActive = Boolean(isActive);
+
+    if (password && password.trim().length >= 6) {
+      supervisor.passwordHash = password.trim(); // Will be hashed by pre-save hook
+    }
+
+    await supervisor.save();
+
+    const safeSupervisor = supervisor.toObject();
+    delete safeSupervisor.passwordHash;
+    delete safeSupervisor.otpSecret;
+    safeSupervisor.status = safeSupervisor.isActive ? 'active' : 'suspended';
+
+    res.status(200).json({
+      success: true,
+      message: 'Supervisor account updated successfully.',
+      supervisor: safeSupervisor
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Delete Supervisor Account (Admin)
+ * DELETE /api/v1/admin/supervisors/:id
+ */
+export async function deleteSupervisor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const supervisor = await User.findById(id);
+    if (!supervisor || supervisor.role !== 'supervisor') {
+      return res.status(404).json({ success: false, message: 'Supervisor account not found.' });
+    }
+
+    // Unassign pending bookings from this supervisor
+    await Booking.updateMany(
+      { supervisor: id, status: { $nin: ['completed', 'cancelled'] } },
+      { $unset: { supervisor: 1, assignedSupervisor: 1 } }
+    );
+
+    await User.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Supervisor account deleted successfully.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Assign Supervisor and Time Slot to Booking (Admin)
+ * PUT /api/v1/admin/bookings/:id/assign
+ */
+export async function assignSupervisorToBooking(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { supervisorId, assignedSlot, note, allowConflict } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!supervisorId) {
+      return res.status(400).json({ success: false, message: 'Please select a supervisor.' });
+    }
+
+    const supervisor = await User.findById(supervisorId);
+    if (!supervisor || supervisor.role !== 'supervisor') {
+      return res.status(400).json({ success: false, message: 'Selected user is not a valid supervisor.' });
+    }
+
+    // Determine target slot date and window
+    const targetDate = assignedSlot?.date || booking.slot?.date;
+    const targetWindow = assignedSlot?.timeWindow || assignedSlot?.window || booking.slot?.window;
+
+    // Time slot conflict check: verify supervisor is not already booked in this slot
+    if (targetDate && targetWindow && !allowConflict) {
+      const existingConflict = await Booking.findOne({
+        _id: { $ne: booking._id },
+        $or: [
+          { supervisor: supervisor._id },
+          { 'assignedSupervisor.id': supervisor._id }
+        ],
+        status: { $in: ['confirmed', 'in_progress', 'pending'] },
+        $or: [
+          { 'assignedSlot.date': targetDate, 'assignedSlot.timeWindow': targetWindow },
+          { 'slot.date': targetDate, 'slot.window': targetWindow }
+        ]
+      }).select('bookingCode serviceTitle customer slot assignedSlot status');
+
+      if (existingConflict) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          conflictingBooking: {
+            _id: existingConflict._id,
+            bookingCode: existingConflict.bookingCode,
+            serviceTitle: existingConflict.serviceTitle,
+            customerName: existingConflict.customer?.name || 'Customer',
+            slotDate: existingConflict.assignedSlot?.date || existingConflict.slot?.date,
+            timeWindow: existingConflict.assignedSlot?.timeWindow || existingConflict.slot?.window,
+            status: existingConflict.status
+          },
+          message: `Time Slot Conflict: Supervisor ${supervisor.name} is already allotted to Booking #${existingConflict.bookingCode} (${existingConflict.serviceTitle || 'Service'}) on ${targetDate} during ${targetWindow}. Enable admin override if you wish to proceed.`
+        });
+      }
+    }
+
+    booking.supervisor = supervisor._id;
+    booking.assignedSupervisor = {
+      id: supervisor._id,
+      name: supervisor.name,
+      phone: supervisor.phone,
+      email: supervisor.email,
+      assignedAt: new Date()
+    };
+
+    if (assignedSlot) {
+      booking.assignedSlot = {
+        date: assignedSlot.date || booking.slot?.date,
+        timeWindow: assignedSlot.timeWindow || assignedSlot.window || booking.slot?.window,
+        notes: assignedSlot.notes || ''
+      };
+      if (assignedSlot.date) booking.slot.date = assignedSlot.date;
+      if (assignedSlot.timeWindow || assignedSlot.window) {
+        booking.slot.window = assignedSlot.timeWindow || assignedSlot.window;
+      }
+    }
+
+    // Ensure 4-digit service verification OTP is set for customer visit
+    if (!booking.serviceOtp) {
+      booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
+    }
+
+    // Update status if currently pending
+    if (booking.status === 'pending') {
+      booking.status = 'confirmed';
+    }
+
+    const assignmentNote = note || `Assigned to supervisor ${supervisor.name} for slot: ${booking.slot.date} (${booking.slot.window})`;
+    booking.statusHistory.push({
+      status: booking.status,
+      timestamp: new Date(),
+      note: assignmentNote,
+      updatedBy: req.user?._id
+    });
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Supervisor ${supervisor.name} assigned to booking ${booking.bookingCode}.`,
+      booking
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Check Supervisors Slot Availability (Admin)
+ * GET /api/v1/admin/supervisors/slot-availability?date=YYYY-MM-DD&timeWindow=...&excludeBookingId=...
+ */
+export async function getSupervisorSlotAvailability(req, res, next) {
+  try {
+    const { date, timeWindow, excludeBookingId } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ success: false, message: 'Date is required for availability check.' });
+    }
+
+    const supervisors = await User.find({ role: 'supervisor', status: 'active' })
+      .select('name email phone city avatar status')
+      .sort({ name: 1 })
+      .lean();
+
+    // Query all active bookings for this date
+    const bookingQuery = {
+      status: { $in: ['confirmed', 'in_progress', 'pending'] },
+      $or: [
+        { 'assignedSlot.date': date },
+        { 'slot.date': date }
+      ]
+    };
+    if (excludeBookingId) {
+      bookingQuery._id = { $ne: excludeBookingId };
+    }
+
+    const dayBookings = await Booking.find(bookingQuery)
+      .select('supervisor assignedSupervisor slot assignedSlot status bookingCode serviceTitle customer')
+      .lean();
+
+    const availability = supervisors.map(sup => {
+      const supIdStr = sup._id.toString();
+
+      // All bookings for this supervisor on this date
+      const supDayBookings = dayBookings.filter(b => 
+        (b.supervisor && b.supervisor.toString() === supIdStr) ||
+        (b.assignedSupervisor?.id && b.assignedSupervisor.id.toString() === supIdStr)
+      );
+
+      // Check slot conflict if timeWindow specified
+      let isBusyInSlot = false;
+      let slotConflictBooking = null;
+
+      if (timeWindow) {
+        slotConflictBooking = supDayBookings.find(b => {
+          const bWindow = b.assignedSlot?.timeWindow || b.slot?.window;
+          return bWindow && bWindow.trim().toLowerCase() === timeWindow.trim().toLowerCase();
+        });
+        isBusyInSlot = Boolean(slotConflictBooking);
+      }
+
+      return {
+        _id: sup._id,
+        name: sup.name,
+        email: sup.email,
+        phone: sup.phone,
+        city: sup.city,
+        avatar: sup.avatar,
+        status: sup.status,
+        dayBookingsCount: supDayBookings.length,
+        isAvailableInSlot: !isBusyInSlot,
+        conflictBooking: slotConflictBooking ? {
+          bookingCode: slotConflictBooking.bookingCode,
+          serviceTitle: slotConflictBooking.serviceTitle,
+          customerName: slotConflictBooking.customer?.name,
+          timeWindow: slotConflictBooking.assignedSlot?.timeWindow || slotConflictBooking.slot?.window,
+          status: slotConflictBooking.status
+        } : null,
+        dayBookings: supDayBookings.map(b => ({
+          bookingCode: b.bookingCode,
+          serviceTitle: b.serviceTitle,
+          timeWindow: b.assignedSlot?.timeWindow || b.slot?.window,
+          status: b.status
+        }))
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      date,
+      timeWindow: timeWindow || null,
+      supervisors: availability
     });
   } catch (err) {
     next(err);
@@ -1122,5 +1560,11 @@ export default {
   deleteCity,
   getAdminUsers,
   updateUserRole,
-  deleteUser
+  deleteUser,
+  getAdminSupervisors,
+  createSupervisor,
+  updateSupervisor,
+  deleteSupervisor,
+  assignSupervisorToBooking,
+  getSupervisorSlotAvailability
 };

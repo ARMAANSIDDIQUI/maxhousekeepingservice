@@ -26,7 +26,8 @@ import {
   LuImage,
   LuSparkles,
   LuCreditCard,
-  LuBanknote
+  LuBanknote,
+  LuCopy
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import confetti from 'canvas-confetti';
@@ -990,6 +991,143 @@ export default function CustomerDashboard() {
                           )}
                         </div>
                       </div>
+
+                    {/* CUSTOMER OTP & SUPERVISOR ASSIGNMENT (URBAN COMPANY / PRONTO STYLE) */}
+                    {b.status !== 'cancelled' && (
+                      <div className="space-y-2.5">
+                        {/* Assigned Supervisor Card */}
+                        {(b.assignedSupervisor?.name || b.supervisor?.name) ? (
+                          <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                                <LuShieldCheck className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono text-[#6B8077] uppercase font-bold tracking-wider">
+                                    ASSIGNED FIELD SUPERVISOR
+                                  </span>
+                                  <span className="px-2 py-0.2 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 uppercase">
+                                    On Duty
+                                  </span>
+                                </div>
+                                <p className="font-bold text-sm text-[#10231D]">
+                                  {b.assignedSupervisor?.name || b.supervisor?.name}
+                                </p>
+                                <p className="text-[11px] text-[#6B8077]">
+                                  Scheduled Arrival: <span className="font-semibold text-[#10231D]">{b.assignedSlot?.date || b.slot?.date} ({b.assignedSlot?.timeWindow || b.slot?.window})</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                              {(b.assignedSupervisor?.phone || b.supervisor?.phone) && (
+                                <a
+                                  href={`tel:${b.assignedSupervisor?.phone || b.supervisor?.phone}`}
+                                  className="px-3.5 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+                                >
+                                  <LuPhone className="w-3.5 h-3.5 text-[#E9A23B]" />
+                                  <span>Call Supervisor</span>
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveBooking(b);
+                                  setChatModalOpen(true);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <LuMessageSquare className="w-3.5 h-3.5" />
+                                <span>Chat</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] flex items-center gap-2.5 text-xs text-[#6B8077]">
+                            <LuClock className="w-4 h-4 text-[#E9A23B] shrink-0" />
+                            <span>
+                              <strong>Supervisor Dispatch:</strong> Operations is assigning a dedicated supervisor for your scheduled window ({b.slot?.date} • {b.slot?.window}).
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Visit Verification OTP Handshake Card */}
+                        {b.serviceOtp && (
+                          <div className="p-3.5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border border-[#E9A23B]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1.5 text-[#E9A23B] text-[10px] font-mono font-bold uppercase tracking-wider">
+                                <LuKey className="w-3.5 h-3.5" />
+                                <span>ON-SITE ARRIVAL OTP</span>
+                              </div>
+                              <p className="text-xs text-[#A3B8B0]">
+                                Share this 4-digit code with your supervisor when they arrive at your doorstep
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1 bg-white rounded-xl px-3.5 py-1.5 border-2 border-[#E9A23B] shadow-xs">
+                                <span className="text-[#10231D] font-mono font-black text-xl tracking-[0.25em]">
+                                  {b.serviceOtp}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard?.writeText(b.serviceOtp);
+                                    toast.success('Verification OTP copied to clipboard!');
+                                  }}
+                                  className="p-1 text-[#6B8077] hover:text-[#10231D] transition-colors cursor-pointer ml-1"
+                                  title="Copy OTP"
+                                >
+                                  <LuCopy className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                b.otpVerified ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-[#E9A23B]/20 text-[#E9A23B] border border-[#E9A23B]/30'
+                              }`}>
+                                {b.otpVerified ? '✓ Verified on Visit' : 'Pending Arrival'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* INSPECTION PHOTOS PREVIEW (IF AVAILABLE) */}
+                    {((b.photos?.before?.length || 0) > 0 || (b.photos?.after?.length || 0) > 0) && (
+                      <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                          <LuCamera className="w-3.5 h-3.5 text-[#E9A23B]" />
+                          <span>Supervisor Inspection Proof ({ (b.photos?.before?.length || 0) + (b.photos?.after?.length || 0) } Photos)</span>
+                        </div>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                          {(b.photos?.before || []).map((p, idx) => (
+                            <a
+                              key={`b-${idx}`}
+                              href={p.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-[#E2D9C8] shrink-0 block group"
+                            >
+                              <img src={p.url} alt="Before" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-mono text-white text-center">Before</span>
+                            </a>
+                          ))}
+                          {(b.photos?.after || []).map((p, idx) => (
+                            <a
+                              key={`a-${idx}`}
+                              href={p.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-emerald-400 shrink-0 block group"
+                            >
+                              <img src={p.url} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <span className="absolute bottom-0 inset-x-0 bg-emerald-950/80 text-[8px] font-mono text-emerald-300 text-center">After</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Service Items & Slot */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

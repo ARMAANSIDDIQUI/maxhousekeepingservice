@@ -8,8 +8,8 @@ export default function MobileBar() {
   const { items, settings } = useBooking();
   const { pathname } = useLocation();
 
-  // Hide mobile consumer bar on admin dashboard
-  if (pathname.startsWith('/admin')) {
+  // Hide mobile consumer bar on admin & supervisor dashboard
+  if (pathname.startsWith('/admin') || pathname.startsWith('/supervisor')) {
     return null;
   }
 

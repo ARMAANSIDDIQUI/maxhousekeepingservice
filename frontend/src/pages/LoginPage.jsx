@@ -81,17 +81,24 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // If already logged in, disable login page and redirect to home
+  // If already logged in, disable login page and redirect to respective dashboard
   React.useEffect(() => {
     if (!isAuthLoading && user) {
-      navigate('/', { replace: true });
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'supervisor') {
+        navigate('/supervisor', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [user, isAuthLoading, navigate]);
-
 
   const handlePostLoginRedirect = (userRole) => {
     if (userRole === 'admin') {
       navigate('/admin', { replace: true });
+    } else if (userRole === 'supervisor') {
+      navigate('/supervisor', { replace: true });
     } else {
       navigate('/dashboard', { replace: true });
     }

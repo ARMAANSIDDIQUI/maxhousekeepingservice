@@ -957,6 +957,25 @@ export const adminAPI = {
   deleteCoupon: (id) => apiRequest(`/admin/coupons/${id}`, { method: 'DELETE' }),
   // Site & Business Settings
   getSettings: () => apiRequest('/admin/settings', { method: 'GET', noCache: true }),
+  // Video upload for Service forms
+  uploadVideo: async (file, folder = 'max-housekeeping/services/videos') => {
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('folder', folder);
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await api.post('/admin/upload-video', formData, {
+      headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+    });
+    return res;
+  },
+  // Supervisor Management (Admins create and manage supervisor accounts)
+  getSupervisors: () => apiRequest('/admin/supervisors', { method: 'GET' }),
+  getSupervisorSlotAvailability: (params) => apiRequest('/admin/supervisors/slot-availability', { method: 'GET', params }),
+  createSupervisor: (data) => apiRequest('/admin/supervisors', { method: 'POST', body: data }),
+  updateSupervisor: (id, data) => apiRequest(`/admin/supervisors/${id}`, { method: 'PUT', body: data }),
+  deleteSupervisor: (id) => apiRequest(`/admin/supervisors/${id}`, { method: 'DELETE' }),
+  assignBookingSupervisor: (id, data) => apiRequest(`/admin/bookings/${id}/assign`, { method: 'PUT', body: data }),
   updateSettings: async (data) => {
     clearCacheByPrefix('/public/settings');
     clearCacheByPrefix('/settings');
@@ -973,6 +992,32 @@ export const adminAPI = {
     } catch {}
     return res;
   }
+};
+
+/**
+ * Supervisor API: Dashboard, OTP verification, and Before/After photo uploads
+ */
+export const supervisorAPI = {
+  getStats: (supervisorId) => apiRequest('/supervisor/stats', { method: 'GET', params: supervisorId ? { supervisorId } : {} }),
+  getSchedule: (date) => apiRequest('/supervisor/schedule', { method: 'GET', params: date ? { date } : {} }),
+  getBookings: (params = {}) => apiRequest('/supervisor/bookings', { method: 'GET', params }),
+  getBookingDetails: (id) => apiRequest(`/supervisor/bookings/${id}`, { method: 'GET' }),
+  verifyOtp: (id, otp) => apiRequest(`/supervisor/bookings/${id}/verify-otp`, { method: 'POST', body: { otp } }),
+  uploadPhoto: async (id, file, type = 'before', notes = '') => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('type', type);
+    if (notes) formData.append('notes', notes);
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await api.post(`/supervisor/bookings/${id}/photos`, formData, {
+      headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+    });
+    return res;
+  },
+  deletePhoto: (id, photoId) => apiRequest(`/supervisor/bookings/${id}/photos/${photoId}`, { method: 'DELETE' }),
+  updateStatus: (id, status, note) => apiRequest(`/supervisor/bookings/${id}/status`, { method: 'PUT', body: { status, note } }),
+  sendMessage: (id, text) => apiRequest(`/supervisor/bookings/${id}/message`, { method: 'POST', body: { text } })
 };
 
 // Export api Axios instance as default for direct use if desired

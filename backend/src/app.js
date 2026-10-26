@@ -16,6 +16,7 @@ import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import supervisorRoutes from './routes/supervisorRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
@@ -150,6 +151,7 @@ app.use('/api/v1', serviceRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/locations', locationRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/supervisor', supervisorRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 

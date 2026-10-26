@@ -8,7 +8,9 @@ import {
   LuCalendar,
   LuArrowLeft,
   LuSparkles,
-  LuMoveHorizontal
+  LuMoveHorizontal,
+  LuVideo,
+  LuPlay
 } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
@@ -16,6 +18,22 @@ import { useToast } from '../context/ToastContext';
 import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
 import SEO from '../components/common/SEO';
+
+function getYouTubeEmbedUrl(url) {
+  if (!url) return '';
+  if (url.includes('youtube.com/watch?v=' || url.includes('m.youtube.com/watch?v='))) {
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  }
+  if (url.includes('youtu.be/')) {
+    const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  }
+  if (url.includes('youtube.com/embed/')) {
+    return url;
+  }
+  return '';
+}
 
 // Helper to compute exact variant pricing for any service and variant key
 function getVariantPricingInfo(service, optKey, groupKey) {
@@ -302,6 +320,47 @@ export default function ServiceDetailPage() {
             </ul>
           </div>
         </div>
+
+        {/* Service Walkthrough Video (Urban Company Style) */}
+        {service.videoUrl && (
+          <div className="p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B]/40 shadow-xl mb-14">
+            <div className="text-center max-w-xl mx-auto mb-6">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E9A23B] flex items-center justify-center gap-1.5">
+                <LuVideo className="w-4 h-4" />
+                <span>SERVICE IN ACTION • VIDEO WALKTHROUGH</span>
+              </span>
+              <h3 className="font-display font-black text-2xl sm:text-3xl text-[#F4EFE6] mt-1.5">
+                Watch Our Expert Process
+              </h3>
+              <p className="text-xs text-[#A3B8B0] mt-1">
+                See how our verified crew details, cleans, and sanitises step-by-step with professional-grade equipment.
+              </p>
+            </div>
+
+            <div className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden border-2 border-[#2C4A3E] shadow-2xl bg-black">
+              {getYouTubeEmbedUrl(service.videoUrl) ? (
+                <iframe
+                  src={getYouTubeEmbedUrl(service.videoUrl)}
+                  title={`${service.title} Video Demonstration`}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster={service.media?.hero?.url || service.imageUrl}
+                  className="w-full h-full object-cover"
+                >
+                  <source src={service.videoUrl} />
+                  Your browser does not support HTML5 video streaming.
+                </video>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Interactive Before & After Demonstration Slider */}
         <div className="p-8 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] mb-14">

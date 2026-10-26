@@ -296,6 +296,8 @@ export async function createBooking(req, res, next) {
       status: (paymentStatus === 'paid' || paymentDetails?.transactionId) ? 'confirmed' : 'pending',
       totals: quote.totals,
       appliedCoupon: quote.coupon,
+      serviceOtp: crypto.randomInt(1000, 10000).toString(),
+      otpVerified: false,
       paymentMode: paymentMode || 'cash_on_service',
       paymentStatus: paymentStatus || (paymentDetails?.transactionId ? 'paid' : 'pending'),
       paymentDetails: paymentDetails || undefined,
@@ -359,7 +361,8 @@ export async function trackBooking(req, res, next) {
   try {
     const { code } = req.params;
     const booking = await Booking.findOne({ bookingCode: code.toUpperCase() })
-      .populate('city', 'name contactOverrides');
+      .populate('city', 'name contactOverrides')
+      .populate('supervisor', 'name phone email avatar role status');
 
     if (!booking) {
       return res.status(404).json({
@@ -368,12 +371,19 @@ export async function trackBooking(req, res, next) {
       });
     }
 
+    // Ensure serviceOtp exists
+    if (!booking.serviceOtp) {
+      booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
+      await booking.save().catch(() => {});
+    }
+
     const bookingObj = booking.toObject();
 
-    // Check if requester is authenticated owner/admin or provided verification phone query
+    // Check if requester is authenticated owner/admin/supervisor or provided verification phone query
     const verifyPhone = req.query.phone ? String(req.query.phone).trim().replace(/\D/g, '') : null;
     const isOwner = req.user && (
       req.user.role === 'admin' ||
+      (req.user.role === 'supervisor' && booking.supervisor && booking.supervisor.toString() === req.user._id.toString()) ||
       (booking.user && booking.user.toString() === req.user._id.toString()) ||
       booking.customer?.phone === req.user.phone
     );
@@ -399,8 +409,9 @@ export async function trackBooking(req, res, next) {
         const parts = bookingObj.address.line1.split(' ');
         bookingObj.address.line1 = parts.slice(0, 2).join(' ') + ', [Address Protected]';
       }
-      // Strip internal messages from public tracker
+      // Strip internal messages and secret OTP from unauthenticated public tracker
       delete bookingObj.messages;
+      delete bookingObj.serviceOtp;
     }
 
     res.status(200).json({
@@ -423,7 +434,16 @@ export async function getMyBookings(req, res, next) {
         { user: req.user._id },
         { 'customer.phone': req.user.phone }
       ]
-    }).sort({ createdAt: -1 });
+    }).populate('supervisor', 'name phone email avatar role status')
+      .sort({ createdAt: -1 });
+
+    // Ensure each booking has a serviceOtp
+    for (const b of bookings) {
+      if (!b.serviceOtp) {
+        b.serviceOtp = crypto.randomInt(1000, 10000).toString();
+        await b.save().catch(() => {});
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -439,6 +459,7 @@ export async function getMyBookings(req, res, next) {
 export function isAuthorizedForBooking(booking, user) {
   if (!user || user.isActive === false) return false;
   if (user.role === 'admin') return true;
+  if (user.role === 'supervisor' && booking.supervisor && booking.supervisor.toString() === user._id.toString()) return true;
   if (booking.user && booking.user.toString() === user._id.toString()) return true;
 
   const userPhone = user.phone ? String(user.phone).trim() : '';

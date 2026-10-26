@@ -240,6 +240,15 @@ export default function Header() {
                 Admin Panel
               </Link>
             )}
+
+            {user && (user.role === 'supervisor' || isAdmin) && (
+              <Link
+                to="/supervisor"
+                className="px-2.5 py-1 rounded-lg bg-[#E9A23B] text-[#10231D] text-xs font-black hover:bg-[#D48E28] transition-colors flex items-center gap-1 shadow-xs"
+              >
+                <span>Supervisor Panel</span>
+              </Link>
+            )}
           </nav>
 
           {/* Right Actions: City, Login / Profile, Book Now */}
@@ -286,6 +295,16 @@ export default function Header() {
                         className="theme-dropdown-item text-xs font-semibold text-[#E9A23B]"
                       >
                         Admin Control Panel
+                      </Link>
+                    )}
+
+                    {(user?.role === 'supervisor' || isAdmin) && (
+                      <Link
+                        to="/supervisor"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="theme-dropdown-item text-xs font-bold text-[#E9A23B]"
+                      >
+                        Supervisor Dashboard
                       </Link>
                     )}
 
@@ -404,6 +423,24 @@ export default function Header() {
             >
               Track Order
             </Link>
+            {user && (user?.role === 'supervisor' || isAdmin) && (
+              <Link
+                to="/supervisor"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-2 text-sm font-bold text-[#E9A23B]"
+              >
+                Supervisor Dashboard
+              </Link>
+            )}
+            {user && (
+              <Link
+                to="/dashboard"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-2 text-sm font-semibold text-[#10231D]"
+              >
+                My Account
+              </Link>
+            )}
             {!user && (
               <Link
                 to="/login"
