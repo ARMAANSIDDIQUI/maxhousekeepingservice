@@ -301,7 +301,9 @@ export default function LiveTrackingRadar({
         zoomControl: true,
         styles: [
           { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+          { featureType: 'landscape', stylers: [{ lightness: 18 }] },
+          { featureType: 'road', stylers: [{ lightness: 22 }] }
         ]
       });
 
@@ -452,8 +454,8 @@ export default function LiveTrackingRadar({
       <div className="relative">
         <div
           ref={mapContainerRef}
-          className="w-full h-80 sm:h-[440px] md:h-[500px] bg-[#0C1B16] transition-all"
-          style={{ minHeight: '340px' }}
+          className="w-full h-72 sm:h-[390px] md:h-[430px] bg-[#E5EAE7] transition-all"
+          style={{ minHeight: '300px' }}
         />
 
         {/* Floating Map Navigation Controls */}
