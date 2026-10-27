@@ -43,9 +43,89 @@ export async function detectCoverage(req, res, next) {
   }
 }
 
+// In-memory cache for road route geometries (2-minute TTL)
+const routeCache = new Map();
+
+/**
+ * Get turn-by-turn road driving route coordinates
+ * GET /api/v1/locations/route?startLat=...&startLng=...&endLat=...&endLng=...
+ */
+export async function getDrivingRoute(req, res, next) {
+  try {
+    const { startLat, startLng, endLat, endLng } = req.query;
+
+    const sLat = parseFloat(startLat);
+    const sLng = parseFloat(startLng);
+    const eLat = parseFloat(endLat);
+    const eLng = parseFloat(endLng);
+
+    if (isNaN(sLat) || isNaN(sLng) || isNaN(eLat) || isNaN(eLng)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid startLat, startLng, endLat, and endLng query parameters are required.'
+      });
+    }
+
+    // Cache key rounded to ~10 meters (4 decimals)
+    const cacheKey = `${sLat.toFixed(4)},${sLng.toFixed(4)}_${eLat.toFixed(4)},${eLng.toFixed(4)}`;
+    const cached = routeCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 2 * 60 * 1000) {
+      return res.status(200).json(cached.data);
+    }
+
+    // Resilient road routing endpoints (OSRM and OpenStreetMap road engines)
+    const osrmEndpoints = [
+      `https://router.project-osrm.org/route/v1/driving/${sLng},${sLat};${eLng},${eLat}?overview=full&geometries=geojson`,
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${sLng},${sLat};${eLng},${eLat}?overview=full&geometries=geojson`
+    ];
+
+    for (const url of osrmEndpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const upstream = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (upstream.ok) {
+          const json = await upstream.json();
+          if (json.code === 'Ok' && json.routes?.[0]?.geometry?.coordinates?.length) {
+            const coordinates = json.routes[0].geometry.coordinates.map((coord) => ({
+              lat: coord[1],
+              lng: coord[0]
+            }));
+
+            const distanceMeters = json.routes[0].distance || 0;
+            const durationSeconds = json.routes[0].duration || 0;
+
+            const responsePayload = {
+              success: true,
+              coordinates,
+              distanceKm: Number((distanceMeters / 1000).toFixed(1)),
+              durationMinutes: Math.max(1, Math.round(durationSeconds / 60))
+            };
+
+            routeCache.set(cacheKey, { timestamp: Date.now(), data: responsePayload });
+            return res.status(200).json(responsePayload);
+          }
+        }
+      } catch (err) {
+        // Continue to fallback endpoint
+      }
+    }
+
+    return res.status(503).json({
+      success: false,
+      message: 'Road network route temporarily calculating. Please retry.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getCities,
-  detectCoverage
+  detectCoverage,
+  getDrivingRoute
 };
 
 

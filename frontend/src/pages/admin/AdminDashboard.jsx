@@ -7796,7 +7796,7 @@ export default function AdminDashboard() {
             onClose={() => setTrackingBookingAdmin(null)}
             title={`Track Location · #${trackingBookingAdmin.bookingCode}`}
             subtitle="Live location and route of the supervisor"
-            maxWidth="max-w-2xl"
+            maxWidth="max-w-4xl"
           >
             <div className="space-y-4">
               <LiveTrackingRadar

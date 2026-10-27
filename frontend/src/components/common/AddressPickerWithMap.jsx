@@ -876,13 +876,34 @@ export default function AddressPickerWithMap({
             </div>
           )}
 
-          <div className="relative rounded-2xl overflow-hidden border border-[#E2D9C8] shadow-xs">
+          <div className="relative rounded-3xl overflow-hidden border-2 border-[#10231D]/15 shadow-md group">
             <div
               ref={mapContainerRef}
-              className="w-full h-52 sm:h-64 bg-[#ECE5D8]"
-              style={{ minHeight: '220px' }}
+              className="w-full h-72 sm:h-96 md:h-[440px] bg-[#ECE5D8] transition-all"
+              style={{ minHeight: '300px' }}
             />
-            <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
+            {/* Floating Top Controls */}
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
+              <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-3 py-1.5 rounded-xl text-xs font-bold border border-white/10 shadow-md flex items-center gap-1.5 pointer-events-auto">
+                <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                <span>Move pin to exact gate / door</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isLocatingUser}
+                className="px-3.5 py-1.5 rounded-xl bg-white/95 hover:bg-white text-[#10231D] text-xs font-bold shadow-md border border-[#D2C8B8] flex items-center gap-1.5 cursor-pointer pointer-events-auto transition-transform active:scale-95 disabled:opacity-60"
+                title="Locate me via device GPS"
+              >
+                {isLocatingUser ? (
+                  <LuLoader className="w-3.5 h-3.5 animate-spin text-[#E9A23B]" />
+                ) : (
+                  <LuNavigation className="w-3.5 h-3.5 text-emerald-600" />
+                )}
+                <span>{isLocatingUser ? 'Locating...' : 'Use My GPS'}</span>
+              </button>
+            </div>
+            <div className="absolute bottom-3 left-3 right-3 pointer-events-none z-10">
               <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />

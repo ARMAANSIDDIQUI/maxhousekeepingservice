@@ -2391,7 +2391,7 @@ export default function CustomerDashboard() {
             onClose={() => setTrackingModalBooking(null)}
             title={`Track Location · #${trackingModalBooking.bookingCode}`}
             subtitle="Live location and route to your address"
-            maxWidth="max-w-2xl"
+            maxWidth="max-w-4xl"
           >
             <div className="space-y-4">
               <LiveTrackingRadar

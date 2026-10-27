@@ -96,60 +96,76 @@ export default function LiveTrackingRadar({
     if (!window.google?.maps || !mapInstanceRef.current) return;
     const google = window.google;
 
+    const renderRoadPolyline = (roadPoints, distKm) => {
+      if (!roadPoints?.length || !mapInstanceRef.current) return;
+
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+      }
+
+      routePolylineRef.current = new google.maps.Polyline({
+        path: roadPoints,
+        geodesic: true,
+        strokeColor: '#E9A23B',
+        strokeOpacity: 0.95,
+        strokeWeight: 5,
+        map: mapInstanceRef.current
+      });
+
+      // Fit map viewport to show the real road route
+      const bounds = new google.maps.LatLngBounds();
+      roadPoints.forEach((pt) => bounds.extend(pt));
+      mapInstanceRef.current.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
+
+      if (distKm && typeof distKm === 'number') {
+        setDistanceKm(distKm);
+      }
+    };
+
+    // 1. Try Backend Road Route Service (Fast, cached, server-to-server)
     try {
-      // Real turn-by-turn street route following road networks (OSRM)
-      const url = `https://router.project-osrm.org/route/v1/driving/${startPos.lng},${startPos.lat};${endPos.lng},${endPos.lat}?overview=full&geometries=geojson`;
-      const res = await fetch(url);
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
+      const backendUrl = `${apiBase}/locations/route?startLat=${startPos.lat}&startLng=${startPos.lng}&endLat=${endPos.lat}&endLng=${endPos.lng}`;
+      const res = await fetch(backendUrl);
       if (res.ok) {
         const data = await res.json();
-        if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates?.length) {
-          const roadPoints = data.routes[0].geometry.coordinates.map((coord) => ({
-            lat: coord[1],
-            lng: coord[0]
-          }));
-
-          if (routePolylineRef.current) {
-            routePolylineRef.current.setMap(null);
-          }
-
-          routePolylineRef.current = new google.maps.Polyline({
-            path: roadPoints,
-            geodesic: true,
-            strokeColor: '#E9A23B',
-            strokeOpacity: 0.95,
-            strokeWeight: 5,
-            map: mapInstanceRef.current
-          });
-
-          // Adjust map viewport to show entire road journey
-          const bounds = new google.maps.LatLngBounds();
-          roadPoints.forEach((pt) => bounds.extend(pt));
-          mapInstanceRef.current.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-
-          // Update real road distance if provided
-          if (data.routes[0].distance) {
-            setDistanceKm(Number((data.routes[0].distance / 1000).toFixed(1)));
-          }
-
+        if (data.success && data.coordinates?.length) {
+          renderRoadPolyline(data.coordinates, data.distanceKm);
           return;
         }
       }
     } catch (err) {
-      console.warn('[LiveTrackingRadar] Real road route notice:', err.message);
+      // Fallback to client-side mirrors
     }
 
-    // Direct fallback only if both routing engines fail
-    if (routePolylineRef.current) {
-      routePolylineRef.current.setMap(null);
+    // 2. Direct client-side road engines (OSRM & OpenStreetMap mirrors)
+    const directEngines = [
+      `https://router.project-osrm.org/route/v1/driving/${startPos.lng},${startPos.lat};${endPos.lng},${endPos.lat}?overview=full&geometries=geojson`,
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${startPos.lng},${startPos.lat};${endPos.lng},${endPos.lat}?overview=full&geometries=geojson`
+    ];
+
+    for (const url of directEngines) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates?.length) {
+            const roadPoints = data.routes[0].geometry.coordinates.map((coord) => ({
+              lat: coord[1],
+              lng: coord[0]
+            }));
+            const distKm = data.routes[0].distance ? Number((data.routes[0].distance / 1000).toFixed(1)) : null;
+            renderRoadPolyline(roadPoints, distKm);
+            return;
+          }
+        }
+      } catch (err) {
+        // Continue to next routing mirror
+      }
     }
-    routePolylineRef.current = new google.maps.Polyline({
-      path: [startPos, endPos],
-      geodesic: true,
-      strokeColor: '#E9A23B',
-      strokeOpacity: 0.8,
-      strokeWeight: 4,
-      map: mapInstanceRef.current
-    });
+
+    // Notice: We strictly DO NOT draw a 2-point straight displacement vector.
+    // If road network data is temporarily unreachable, markers stay at their exact locations.
   };
 
   // Sync prop changes
@@ -341,6 +357,31 @@ export default function LiveTrackingRadar({
     }
   }, [mapLoaded, resolvedCustomerLoc, customerLocation, liveLocation]);
 
+  const handleRecenterSupervisor = () => {
+    if (mapInstanceRef.current && liveLocation?.lat) {
+      mapInstanceRef.current.panTo({ lat: liveLocation.lat, lng: liveLocation.lng });
+      mapInstanceRef.current.setZoom(16);
+    }
+  };
+
+  const handleRecenterDestination = () => {
+    const cust = resolvedCustomerLoc || customerLocation;
+    if (mapInstanceRef.current && cust?.lat) {
+      mapInstanceRef.current.panTo({ lat: cust.lat, lng: cust.lng });
+      mapInstanceRef.current.setZoom(16);
+    }
+  };
+
+  const handleFitRoute = () => {
+    const cust = resolvedCustomerLoc || customerLocation;
+    if (mapInstanceRef.current && cust?.lat && liveLocation?.lat && window.google?.maps) {
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(cust);
+      bounds.extend(liveLocation);
+      mapInstanceRef.current.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+    }
+  };
+
   const targetCoords = resolvedCustomerLoc || customerLocation;
   const navUrl = (targetCoords?.lat && targetCoords?.lng)
     ? `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`
@@ -349,14 +390,14 @@ export default function LiveTrackingRadar({
   const currentSupervisor = resolvedSupervisor || supervisorInfo;
 
   return (
-    <div className="bg-[#10231D] text-[#F4EFE6] rounded-2xl border border-[#2D453B] overflow-hidden shadow-xl">
+    <div className="bg-[#10231D] text-[#F4EFE6] rounded-3xl border-2 border-[#2D453B] overflow-hidden shadow-2xl">
       {/* Header with Uber/Rapido-Style Distance & ETA */}
-      <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2D453B]/70 bg-[#0C1B16]">
-        <div className="flex items-center gap-2.5">
+      <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2D453B]/70 bg-[#0C1B16]">
+        <div className="flex items-center gap-3">
           <div className="relative">
-            <span className={`w-3 h-3 rounded-full ${isSharing ? 'bg-[#25D366]' : 'bg-[#6B8077]'} block`} />
+            <span className={`w-3.5 h-3.5 rounded-full ${isSharing ? 'bg-[#25D366]' : 'bg-[#6B8077]'} block`} />
             {isSharing && (
-              <span className="w-3 h-3 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
+              <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
             )}
           </div>
           <div>
@@ -364,7 +405,7 @@ export default function LiveTrackingRadar({
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#E9A23B]">
                 {isSharing ? 'LIVE LOCATION MAP' : 'SUPERVISOR ASSIGNED'}
               </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
                 isSharing ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-[#2D453B] text-[#A3B8B0]'
               }`}>
                 {isSharing ? 'Sharing On' : 'Sharing Off'}
@@ -381,16 +422,16 @@ export default function LiveTrackingRadar({
         </div>
 
         {/* Uber/Rapido Distance & ETA Pill */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {distanceKm !== null && isSharing && etaInfo && (
-            <div className="px-3.5 py-1.5 rounded-xl bg-[#2D453B] border border-[#3E5C4F] flex items-center gap-3">
+            <div className="px-4 py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-3.5 shadow-sm">
               <div>
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">Distance</span>
-                <span className="text-xs font-black text-[#E9A23B] tnum">{etaInfo.distanceText}</span>
+                <span className="text-xs sm:text-sm font-black text-[#E9A23B] tnum">{etaInfo.distanceText}</span>
               </div>
-              <div className="border-l border-[#3E5C4F] pl-2.5">
+              <div className="border-l border-[#3E5C4F] pl-3">
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">ETA</span>
-                <span className="text-xs font-black text-emerald-300 tnum">{etaInfo.etaText}</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-300 tnum">{etaInfo.etaText}</span>
               </div>
             </div>
           )}
@@ -399,7 +440,7 @@ export default function LiveTrackingRadar({
             href={navUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+            className="px-3.5 py-2 rounded-2xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
           >
             <span>Open Maps</span>
             <LuExternalLink className="w-3.5 h-3.5" />
@@ -407,23 +448,54 @@ export default function LiveTrackingRadar({
         </div>
       </div>
 
-      {/* Map Canvas with Floating Uber-Style Live Pill */}
+      {/* Map Canvas with Large Responsive Height and Floating Controls */}
       <div className="relative">
         <div
           ref={mapContainerRef}
-          className="w-full h-60 sm:h-72 bg-[#0C1B16]"
-          style={{ minHeight: '230px' }}
+          className="w-full h-80 sm:h-[440px] md:h-[500px] bg-[#0C1B16] transition-all"
+          style={{ minHeight: '340px' }}
         />
+
+        {/* Floating Map Navigation Controls */}
+        <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-10">
+          <button
+            type="button"
+            onClick={handleRecenterSupervisor}
+            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#E9A23B] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+            title="Focus on Supervisor"
+          >
+            <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B]" />
+            <span className="hidden sm:inline">Supervisor</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleRecenterDestination}
+            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+            title="Focus on Destination Doorstep"
+          >
+            <LuMapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Doorstep</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleFitRoute}
+            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#A3B8B0] hover:text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+            title="Fit Full Route"
+          >
+            <LuCompass className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Fit Route</span>
+          </button>
+        </div>
 
         {/* Floating Uber/Rapido Live Arrival Pill on Map */}
         {isSharing && etaInfo && (
-          <div className="absolute top-3 left-3 right-3 sm:right-auto z-10 pointer-events-none">
-            <div className={`backdrop-blur-md px-3.5 py-2 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
+          <div className="absolute top-3 left-3 right-16 sm:right-auto z-10 pointer-events-none">
+            <div className={`backdrop-blur-md px-4 py-2.5 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
               etaInfo.isArrived
-                ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200'
-                : 'bg-[#10231D]/90 border-[#E9A23B]/60 text-[#F4EFE6]'
+                ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200'
+                : 'bg-[#10231D]/95 border-[#E9A23B]/60 text-[#F4EFE6]'
             }`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${etaInfo.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B]'} relative flex items-center justify-center`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${etaInfo.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B]'} relative flex items-center justify-center shrink-0`}>
                 <span className={`w-2.5 h-2.5 rounded-full ${etaInfo.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B]'} absolute inset-0 animate-ping opacity-75`} />
               </span>
               <div>
@@ -431,11 +503,11 @@ export default function LiveTrackingRadar({
                   <span className="font-black text-xs uppercase tracking-wide">
                     {etaInfo.distanceText}
                   </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-black/50 text-[#E9A23B] font-bold">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 text-[#E9A23B] font-bold">
                     {etaInfo.etaText}
                   </span>
                 </div>
-                <p className="text-[10px] text-[#A3B8B0]">
+                <p className="text-[10px] text-[#A3B8B0] line-clamp-1">
                   {etaInfo.statusText}
                 </p>
               </div>
@@ -445,7 +517,7 @@ export default function LiveTrackingRadar({
 
         {/* Live overlay update time */}
         <div className="absolute bottom-3 right-3 pointer-events-none">
-          <div className="bg-[#10231D]/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0]">
+          <div className="bg-[#10231D]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
             <LuCompass className="w-3 h-3 text-[#E9A23B]" />
             <span>Updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
