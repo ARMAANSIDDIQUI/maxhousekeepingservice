@@ -361,7 +361,7 @@ export default function AddressPickerWithMap({
     }
   }, [mapLoaded]);
 
-  // Debounced search on Google Places Autocomplete
+  // Debounced search dynamically fetched via Google Places Autocomplete API with Nearest Location Biasing
   const handleStreetInputChange = (e) => {
     const query = e.target.value;
     setStreetQuery(query);
@@ -381,22 +381,75 @@ export default function AddressPickerWithMap({
       }
 
       setIsSearching(true);
+
+      const request = {
+        input: query,
+        sessionToken: sessionTokenRef.current,
+        componentRestrictions: { country: 'in' }
+      };
+
+      // Dynamic nearest-location biasing: prioritize places closest to the user's doorstep / city
+      if (coordinates && typeof coordinates.lat === 'number') {
+        if (window.google?.maps?.LatLng) {
+          request.origin = new window.google.maps.LatLng(coordinates.lat, coordinates.lng);
+        }
+        request.locationBias = {
+          radius: 35000,
+          center: { lat: coordinates.lat, lng: coordinates.lng }
+        };
+      }
+
       autocompleteServiceRef.current.getPlacePredictions(
-        {
-          input: query,
-          sessionToken: sessionTokenRef.current,
-          componentRestrictions: { country: 'in' }
-        },
+        request,
         (results, status) => {
           setIsSearching(false);
           const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
 
           if (status === isOk && results && results.length > 0) {
-            setPredictions(results.slice(0, 8));
+            // Sort dynamically fetched places by nearest distance from current location
+            const sorted = [...results].sort((a, b) => {
+              if (a.distance_meters != null && b.distance_meters != null) {
+                return a.distance_meters - b.distance_meters;
+              }
+              return 0;
+            });
+            setPredictions(sorted.slice(0, 8));
             setShowPredictions(true);
           } else {
-            setPredictions([]);
-            setShowPredictions(false);
+            // Dynamic fallback: Query Google Geocoder API over the network
+            if (geocoderRef.current) {
+              const fullSearch = cityText && !query.toLowerCase().includes(cityText.toLowerCase())
+                ? `${query}, ${cityText}`
+                : query;
+              geocoderRef.current.geocode(
+                {
+                  address: fullSearch,
+                  componentRestrictions: { country: 'in' }
+                },
+                (geoResults, geoStatus) => {
+                  if (geoStatus === 'OK' && geoResults && geoResults.length > 0) {
+                    const mapped = geoResults.slice(0, 6).map((g) => ({
+                      place_id: g.place_id,
+                      description: g.formatted_address,
+                      geometry: g.geometry,
+                      address_components: g.address_components,
+                      structured_formatting: {
+                        main_text: g.formatted_address.split(',')[0],
+                        secondary_text: g.formatted_address.split(',').slice(1).join(',').trim()
+                      }
+                    }));
+                    setPredictions(mapped);
+                    setShowPredictions(true);
+                  } else {
+                    setPredictions([]);
+                    setShowPredictions(false);
+                  }
+                }
+              );
+            } else {
+              setPredictions([]);
+              setShowPredictions(false);
+            }
           }
         }
       );
@@ -486,6 +539,24 @@ export default function AddressPickerWithMap({
   const handleSelectPrediction = (prediction) => {
     setShowPredictions(false);
     setStreetQuery(prediction.description);
+
+    if (prediction.geometry?.location) {
+      const lat = typeof prediction.geometry.location.lat === 'function'
+        ? prediction.geometry.location.lat()
+        : prediction.geometry.location.lat;
+      const lng = typeof prediction.geometry.location.lng === 'function'
+        ? prediction.geometry.location.lng()
+        : prediction.geometry.location.lng;
+      const newCoords = { lat, lng };
+      const comps = extractAddressComponents(prediction, true);
+      applyLocationCoordinates(newCoords, {
+        line1: prediction.description,
+        city: comps.city,
+        state: comps.state,
+        pincode: comps.pincode
+      });
+      return;
+    }
 
     if (!placesServiceRef.current || !prediction.place_id) {
       handleRefineLocationFromSearch(prediction.description);
@@ -692,7 +763,7 @@ export default function AddressPickerWithMap({
           <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#E2D9C8] rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
             <div className="px-3 py-1.5 bg-[#F4EFE6] border-b border-[#E2D9C8] text-[10px] font-bold text-[#6B8077] flex items-center justify-between">
               <span>SUGGESTED AREAS & LANDMARKS</span>
-              <span>Select to refine map pinpoint</span>
+              <span>Nearest locations shown first</span>
             </div>
             {predictions.map((p) => (
               <button
@@ -703,9 +774,18 @@ export default function AddressPickerWithMap({
               >
                 <LuMapPin className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-[#10231D] truncate">
-                    {p.structured_formatting?.main_text || p.description}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-[#10231D] truncate">
+                      {p.structured_formatting?.main_text || p.description}
+                    </p>
+                    {p.distance_meters != null && (
+                      <span className="text-[10px] font-semibold text-[#6B8077] bg-[#ECE5D8] px-1.5 py-0.5 rounded shrink-0">
+                        {p.distance_meters < 1000
+                          ? `${Math.round(p.distance_meters)}m away`
+                          : `${(p.distance_meters / 1000).toFixed(1)} km away`}
+                      </span>
+                    )}
+                  </div>
                   {p.structured_formatting?.secondary_text && (
                     <p className="text-[11px] text-[#6B8077] truncate">
                       {p.structured_formatting.secondary_text}
