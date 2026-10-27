@@ -12,7 +12,6 @@ import {
   LuLock
 } from 'react-icons/lu';
 import { loadGoogleMapsScript } from '../../utils/googleMapsLoader';
-import { searchLocalities } from '../../utils/serviceLocalities';
 
 /**
  * AddressPickerWithMap
@@ -362,7 +361,7 @@ export default function AddressPickerWithMap({
     }
   }, [mapLoaded]);
 
-  // Debounced search on Autocomplete with instant curated local directory fallback
+  // Debounced search on Google Places Autocomplete
   const handleStreetInputChange = (e) => {
     const query = e.target.value;
     setStreetQuery(query);
@@ -376,30 +375,8 @@ export default function AddressPickerWithMap({
       return;
     }
 
-    // 1. Immediately compute curated local matches for instant responsiveness
-    const localMatches = searchLocalities(query, cityText || defaultCity).map(item => ({
-      place_id: `local_${item.name}_${item.pincode}`,
-      description: `${item.name}, ${item.area ? item.area + ', ' : ''}${item.city}`,
-      isLocal: true,
-      data: item,
-      structured_formatting: {
-        main_text: item.name,
-        secondary_text: `${item.area ? item.area + ' • ' : ''}${item.city} (${item.pincode})`
-      }
-    }));
-
-    if (localMatches.length > 0) {
-      setPredictions(localMatches);
-      setShowPredictions(true);
-    }
-
-    // 2. Debounced query to Google Places Autocomplete if service is loaded
     debounceTimerRef.current = setTimeout(() => {
       if (!autocompleteServiceRef.current || disabled) {
-        if (localMatches.length > 0) {
-          setPredictions(localMatches);
-          setShowPredictions(true);
-        }
         return;
       }
 
@@ -415,26 +392,18 @@ export default function AddressPickerWithMap({
           const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
 
           if (status === isOk && results && results.length > 0) {
-            // Merge Google results with local service matches
-            const combined = [...results, ...localMatches.filter(l => !results.some(r => r.description.toLowerCase().includes(l.data.name.toLowerCase())))];
-            setPredictions(combined.slice(0, 8));
+            setPredictions(results.slice(0, 8));
             setShowPredictions(true);
           } else {
-            // Google Places returned REQUEST_DENIED, ZERO_RESULTS or billing notice -> use local matches
-            if (localMatches.length > 0) {
-              setPredictions(localMatches);
-              setShowPredictions(true);
-            } else {
-              setPredictions([]);
-              setShowPredictions(false);
-            }
+            setPredictions([]);
+            setShowPredictions(false);
           }
         }
       );
     }, 300);
   };
 
-  // Refine pinpoint directly using search text (via Geocoder or local search)
+  // Refine pinpoint directly using search text via Google Geocoder
   const handleRefineLocationFromSearch = (searchText = streetQuery) => {
     const query = (searchText || '').trim();
     if (!query) return;
@@ -442,25 +411,14 @@ export default function AddressPickerWithMap({
     setShowPredictions(false);
     setIsSearching(true);
 
-    // Check local directory first for high precision
-    const localMatches = searchLocalities(query, cityText || defaultCity);
-    if (localMatches.length > 0) {
-      const match = localMatches[0];
-      applyLocationCoordinates(match.coordinates, {
-        line1: `${match.name}, ${match.area ? match.area + ', ' : ''}${match.city}`,
-        city: match.city,
-        state: match.state,
-        pincode: match.pincode
-      });
-      setIsSearching(false);
-      return;
-    }
-
-    // Geocode query if no direct local match
     if (geocoderRef.current) {
+      const fullSearchAddress = cityText && !query.toLowerCase().includes(cityText.toLowerCase())
+        ? `${query}, ${cityText}`
+        : query;
+
       geocoderRef.current.geocode(
         {
-          address: query,
+          address: fullSearchAddress,
           componentRestrictions: { country: 'in' }
         },
         (results, status) => {
@@ -527,20 +485,6 @@ export default function AddressPickerWithMap({
   // When user selects a prediction from the dropdown
   const handleSelectPrediction = (prediction) => {
     setShowPredictions(false);
-
-    // A. Curated Local Item selected
-    if (prediction.isLocal && prediction.data) {
-      const item = prediction.data;
-      applyLocationCoordinates(item.coordinates, {
-        line1: `${item.name}, ${item.area ? item.area + ', ' : ''}${item.city}`,
-        city: item.city,
-        state: item.state,
-        pincode: item.pincode
-      });
-      return;
-    }
-
-    // B. Google Places item selected
     setStreetQuery(prediction.description);
 
     if (!placesServiceRef.current || !prediction.place_id) {
@@ -762,15 +706,12 @@ export default function AddressPickerWithMap({
                   <p className="text-xs font-bold text-[#10231D] truncate">
                     {p.structured_formatting?.main_text || p.description}
                   </p>
-                  <p className="text-[11px] text-[#6B8077] truncate">
-                    {p.structured_formatting?.secondary_text || (p.isLocal ? `${p.data?.city} (${p.data?.pincode})` : '')}
-                  </p>
+                  {p.structured_formatting?.secondary_text && (
+                    <p className="text-[11px] text-[#6B8077] truncate">
+                      {p.structured_formatting.secondary_text}
+                    </p>
+                  )}
                 </div>
-                {p.isLocal && (
-                  <span className="text-[9px] font-bold bg-[#E9A23B]/15 text-[#8C4F00] px-1.5 py-0.5 rounded shrink-0">
-                    Verified Area
-                  </span>
-                )}
               </button>
             ))}
           </div>

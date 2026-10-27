@@ -636,6 +636,13 @@ export async function updateSupervisorBookingStatus(req, res, next) {
       });
     }
 
+    if (status === 'completed' && !booking.otpVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot mark work as completed: Customer arrival OTP must be verified first.'
+      });
+    }
+
     if (status) {
       booking.status = status;
       // Immediately terminate live location sharing as soon as service is completed or cancelled

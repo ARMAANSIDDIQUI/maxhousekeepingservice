@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import {
   LuShieldCheck,
   LuCalendar,
@@ -29,6 +29,7 @@ import {
   LuZap,
   LuNavigation,
   LuKey,
+  LuLock,
   LuSlidersHorizontal,
   LuCompass,
   LuRadio
@@ -85,6 +86,11 @@ export default function SupervisorDashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Admins are not supervisors - redirect admins to Admin Panel
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
+
   const [stats, setStats] = useState({
     totalAssigned: 0,
     todayBookings: 0,
@@ -117,10 +123,6 @@ export default function SupervisorDashboard() {
     toast.success(`Duty status: ${status === 'active' ? 'Active on Duty' : status === 'onsite' ? 'On Site Inspection' : status === 'break' ? 'On Break' : 'Off Duty'}`);
   };
 
-  // Admin Fleet Switcher - default to current user's assigned bookings
-  const [supervisorsList, setSupervisorsList] = useState([]);
-  const [selectedSupervisorFilter, setSelectedSupervisorFilter] = useState('me');
-
   // Helper to verify if a booking is assigned to the currently logged in user
   const isAssignedToMe = (b) => {
     if (!b || !user) return false;
@@ -130,18 +132,6 @@ export default function SupervisorDashboard() {
     const assignedId = b.assignedSupervisor?.id ? String(b.assignedSupervisor.id._id || b.assignedSupervisor.id).trim() : '';
     return supId === currentUserId || assignedId === currentUserId;
   };
-
-  useEffect(() => {
-    if (isAdmin) {
-      supervisorAPI.getSupervisors()
-        .then(res => {
-          if (res?.success) {
-            setSupervisorsList(res.supervisors || []);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [isAdmin]);
 
   // Unassigned Open Dispatches Pool
   const [poolBookings, setPoolBookings] = useState([]);
@@ -342,11 +332,10 @@ export default function SupervisorDashboard() {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   // Fetch Supervisor Daily Schedule
-  const loadSchedule = async (date = scheduleDate, supId = selectedSupervisorFilter) => {
+  const loadSchedule = async (date = scheduleDate) => {
     setLoadingSchedule(true);
     try {
-      const filterParam = supId !== 'all' ? supId : undefined;
-      const res = await supervisorAPI.getSchedule(date, filterParam);
+      const res = await supervisorAPI.getSchedule(date);
       if (res?.success) {
         setScheduleData(res);
       }
@@ -448,14 +437,13 @@ export default function SupervisorDashboard() {
   };
 
   // Fetch Stats & Bookings
-  const loadData = async (supId = selectedSupervisorFilter) => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const filterParam = supId !== 'all' ? supId : undefined;
       const [statsRes, bookingsRes] = await Promise.all([
-        supervisorAPI.getStats(filterParam),
-        supervisorAPI.getBookings({ filter: activeFilter, supervisorId: filterParam }),
-        loadSchedule(scheduleDate, supId)
+        supervisorAPI.getStats(),
+        supervisorAPI.getBookings({ filter: activeFilter }),
+        loadSchedule(scheduleDate)
       ]);
 
       if (statsRes?.success && statsRes.stats) {
@@ -476,18 +464,18 @@ export default function SupervisorDashboard() {
   };
 
   useEffect(() => {
-    if (!isSupervisor && !isAdmin) {
+    if (!isSupervisor) {
       navigate('/login');
       return;
     }
-    loadData(selectedSupervisorFilter);
-  }, [activeFilter, isSupervisor, isAdmin, selectedSupervisorFilter]);
+    loadData();
+  }, [activeFilter, isSupervisor]);
 
   useEffect(() => {
-    if (isSupervisor || isAdmin) {
-      loadSchedule(scheduleDate, selectedSupervisorFilter);
+    if (isSupervisor) {
+      loadSchedule(scheduleDate);
     }
-  }, [scheduleDate, selectedSupervisorFilter]);
+  }, [scheduleDate, isSupervisor]);
 
   // Open modal and sync latest details
   const handleOpenBooking = async (b, initialTab) => {
@@ -642,17 +630,8 @@ export default function SupervisorDashboard() {
       return;
     }
     if (newStatus === 'completed' && !selectedBooking.otpVerified) {
-      setConfirmModal({
-        isOpen: true,
-        title: 'Customer OTP Not Verified',
-        message: 'Warning: Customer arrival OTP has not been verified yet! Do you still want to mark this booking as Completed?',
-        confirmText: 'Complete Job',
-        confirmVariant: 'warning',
-        onConfirm: () => {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-          executeUpdateStatus(newStatus);
-        }
-      });
+      toast.error('Work cannot be marked completed until customer arrival OTP is verified!');
+      setActiveModalTab('otp');
       return;
     }
     executeUpdateStatus(newStatus);
@@ -664,6 +643,12 @@ export default function SupervisorDashboard() {
   const executeMarkCompleted = async (b) => {
     if (!isAssignedToMe(b)) {
       toast.error('Access restricted: Only the assigned supervisor can complete this service visit.');
+      return;
+    }
+    if (!b.otpVerified) {
+      toast.error('Cannot mark service as completed: Customer arrival OTP must be verified first.');
+      setQuickOtpBooking(b);
+      setQuickOtpInput('');
       return;
     }
     setCompletingId(b._id);
@@ -690,30 +675,22 @@ export default function SupervisorDashboard() {
   const handleMarkCompleted = (b) => {
     if (!b) return;
     if (!b.otpVerified) {
-      setConfirmModal({
-        isOpen: true,
-        title: 'Customer OTP Not Verified',
-        message: `Warning: Customer arrival OTP for #${b.bookingCode} has not been verified yet! Do you still want to mark this booking as Completed?`,
-        confirmText: 'Complete Job',
-        confirmVariant: 'warning',
-        onConfirm: () => {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-          executeMarkCompleted(b);
-        }
-      });
-    } else {
-      setConfirmModal({
-        isOpen: true,
-        title: 'Confirm Service Completion',
-        message: `Confirm service completion for #${b.bookingCode}? This will mark the booking as Completed and finalize the visit.`,
-        confirmText: 'Complete Job',
-        confirmVariant: 'primary',
-        onConfirm: () => {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-          executeMarkCompleted(b);
-        }
-      });
+      toast.error(`Cannot complete job: Customer arrival OTP for #${b.bookingCode} must be verified first!`);
+      setQuickOtpBooking(b);
+      setQuickOtpInput('');
+      return;
     }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirm Service Completion',
+      message: `Confirm service completion for #${b.bookingCode}? This will mark the booking as Completed and finalize the visit.`,
+      confirmText: 'Complete Job',
+      confirmVariant: 'primary',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        executeMarkCompleted(b);
+      }
+    });
   };
 
   // Filter Bookings by search term
@@ -789,31 +766,6 @@ export default function SupervisorDashboard() {
               ))}
             </div>
 
-            {/* Admin Fleet Switcher */}
-            {isAdmin && supervisorsList.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/20">
-                <LuCompass className="w-3.5 h-3.5 text-[#E9A23B]" />
-                <span className="text-[11px] font-bold text-[#E9A23B] hidden sm:inline">Fleet:</span>
-                <select
-                  value={selectedSupervisorFilter}
-                  onChange={(e) => setSelectedSupervisorFilter(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-[#F4EFE6] focus:outline-none cursor-pointer"
-                >
-                  <option value="me" className="bg-[#10231D] text-[#F4EFE6]">My Assigned Visits ({user?.name || 'Me'})</option>
-                  <option value="all" className="bg-[#10231D] text-[#F4EFE6]">All Fleet Dispatches</option>
-                  {supervisorsList.map(s => (
-                    <option key={s._id} value={s._id} className="bg-[#10231D] text-[#F4EFE6]">
-                      {s.name} ({s.city || 'Moradabad'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-
-
-
-
             <button
               type="button"
               onClick={() => loadData()}
@@ -823,16 +775,6 @@ export default function SupervisorDashboard() {
             >
               <LuRotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
-
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => navigate('/admin')}
-                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#E9A23B] transition-colors"
-              >
-                Admin
-              </button>
-            )}
 
             <button
               type="button"
@@ -2403,15 +2345,30 @@ export default function SupervisorDashboard() {
 
               <div className="flex items-center gap-2">
                 {selectedBooking.status !== 'completed' && (
-                  <button
-                    type="button"
-                    onClick={() => handleMarkCompleted(selectedBooking)}
-                    disabled={completingId === selectedBooking._id}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  >
-                    <LuCircleCheck className="w-4 h-4 text-emerald-200" />
-                    <span>{completingId === selectedBooking._id ? 'Completing...' : 'Work Done (Complete)'}</span>
-                  </button>
+                  selectedBooking.otpVerified ? (
+                    <button
+                      type="button"
+                      onClick={() => handleMarkCompleted(selectedBooking)}
+                      disabled={completingId === selectedBooking._id}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <LuCircleCheck className="w-4 h-4 text-emerald-200" />
+                      <span>{completingId === selectedBooking._id ? 'Completing...' : 'Work Done (Complete)'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.error('Customer arrival OTP must be verified before marking work as completed.');
+                        setActiveModalTab('otp');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#6B8077] border border-[#E2D9C8] text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title="Customer arrival OTP must be verified before service completion"
+                    >
+                      <LuLock className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>Complete Locked (OTP Required)</span>
+                    </button>
+                  )
                 )}
                 {!selectedBooking.otpVerified && (
                   <button
@@ -2420,7 +2377,7 @@ export default function SupervisorDashboard() {
                       setQuickOtpBooking(selectedBooking);
                       setQuickOtpInput('');
                     }}
-                    className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer animate-pulse"
                   >
                     <LuKey className="w-4 h-4" />
                     <span>Verify OTP</span>

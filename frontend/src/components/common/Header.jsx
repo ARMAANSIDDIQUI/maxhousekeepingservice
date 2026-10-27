@@ -368,7 +368,7 @@ export default function Header() {
               </Link>
             )}
 
-            {user && (user.role === 'supervisor' || isAdmin) && (
+            {user && user.role === 'supervisor' && !isAdmin && (
               <Link
                 to="/supervisor"
                 className="px-2.5 py-1 rounded-lg bg-[#E9A23B] text-[#10231D] text-xs font-black hover:bg-[#D48E28] transition-colors flex items-center gap-1 shadow-xs"
@@ -425,7 +425,7 @@ export default function Header() {
                       </Link>
                     )}
 
-                    {(user?.role === 'supervisor' || isAdmin) && (
+                    {user?.role === 'supervisor' && !isAdmin && (
                       <Link
                         to="/supervisor"
                         onClick={() => setIsUserMenuOpen(false)}
@@ -568,7 +568,7 @@ export default function Header() {
             >
               Track Order
             </Link>
-            {user && (user?.role === 'supervisor' || isAdmin) && (
+            {user && user?.role === 'supervisor' && !isAdmin && (
               <Link
                 to="/supervisor"
                 onClick={() => setIsMobileMenuOpen(false)}
