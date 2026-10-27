@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import Service from '../models/Service.js';
 import Category from '../models/Category.js';
 import Booking from '../models/Booking.js';
@@ -152,10 +153,13 @@ export async function updateBooking(req, res, next) {
           if (!booking.serviceOtp) {
             booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
           }
+          if (['pending', 'assigned'].includes(booking.status) || !booking.status) {
+            booking.status = 'confirmed';
+          }
           booking.statusHistory.push({
             status: booking.status,
             timestamp: new Date(),
-            note: `Supervisor ${sup.name} assigned to booking`,
+            note: `Supervisor ${sup.name} assigned to booking. Status automatically updated to confirmed.`,
             updatedBy: req.user?._id
           });
         }
@@ -216,7 +220,13 @@ export async function updateBooking(req, res, next) {
 export async function deleteBooking(req, res, next) {
   try {
     const { id } = req.params;
-    const booking = await Booking.findByIdAndDelete(id);
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findByIdAndDelete(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOneAndDelete({ bookingCode: id });
+    }
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
@@ -560,7 +570,10 @@ export async function deleteService(req, res, next) {
  */
 export async function getAdminCoupons(req, res, next) {
   try {
-    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    const coupons = await Coupon.find()
+      .populate('applicableServices', 'title slug price')
+      .populate('applicableCategories', 'name slug')
+      .sort({ createdAt: -1 });
     res.status(200).json({ success: true, coupons });
   } catch (err) {
     next(err);
@@ -569,7 +582,10 @@ export async function getAdminCoupons(req, res, next) {
 
 export async function createCoupon(req, res, next) {
   try {
-    const coupon = await Coupon.create(req.body);
+    let coupon = await Coupon.create(req.body);
+    coupon = await Coupon.findById(coupon._id)
+      .populate('applicableServices', 'title slug price')
+      .populate('applicableCategories', 'name slug');
     res.status(201).json({ success: true, coupon });
   } catch (err) {
     next(err);
@@ -578,7 +594,9 @@ export async function createCoupon(req, res, next) {
 
 export async function updateCoupon(req, res, next) {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true })
+      .populate('applicableServices', 'title slug price')
+      .populate('applicableCategories', 'name slug');
     res.status(200).json({ success: true, coupon });
   } catch (err) {
     next(err);
@@ -1155,6 +1173,48 @@ export async function deleteSupervisor(req, res, next) {
 }
 
 /**
+ * Helper to parse time window string into start and end minutes from midnight (0-1440)
+ * Handles "08:00 AM - 10:00 AM", "Morning (8:00 AM – 11:00 AM)", etc.
+ */
+export function parseTimeWindowRange(windowStr) {
+  if (!windowStr || typeof windowStr !== 'string') return null;
+  const clean = windowStr.replace(/[\u2013\u2014]/g, '-');
+  const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/gi;
+  const matches = [...clean.matchAll(timeRegex)];
+  if (matches.length >= 2) {
+    const parseToMinutes = (h, m, meridiem) => {
+      let hours = parseInt(h, 10);
+      const minutes = m ? parseInt(m, 10) : 0;
+      if (meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    };
+    return {
+      start: parseToMinutes(matches[0][1], matches[0][2], matches[0][3]),
+      end: parseToMinutes(matches[1][1], matches[1][2], matches[1][3])
+    };
+  }
+  return null;
+}
+
+/**
+ * Checks whether two time window intervals overlap
+ */
+export function doTimeWindowsOverlap(winA, winB) {
+  if (!winA || !winB) return false;
+  const cleanA = String(winA).trim().toLowerCase().replace(/[\u2013\u2014]/g, '-');
+  const cleanB = String(winB).trim().toLowerCase().replace(/[\u2013\u2014]/g, '-');
+  if (cleanA === cleanB) return true;
+
+  const rangeA = parseTimeWindowRange(cleanA);
+  const rangeB = parseTimeWindowRange(cleanB);
+  if (rangeA && rangeB) {
+    return Math.max(rangeA.start, rangeB.start) < Math.min(rangeA.end, rangeB.end);
+  }
+  return cleanA.includes(cleanB) || cleanB.includes(cleanA);
+}
+
+/**
  * Assign Supervisor and Time Slot to Booking (Admin)
  * PUT /api/v1/admin/bookings/:id/assign
  */
@@ -1181,20 +1241,30 @@ export async function assignSupervisorToBooking(req, res, next) {
     const targetDate = assignedSlot?.date || booking.slot?.date;
     const targetWindow = assignedSlot?.timeWindow || assignedSlot?.window || booking.slot?.window;
 
-    // Time slot conflict check: verify supervisor is not already booked in this slot
+    // Time slot conflict check: verify supervisor is not already booked in an overlapping slot
     if (targetDate && targetWindow && !allowConflict) {
-      const existingConflict = await Booking.findOne({
+      const datePrefix = String(targetDate).slice(0, 10);
+      const candidateBookings = await Booking.find({
         _id: { $ne: booking._id },
+        status: { $in: ['confirmed', 'in_progress', 'pending', 'assigned', 'approved'] },
         $or: [
           { supervisor: supervisor._id },
           { 'assignedSupervisor.id': supervisor._id }
         ],
-        status: { $in: ['confirmed', 'in_progress', 'pending'] },
-        $or: [
-          { 'assignedSlot.date': targetDate, 'assignedSlot.timeWindow': targetWindow },
-          { 'slot.date': targetDate, 'slot.window': targetWindow }
+        $and: [
+          {
+            $or: [
+              { 'assignedSlot.date': new RegExp('^' + datePrefix) },
+              { 'slot.date': new RegExp('^' + datePrefix) }
+            ]
+          }
         ]
       }).select('bookingCode serviceTitle customer slot assignedSlot status');
+
+      const existingConflict = candidateBookings.find(b => {
+        const bWindow = b.assignedSlot?.timeWindow || b.slot?.window;
+        return doTimeWindowsOverlap(bWindow, targetWindow);
+      });
 
       if (existingConflict) {
         return res.status(409).json({
@@ -1209,7 +1279,7 @@ export async function assignSupervisorToBooking(req, res, next) {
             timeWindow: existingConflict.assignedSlot?.timeWindow || existingConflict.slot?.window,
             status: existingConflict.status
           },
-          message: `Time Slot Conflict: Supervisor ${supervisor.name} is already allotted to Booking #${existingConflict.bookingCode} (${existingConflict.serviceTitle || 'Service'}) on ${targetDate} during ${targetWindow}. Enable admin override if you wish to proceed.`
+          message: `Time Slot Conflict: Supervisor ${supervisor.name} is already allotted to Booking #${existingConflict.bookingCode} (${existingConflict.serviceTitle || 'Service'}) on this date during ${existingConflict.assignedSlot?.timeWindow || existingConflict.slot?.window}. Enable admin override if you wish to proceed.`
         });
       }
     }
@@ -1220,6 +1290,7 @@ export async function assignSupervisorToBooking(req, res, next) {
       name: supervisor.name,
       phone: supervisor.phone,
       email: supervisor.email,
+      avatar: supervisor.avatar || supervisor.avatarUrl || '',
       assignedAt: new Date()
     };
 
@@ -1240,12 +1311,12 @@ export async function assignSupervisorToBooking(req, res, next) {
       booking.serviceOtp = crypto.randomInt(1000, 10000).toString();
     }
 
-    // Update status if currently pending
-    if (booking.status === 'pending') {
+    // Update status automatically to confirmed when supervisor is assigned
+    if (['pending', 'assigned'].includes(booking.status) || !booking.status) {
       booking.status = 'confirmed';
     }
 
-    const assignmentNote = note || `Assigned to supervisor ${supervisor.name} for slot: ${booking.slot.date} (${booking.slot.window})`;
+    const assignmentNote = note || `Assigned to supervisor ${supervisor.name} for slot: ${booking.slot.date} (${booking.slot.window}). Status automatically confirmed.`;
     booking.statusHistory.push({
       status: booking.status,
       timestamp: new Date(),
@@ -1282,12 +1353,14 @@ export async function getSupervisorSlotAvailability(req, res, next) {
       .sort({ name: 1 })
       .lean();
 
+    const datePrefix = String(date).slice(0, 10);
+
     // Query all active bookings for this date
     const bookingQuery = {
-      status: { $in: ['confirmed', 'in_progress', 'pending'] },
+      status: { $in: ['confirmed', 'in_progress', 'pending', 'assigned', 'approved'] },
       $or: [
-        { 'assignedSlot.date': date },
-        { 'slot.date': date }
+        { 'assignedSlot.date': new RegExp('^' + datePrefix) },
+        { 'slot.date': new RegExp('^' + datePrefix) }
       ]
     };
     if (excludeBookingId) {
@@ -1314,7 +1387,7 @@ export async function getSupervisorSlotAvailability(req, res, next) {
       if (timeWindow) {
         slotConflictBooking = supDayBookings.find(b => {
           const bWindow = b.assignedSlot?.timeWindow || b.slot?.window;
-          return bWindow && bWindow.trim().toLowerCase() === timeWindow.trim().toLowerCase();
+          return doTimeWindowsOverlap(bWindow, timeWindow);
         });
         isBusyInSlot = Boolean(slotConflictBooking);
       }

@@ -21,6 +21,8 @@ import { useBooking } from '../context/BookingContext';
 import { FaInstagram } from 'react-icons/fa6';
 import SEO from '../components/common/SEO';
 
+import { formatDateDMY } from '../utils/date';
+
 export default function TrackBookingPage() {
   const { settings } = useBooking();
   const { code } = useParams();
@@ -187,11 +189,17 @@ export default function TrackBookingPage() {
                       <LuCopy className="w-4 h-4" />
                     </button>
                   </div>
-                  <span className={`text-[10px] font-bold mt-1.5 uppercase ${
-                    booking.otpVerified ? 'text-emerald-400' : 'text-[#E9A23B]'
-                  }`}>
-                    {booking.otpVerified ? '✓ Verified on Visit' : 'Pending Verification at Visit'}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {booking.otpVerified ? (
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-1">
+                        <LuCheck className="w-3 h-3" /> Verified on Visit
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-[#E9A23B] uppercase">
+                        Pending Verification at Visit
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -199,24 +207,50 @@ export default function TrackBookingPage() {
             {/* ASSIGNED SUPERVISOR & TIME SLOT */}
             {Boolean(booking.assignedSupervisor?.name || booking.supervisor?.name) ? (() => {
               const sup = booking.assignedSupervisor?.name ? booking.assignedSupervisor : booking.supervisor;
+              const avatarUrl = sup.avatar || sup.photo;
               return (
                 <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                      <LuShieldCheck className="w-5 h-5" />
-                    </div>
+                    {avatarUrl ? (
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatarUrl}
+                          alt={sup.name}
+                          className="w-13 h-13 rounded-2xl object-cover border-2 border-[#E9A23B] shadow-sm"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'flex';
+                            }
+                          }}
+                        />
+                        <div
+                          style={{ display: 'none' }}
+                          className="w-13 h-13 rounded-2xl bg-[#10231D] text-[#E9A23B] items-center justify-center font-bold text-base shadow-sm border border-[#E2D9C8]"
+                        >
+                          {sup.name?.charAt(0)?.toUpperCase() || 'S'}
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
+                          <LuCheck className="w-2.5 h-2.5 text-white" />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-13 h-13 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-base shadow-xs shrink-0 border border-[#E2D9C8]">
+                        <LuShieldCheck className="w-6 h-6" />
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono uppercase text-[#6B8077] font-bold">
                           ASSIGNED SUPERVISOR & LEAD
                         </span>
-                        <span className="px-2 py-0.2 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 uppercase">
-                          Dispatched
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 uppercase flex items-center gap-1">
+                          <LuCheck className="w-2.5 h-2.5" /> Dispatched
                         </span>
                       </div>
                       <p className="font-bold text-sm text-[#10231D]">{sup.name}</p>
                       <p className="text-[11px] text-[#6B8077]">
-                        Scheduled Window: <span className="font-semibold text-[#10231D]">{booking.assignedSlot?.date || booking.slot?.date} ({booking.assignedSlot?.timeWindow || booking.slot?.window})</span>
+                        Scheduled Window: <span className="font-semibold text-[#10231D]">{formatDateDMY(booking.assignedSlot?.date || booking.slot?.date)} ({booking.assignedSlot?.timeWindow || booking.slot?.window})</span>
                       </p>
                     </div>
                   </div>
@@ -241,7 +275,7 @@ export default function TrackBookingPage() {
                   <div className="text-xs">
                     <p className="font-bold text-[#10231D]">Field Supervisor Allocation in Progress</p>
                     <p className="text-[#6B8077] text-[11px]">
-                      Our operations dispatch team is currently allocating an area supervisor for your reserved slot ({booking.slot?.date} • {booking.slot?.window}).
+                      Our operations dispatch team is currently allocating an area supervisor for your reserved slot ({formatDateDMY(booking.slot?.date)} • {booking.slot?.window}).
                     </p>
                   </div>
                 </div>
@@ -298,7 +332,7 @@ export default function TrackBookingPage() {
               </div>
               <div>
                 <p className="text-[#6B8077] font-semibold">SCHEDULE:</p>
-                <p className="font-bold text-[#10231D] text-sm">{booking.slot?.date}</p>
+                <p className="font-bold text-[#10231D] text-sm">{formatDateDMY(booking.slot?.date)}</p>
                 <p className="text-[#3D524A]">{booking.slot?.window}</p>
               </div>
               <div className="sm:col-span-2 pt-2 border-t border-[#E2D9C8]">

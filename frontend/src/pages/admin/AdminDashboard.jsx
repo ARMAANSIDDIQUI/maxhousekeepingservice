@@ -39,8 +39,11 @@ import {
   LuKey,
   LuUserCheck,
   LuCopy,
-  LuTriangleAlert
+  LuTriangleAlert,
+  LuGift,
+  LuPercent
 } from 'react-icons/lu';
+import { formatDateDMY } from '../../utils/date';
 import {
   apiRequest,
   adminAPI,
@@ -127,12 +130,17 @@ export default function AdminDashboard() {
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [couponForm, setCouponForm] = useState({
     code: '',
+    description: '',
     discountType: 'flat',
     discountValue: 100,
     minOrderValue: 499,
     maxDiscount: 500,
     expiryDate: '',
-    usageLimit: 1000
+    usageLimit: 1000,
+    firstBookingOnly: false,
+    oncePerUser: true,
+    showInOffers: true,
+    applicableServices: []
   });
   const [savingCoupon, setSavingCoupon] = useState(false);
 
@@ -2260,6 +2268,7 @@ export default function AdminDashboard() {
     try {
       const payload = {
         code: couponForm.code.trim().toUpperCase(),
+        description: couponForm.description?.trim() || '',
         discountType: couponForm.discountType,
         discountValue: Number(couponForm.discountValue),
         minOrderValue: Number(couponForm.minOrderValue) || 0,
@@ -2268,6 +2277,10 @@ export default function AdminDashboard() {
         usageLimit: Number(couponForm.usageLimit) || 1000,
         expiryDate: couponForm.expiryDate ? new Date(couponForm.expiryDate) : undefined,
         validUntil: couponForm.expiryDate ? new Date(couponForm.expiryDate) : undefined,
+        firstBookingOnly: Boolean(couponForm.firstBookingOnly),
+        oncePerUser: Boolean(couponForm.oncePerUser),
+        showInOffers: Boolean(couponForm.showInOffers),
+        applicableServices: couponForm.applicableServices || [],
         isActive: true
       };
       const res = await adminAPI.createCoupon(payload);
@@ -2277,12 +2290,17 @@ export default function AdminDashboard() {
         setCouponModalOpen(false);
         setCouponForm({
           code: '',
+          description: '',
           discountType: 'flat',
           discountValue: 100,
           minOrderValue: 499,
           maxDiscount: 500,
           expiryDate: '',
-          usageLimit: 1000
+          usageLimit: 1000,
+          firstBookingOnly: false,
+          oncePerUser: true,
+          showInOffers: true,
+          applicableServices: []
         });
       }
     } catch (err) {
@@ -3454,7 +3472,7 @@ export default function AdminDashboard() {
                                 : 'bg-amber-100 text-amber-800 border border-amber-200'
                             }`}>
                               <LuKey className="w-2.5 h-2.5" />
-                              <span>{b.otpVerified ? 'OTP Verified' : `OTP: ${b.serviceOtp}`}</span>
+                              <span>{b.otpVerified ? 'OTP Verified' : 'Arrival OTP Pending'}</span>
                             </span>
                           )}
                         </td>
@@ -5882,29 +5900,165 @@ export default function AdminDashboard() {
         {/* ========================================================
             MODAL 6: CREATE NEW COUPON
         ======================================================== */}
+        {/* ========================================================
+            MODAL 6: CREATE NEW COUPON (SMART PROMOTIONS & VOUCHERS)
+        ======================================================== */}
         {couponModalOpen && (
           <Modal
             isOpen={true}
             onClose={() => setCouponModalOpen(false)}
-            title="Create New Discount Coupon"
-            subtitle="Configure a voucher code redeemable during booking checkout"
-            maxWidth="max-w-md"
+            title="Create Smart Discount Voucher"
+            subtitle="Configure targeted coupon promotions, customer redemption limits, and service restrictions"
+            maxWidth="max-w-2xl"
           >
             <form onSubmit={handleCreateCoupon} className="space-y-4">
+              {/* 1-Click Quick Preset Templates */}
               <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Coupon Code:
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-[#6B8077] font-bold mb-1.5">
+                  1-Click Preset Templates:
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. MAXCLEAN20, DIWALI100"
-                  value={couponForm.code}
-                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-mono font-black text-[#10231D] uppercase"
-                  required
-                />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCouponForm({
+                        code: 'WELCOME20',
+                        description: 'Special 20% savings on your first home cleaning',
+                        discountType: 'percentage',
+                        discountValue: 20,
+                        minOrderValue: 499,
+                        maxDiscount: 300,
+                        expiryDate: '',
+                        usageLimit: 1000,
+                        firstBookingOnly: true,
+                        oncePerUser: true,
+                        showInOffers: true,
+                        applicableServices: []
+                      });
+                    }}
+                    className="p-2.5 rounded-xl border border-[#E2D9C8] bg-white hover:bg-[#F4EFE6] text-left transition-all cursor-pointer shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                      <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
+                      <span>New Customer</span>
+                    </div>
+                    <p className="text-[10px] text-[#6B8077] mt-0.5">20% off 1st visit</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCouponForm({
+                        code: 'SPECIAL150',
+                        description: 'Flat ₹150 instant discount on housekeeping',
+                        discountType: 'flat',
+                        discountValue: 150,
+                        minOrderValue: 799,
+                        maxDiscount: 150,
+                        expiryDate: '',
+                        usageLimit: 500,
+                        firstBookingOnly: false,
+                        oncePerUser: true,
+                        showInOffers: true,
+                        applicableServices: []
+                      });
+                    }}
+                    className="p-2.5 rounded-xl border border-[#E2D9C8] bg-white hover:bg-[#F4EFE6] text-left transition-all cursor-pointer shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                      <LuGift className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Flat ₹150 Off</span>
+                    </div>
+                    <p className="text-[10px] text-[#6B8077] mt-0.5">1x per customer</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCouponForm({
+                        code: 'SERVICE100',
+                        description: 'Special promo valid on selected cleaning services',
+                        discountType: 'flat',
+                        discountValue: 100,
+                        minOrderValue: 499,
+                        maxDiscount: 100,
+                        expiryDate: '',
+                        usageLimit: 1000,
+                        firstBookingOnly: false,
+                        oncePerUser: true,
+                        showInOffers: true,
+                        applicableServices: services.slice(0, 2).map(s => s._id)
+                      });
+                    }}
+                    className="p-2.5 rounded-xl border border-[#E2D9C8] bg-white hover:bg-[#F4EFE6] text-left transition-all cursor-pointer shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                      <LuTag className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Service Promo</span>
+                    </div>
+                    <p className="text-[10px] text-[#6B8077] mt-0.5">Specific items only</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCouponForm({
+                        code: 'FESTIVE15',
+                        description: 'Festive season savings across all premium services',
+                        discountType: 'percentage',
+                        discountValue: 15,
+                        minOrderValue: 1499,
+                        maxDiscount: 500,
+                        expiryDate: '',
+                        usageLimit: 2000,
+                        firstBookingOnly: false,
+                        oncePerUser: false,
+                        showInOffers: true,
+                        applicableServices: []
+                      });
+                    }}
+                    className="p-2.5 rounded-xl border border-[#E2D9C8] bg-white hover:bg-[#F4EFE6] text-left transition-all cursor-pointer shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#10231D]">
+                      <LuPercent className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>VIP Festive</span>
+                    </div>
+                    <p className="text-[10px] text-[#6B8077] mt-0.5">15% off orders &gt; ₹1.4k</p>
+                  </button>
+                </div>
               </div>
 
+              {/* Code & Tagline */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Coupon Code: <span className="text-[#C2512D]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. WELCOME20, DIWALI100"
+                    value={couponForm.code}
+                    onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase().replace(/\s/g, '') })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-sm font-mono font-black text-[#10231D] uppercase"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#10231D] mb-1">
+                    Customer Display Tagline / Description:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Valid only for 1st-time bookings"
+                    value={couponForm.description}
+                    onChange={(e) => setCouponForm({ ...couponForm, description: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-medium text-[#10231D]"
+                  />
+                </div>
+              </div>
+
+              {/* Discount Type & Value */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
@@ -5923,19 +6077,20 @@ export default function AdminDashboard() {
 
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Discount Value ({couponForm.discountType === 'percentage' ? '%' : '₹'}):
+                    Discount Value ({couponForm.discountType === 'percentage' ? '%' : '₹'}): <span className="text-[#C2512D]">*</span>
                   </label>
                   <input
                     type="number"
                     min={1}
                     value={couponForm.discountValue}
                     onChange={(e) => setCouponForm({ ...couponForm, discountValue: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
                     required
                   />
                 </div>
               </div>
 
+              {/* Min Order & Max Discount */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
@@ -5946,7 +6101,7 @@ export default function AdminDashboard() {
                     min={0}
                     value={couponForm.minOrderValue}
                     onChange={(e) => setCouponForm({ ...couponForm, minOrderValue: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
                   />
                 </div>
 
@@ -5957,38 +6112,246 @@ export default function AdminDashboard() {
                   <input
                     type="number"
                     min={0}
-                    placeholder="Optional"
+                    placeholder="Optional (Unlimited)"
                     value={couponForm.maxDiscount || ''}
                     onChange={(e) => setCouponForm({ ...couponForm, maxDiscount: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
                   />
                 </div>
               </div>
 
+              {/* Expiry & Usage Limit */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Expiry Date:
+                    Expiry Date (Optional):
                   </label>
                   <input
                     type="date"
                     value={couponForm.expiryDate}
                     onChange={(e) => setCouponForm({ ...couponForm, expiryDate: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Usage Limit:
+                    Total Global Usage Limit:
                   </label>
                   <input
                     type="number"
                     min={1}
                     value={couponForm.usageLimit}
                     onChange={(e) => setCouponForm({ ...couponForm, usageLimit: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
+                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
                   />
+                </div>
+              </div>
+
+              {/* SMART RULES & ELIGIBILITY CHECKBOXES */}
+              <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-3">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[#6B8077] font-bold block">
+                  Smart Eligibility & Fraud Prevention Rules:
+                </span>
+
+                <div className="space-y-2.5">
+                  {/* Checkbox 1: New User / 1st Booking Only */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-[#E2D9C8] cursor-pointer hover:border-[#E9A23B] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={couponForm.firstBookingOnly}
+                      onChange={(e) => setCouponForm({ ...couponForm, firstBookingOnly: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 text-[#E9A23B] rounded accent-[#E9A23B] cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                        <span>New User / 1st Booking Only</span>
+                        {couponForm.firstBookingOnly && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-amber-100 text-amber-900 font-bold uppercase">
+                            Enforced
+                          </span>
+                        )}
+                      </span>
+                      <p className="text-[11px] text-[#6B8077] mt-0.5 leading-snug">
+                        Strictly valid only if customer has zero prior bookings across phone number, email address, or user account.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Checkbox 2: Once Per User */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-[#E2D9C8] cursor-pointer hover:border-[#E9A23B] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={couponForm.oncePerUser}
+                      onChange={(e) => setCouponForm({ ...couponForm, oncePerUser: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 text-[#E9A23B] rounded accent-[#E9A23B] cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                        <span>Once Per Customer / Phone Number</span>
+                        {couponForm.oncePerUser && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-blue-100 text-blue-900 font-bold uppercase">
+                            Enforced
+                          </span>
+                        )}
+                      </span>
+                      <p className="text-[11px] text-[#6B8077] mt-0.5 leading-snug">
+                        Prevents the same customer from reusing this voucher code multiple times across different reservations.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Checkbox 3: Show in Offers Banner */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-[#E2D9C8] cursor-pointer hover:border-[#E9A23B] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={couponForm.showInOffers}
+                      onChange={(e) => setCouponForm({ ...couponForm, showInOffers: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 text-[#E9A23B] rounded accent-[#E9A23B] cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                        <span>Show in Booking Offers Carousel</span>
+                        {couponForm.showInOffers && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-emerald-100 text-emerald-900 font-bold uppercase">
+                            Public
+                          </span>
+                        )}
+                      </span>
+                      <p className="text-[11px] text-[#6B8077] mt-0.5 leading-snug">
+                        Display this promo card publicly on the booking checkout page with 1-click apply for customers.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* RESTRICT TO SPECIFIC SERVICES CHECKBOX & MULTI-SELECT */}
+              <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={couponForm.applicableServices.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setCouponForm({ ...couponForm, applicableServices: services.slice(0, 3).map(s => s._id) });
+                        } else {
+                          setCouponForm({ ...couponForm, applicableServices: [] });
+                        }
+                      }}
+                      className="w-4 h-4 text-[#E9A23B] rounded accent-[#E9A23B] cursor-pointer"
+                    />
+                    <span className="font-bold text-xs text-[#10231D]">
+                      Restrict to Specific Services ({couponForm.applicableServices.length > 0 ? `${couponForm.applicableServices.length} Selected` : 'Currently All Services'})
+                    </span>
+                  </label>
+
+                  {couponForm.applicableServices.length > 0 && (
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setCouponForm({ ...couponForm, applicableServices: services.map(s => s._id) })}
+                        className="font-bold text-[#E9A23B] hover:underline"
+                      >
+                        Select All ({services.length})
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => setCouponForm({ ...couponForm, applicableServices: [] })}
+                        className="font-bold text-[#6B8077] hover:underline"
+                      >
+                        Reset to All Services
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {couponForm.applicableServices.length > 0 && (
+                  <div className="p-2.5 rounded-xl bg-white border border-[#E2D9C8] max-h-40 overflow-y-auto space-y-1.5 scrollbar-thin">
+                    {services.map((s) => {
+                      const isChecked = couponForm.applicableServices.includes(s._id);
+                      return (
+                        <label
+                          key={s._id}
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                            isChecked
+                              ? 'bg-[#F4EFE6] border-[#E9A23B] text-[#10231D] font-bold'
+                              : 'bg-white border-transparent text-[#6B8077] hover:bg-[#ECE5D8]/50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const cur = couponForm.applicableServices;
+                              const next = e.target.checked
+                                ? [...cur, s._id]
+                                : cur.filter(id => id !== s._id);
+                              setCouponForm({ ...couponForm, applicableServices: next });
+                            }}
+                            className="w-3.5 h-3.5 text-[#E9A23B] rounded accent-[#E9A23B] cursor-pointer shrink-0"
+                          />
+                          <span className="truncate">{s.title}</span>
+                          <span className="text-[10px] text-[#6B8077] font-mono ml-auto shrink-0">
+                            ₹{s.price}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* LIVE CUSTOMER VOUCHER PREVIEW CARD */}
+              <div className="p-3.5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-[#E9A23B] text-[#10231D] font-mono font-black text-xs tracking-wider">
+                      {couponForm.code || 'COUPONCODE'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">
+                      {couponForm.discountType === 'percentage'
+                        ? `${couponForm.discountValue || 0}% OFF`
+                        : `₹${couponForm.discountValue || 0} FLAT OFF`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#A3B8B0]">
+                    {couponForm.description || `Save on your housekeeping booking`}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[9px] font-bold">
+                    {couponForm.firstBookingOnly && (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[#E9A23B] border border-[#E9A23B]/30">
+                        1st Booking Only
+                      </span>
+                    )}
+                    {couponForm.oncePerUser && (
+                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        1x Per Customer
+                      </span>
+                    )}
+                    {couponForm.applicableServices.length > 0 ? (
+                      <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        {couponForm.applicableServices.length} Specific Service(s)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-white/10 text-[#F4EFE6]/70">
+                        All Services
+                      </span>
+                    )}
+                    {couponForm.minOrderValue > 0 && (
+                      <span className="text-[#A3B8B0] font-mono">
+                        Min Order: ₹{couponForm.minOrderValue}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="px-2 py-1 rounded-full bg-white/10 text-[10px] font-mono text-[#E9A23B] border border-[#E9A23B]/30 font-bold">
+                    Live Checkout Preview
+                  </span>
                 </div>
               </div>
 
@@ -5996,16 +6359,16 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setCouponModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-xs font-bold text-[#10231D] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingCoupon}
-                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs transition-colors cursor-pointer shadow-sm"
                 >
-                  {savingCoupon ? 'Creating...' : 'Create Coupon'}
+                  {savingCoupon ? 'Creating Voucher...' : 'Publish Discount Coupon'}
                 </button>
               </div>
             </form>
@@ -6350,26 +6713,13 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  {/* Customer Service Verification OTP */}
+                  {/* Customer Service Verification OTP (Confidential to Customer) */}
                   <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] space-y-1.5">
-                    <span className="text-[10px] font-mono text-[#6B8077] uppercase block">Customer Service Verification OTP</span>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-2xl font-black tracking-widest text-[#10231D] px-3 py-1 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
-                        {viewBookingDetails.serviceOtp || '----'}
+                    <span className="text-[10px] font-mono text-[#6B8077] uppercase block">Customer Arrival Handshake OTP</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-[#10231D] px-2.5 py-1 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8]">
+                        •••• (Protected Customer PIN)
                       </span>
-                      {viewBookingDetails.serviceOtp && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(viewBookingDetails.serviceOtp);
-                            toast.success('Service verification OTP copied to clipboard!');
-                          }}
-                          className="p-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] transition-colors cursor-pointer"
-                          title="Copy OTP"
-                        >
-                          <LuCopy className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
                     <div>
                       {viewBookingDetails.otpVerified ? (
@@ -6385,7 +6735,7 @@ export default function AdminDashboard() {
                       )}
                     </div>
                     <p className="text-[10px] text-[#6B8077]">
-                      The customer shares this code with the supervisor upon physical arrival to verify authenticity.
+                      For security, only the customer sees their OTP on their tracking page. The supervisor enters it on arrival.
                     </p>
                   </div>
                 </div>
@@ -6938,9 +7288,9 @@ export default function AdminDashboard() {
                     let tag = '';
                     if (avail) {
                       if (!avail.isAvailableInSlot) {
-                        tag = `⚠️ [Busy in Slot: #${avail.conflictBooking?.bookingCode || 'Active Booking'}]`;
+                        tag = `[BUSY in Slot: #${avail.conflictBooking?.bookingCode || 'Active Booking'}]`;
                       } else {
-                        tag = `✓ [Available • ${avail.dayBookingsCount} job${avail.dayBookingsCount === 1 ? '' : 's'} on date]`;
+                        tag = `[AVAILABLE • ${avail.dayBookingsCount} job${avail.dayBookingsCount === 1 ? '' : 's'} on date]`;
                       }
                     }
                     return (
@@ -7052,7 +7402,7 @@ export default function AdminDashboard() {
               <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-[11px] text-[#6B8077] flex items-center gap-2">
                 <LuKey className="w-4 h-4 text-[#E9A23B] shrink-0" />
                 <span>
-                  <strong>On-Site OTP Security:</strong> A 4-digit verification OTP ({assignBooking.serviceOtp || 'auto-generated on save'}) will be active. Supervisor must collect and enter this OTP on arrival before starting the job.
+                  <strong>On-Site OTP Security:</strong> A 4-digit arrival OTP is issued privately to the customer on their booking tracker. Supervisor must collect and enter this OTP on arrival before starting the job.
                 </span>
               </div>
 

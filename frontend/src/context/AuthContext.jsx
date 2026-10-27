@@ -310,6 +310,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Refresh user data & addresses from server
+  const refreshUser = async () => {
+    try {
+      const data = await apiRequest('/auth/me', { noCache: true });
+      if (data.success && data.user) {
+        setUser(cleanUser(data.user));
+        return data.user;
+      }
+    } catch {
+      // ignore transient refresh errors
+    }
+    return null;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -317,6 +331,7 @@ export function AuthProvider({ children }) {
         isLoading,
         isAdmin: user?.role === 'admin',
         isSupervisor: user?.role === 'supervisor',
+        refreshUser,
         updateProfile,
         sendSignupOtp,
         register,

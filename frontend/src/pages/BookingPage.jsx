@@ -210,7 +210,7 @@ export default function BookingPage() {
     settings: contextSettings
   } = useBooking();
 
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, refreshUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -352,7 +352,6 @@ export default function BookingPage() {
   // Address Feature (Saved Address Dropdown vs Temporary Address Checkbox)
   const [isTemporaryAddress, setIsTemporaryAddress] = useState(false);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
-  const [saveAddressToProfile, setSaveAddressToProfile] = useState(true);
   const [addressForm, setAddressForm] = useState({
     line1: '',
     landmark: '',
@@ -568,7 +567,7 @@ export default function BookingPage() {
         paymentMode: paymentDetails ? 'online_before' : (paymentChoice || 'cash_on_service'),
         paymentStatus: paymentDetails ? 'paid' : 'pending',
         paymentDetails: paymentDetails || undefined,
-        saveAddressToProfile: user ? Boolean(saveAddressToProfile) : false
+        saveAddressToProfile: Boolean(user && !isSavedAddressSelected && !isTemporaryAddress)
       };
 
       const res = await apiRequest('/bookings', {
@@ -577,6 +576,7 @@ export default function BookingPage() {
       });
 
       if (res.success && res.booking) {
+        if (refreshUser) refreshUser();
         // Confetti celebration
         try {
           confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
@@ -1484,21 +1484,6 @@ export default function BookingPage() {
                     )}
                   </div>
                 </div>
-
-                {user && !isTemporaryAddress && (!selectedSavedAddressId || selectedSavedAddressId === 'new') && (
-                  <div className="pt-1 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="saveAddressCheck"
-                      checked={saveAddressToProfile}
-                      onChange={(e) => setSaveAddressToProfile(e.target.checked)}
-                      className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
-                    />
-                    <label htmlFor="saveAddressCheck" className="text-xs text-[#3D524A] cursor-pointer select-none">
-                      Save this address to my profile address book for future bookings
-                    </label>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1733,7 +1718,7 @@ export default function BookingPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Coupon (e.g. WELCOME10)"
+                      placeholder="Enter coupon code"
                       value={inputCoupon}
                       onChange={(e) => setInputCoupon(e.target.value.toUpperCase())}
                       className="flex-1 p-2 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-mono uppercase"
@@ -1741,7 +1726,7 @@ export default function BookingPage() {
                     <button
                       type="button"
                       onClick={() => applyCoupon(inputCoupon)}
-                      className="px-3 py-2 rounded-lg bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A]"
+                      className="px-3 py-2 rounded-lg bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
                     >
                       Apply
                     </button>
@@ -1749,9 +1734,15 @@ export default function BookingPage() {
                   {appliedCoupon && (
                     <div className="mt-2 flex items-center justify-between text-xs text-[#10231D] bg-[#DDEBE4] px-2.5 py-1.5 rounded-lg border border-[#BED6CC]">
                       <span>Code <strong>{appliedCoupon.code}</strong> applied</span>
-                      <button type="button" onClick={removeCoupon} className="text-[#C2512D] font-bold">
+                      <button type="button" onClick={removeCoupon} className="text-[#C2512D] font-bold cursor-pointer">
                         Remove
                       </button>
+                    </div>
+                  )}
+                  {quote?.couponError && (
+                    <div className="mt-2 p-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-700 flex items-start gap-1.5">
+                      <LuCircleAlert className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                      <span>{quote.couponError}</span>
                     </div>
                   )}
                 </div>

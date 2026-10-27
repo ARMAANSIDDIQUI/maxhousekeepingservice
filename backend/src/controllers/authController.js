@@ -492,6 +492,27 @@ export async function getMe(req, res, next) {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    // Auto-clean any duplicated addresses accumulated from prior bookings
+    if (Array.isArray(user.addresses) && user.addresses.length > 1) {
+      const seen = new Set();
+      const unique = [];
+      let hadDuplicates = false;
+      for (const a of user.addresses) {
+        const key = `${(a.line1 || '').toLowerCase().replace(/[\W_]+/g, ' ').trim()}|${String(a.pincode || '').trim().replace(/\D/g, '')}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(a);
+        } else {
+          hadDuplicates = true;
+        }
+      }
+      if (hadDuplicates) {
+        user.addresses = unique;
+        await user.save();
+      }
+    }
+
     const userObj = user.toObject();
     if (userObj.phone && userObj.phone.startsWith('g_')) {
       userObj.phone = '';
@@ -537,6 +558,26 @@ export async function addAddress(req, res, next) {
     }
 
     const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Check if address with matching line1 and pincode already exists
+    const normLine1 = (line1 || '').toLowerCase().replace(/[\W_]+/g, ' ').trim();
+    const normPincode = String(pincode || '').trim().replace(/\D/g, '');
+    const alreadyExists = (user.addresses || []).some(existing => {
+      const exLine1 = (existing.line1 || '').toLowerCase().replace(/[\W_]+/g, ' ').trim();
+      const exPincode = String(existing.pincode || '').trim().replace(/\D/g, '');
+      return exLine1 === normLine1 && exPincode === normPincode;
+    });
+
+    if (alreadyExists) {
+      return res.status(200).json({
+        success: true,
+        message: 'Address is already saved in your address book.',
+        addresses: user.addresses
+      });
+    }
 
     if (isDefault) {
       user.addresses.forEach(addr => { addr.isDefault = false; });

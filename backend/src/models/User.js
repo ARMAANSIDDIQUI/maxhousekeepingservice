@@ -23,6 +23,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['customer', 'cleaner', 'admin', 'supervisor'], default: 'customer', index: true },
   authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   avatarUrl: { type: String, default: '' },
+  avatar: { type: String, default: '' },
   emailVerified: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true, index: true },
   otpSecret: {

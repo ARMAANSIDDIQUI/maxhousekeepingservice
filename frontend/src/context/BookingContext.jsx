@@ -175,11 +175,12 @@ export function BookingProvider({ children }) {
   const refreshQuote = useCallback(async (currentItems, citySlug, coupon) => {
     if (!currentItems || currentItems.length === 0) {
       setQuote(null);
-      return;
+      return null;
     }
 
     setIsQuoting(true);
     try {
+      const activeCoupon = coupon !== undefined ? coupon : couponCode;
       const payload = {
         items: currentItems.map(i => ({
           serviceId: i.service._id || i.service.id,
@@ -187,7 +188,13 @@ export function BookingProvider({ children }) {
           qty: i.qty || 1
         })),
         citySlug: citySlug || selectedCity?.slug || 'moradabad',
-        couponCode: coupon || couponCode || undefined
+        couponCode: activeCoupon ? activeCoupon.trim().toUpperCase() : undefined,
+        customer: {
+          phone: customer?.phone,
+          email: customer?.email
+        },
+        phone: customer?.phone,
+        email: customer?.email
       };
 
       const res = await apiRequest('/bookings/quote', {
@@ -202,7 +209,9 @@ export function BookingProvider({ children }) {
         } else {
           setAppliedCoupon(null);
         }
+        return res.quote;
       }
+      return null;
     } catch {
       // Offline fallback: calculate accurate variant price locally
       const isMbd = !selectedCity || selectedCity.slug === 'moradabad';
@@ -377,8 +386,14 @@ export function BookingProvider({ children }) {
     if (!code || !code.trim()) return;
     const cleanCode = code.trim().toUpperCase();
     setCouponCode(cleanCode);
-    await refreshQuote(items, selectedCity?.slug, cleanCode);
-    toast.success(`Applied coupon code ${cleanCode}!`);
+    const resQuote = await refreshQuote(items, selectedCity?.slug, cleanCode);
+    if (resQuote?.couponError) {
+      toast.error(resQuote.couponError);
+    } else if (resQuote?.totals?.couponDiscount > 0) {
+      toast.success(`Coupon ${cleanCode} applied! You saved ₹${resQuote.totals.couponDiscount}`);
+    } else {
+      toast.success(`Coupon ${cleanCode} applied!`);
+    }
   };
 
   // Remove Coupon

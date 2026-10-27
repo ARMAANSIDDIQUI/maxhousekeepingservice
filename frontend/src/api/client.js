@@ -736,10 +736,13 @@ export function getFallbackResponse(url, options = {}) {
 
 import { getCache, setCache, clearCacheByPrefix } from '../utils/cache.js';
 
-// Proactively clear any legacy stale cached business settings from localStorage
+// Proactively clear any legacy stale cached business settings and operational data from localStorage
 try {
   clearCacheByPrefix('/public/settings');
   clearCacheByPrefix('/settings');
+  clearCacheByPrefix('/supervisor');
+  clearCacheByPrefix('/bookings');
+  clearCacheByPrefix('/admin/bookings');
 } catch {}
 
 // Unified apiRequest helper powered by Axios with automatic graceful fallbacks and memory+localStorage caching
@@ -748,7 +751,13 @@ export async function apiRequest(endpoint, options = {}) {
   const rawUrl = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const cacheKey = options.params ? `${rawUrl}_${JSON.stringify(options.params)}` : rawUrl;
 
-  const isPrivateEndpoint = rawUrl.startsWith('/auth') || rawUrl.startsWith('/admin') || rawUrl.includes('/bookings/my') || rawUrl.includes('/messages') || rawUrl.includes('/settings');
+  const isPrivateEndpoint =
+    rawUrl.startsWith('/auth') ||
+    rawUrl.startsWith('/admin') ||
+    rawUrl.startsWith('/supervisor') ||
+    rawUrl.includes('/bookings') ||
+    rawUrl.includes('/messages') ||
+    rawUrl.includes('/settings');
   const canCache = method === 'get' && !options.noCache && !isPrivateEndpoint;
 
   // Check cache for public idempotent GET requests
@@ -798,6 +807,11 @@ export async function apiRequest(endpoint, options = {}) {
           clearCacheByPrefix('/public/settings');
           clearCacheByPrefix('/settings');
           clearCacheByPrefix('/admin/settings');
+        }
+        if (rawUrl.includes('/bookings') || rawUrl.includes('/supervisor')) {
+          clearCacheByPrefix('/bookings');
+          clearCacheByPrefix('/supervisor');
+          clearCacheByPrefix('/admin/bookings');
         }
       }
       return response;
@@ -865,7 +879,8 @@ export const bookingsAPI = {
   cancelBooking: (id, reason) => apiRequest(`/bookings/${id}/cancel`, { method: 'PUT', body: { reason } }),
   deleteBooking: (id) => apiRequest(`/bookings/${id}`, { method: 'DELETE' }),
   getMessages: (bookingId) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'GET' }),
-  sendMessage: (bookingId, text, senderName) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'POST', body: { text, senderName } })
+  sendMessage: (bookingId, text, senderName) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'POST', body: { text, senderName } }),
+  getPublicCoupons: () => apiRequest('/bookings/coupons', { method: 'GET' })
 };
 
 export const authAPI = {
@@ -894,8 +909,8 @@ export const publicAPI = {
 };
 
 export const adminAPI = {
-  getStats: () => apiRequest('/admin/stats', { method: 'GET' }),
-  getBookings: (params = {}) => apiRequest('/admin/bookings', { method: 'GET', params }),
+  getStats: () => apiRequest('/admin/stats', { method: 'GET', noCache: true }),
+  getBookings: (params = {}) => apiRequest('/admin/bookings', { method: 'GET', noCache: true, params }),
   getServices: () => apiRequest('/admin/services', { method: 'GET' }),
   updateBooking: (id, data) => apiRequest(`/admin/bookings/${id}`, { method: 'PUT', body: data }),
   deleteBooking: (id) => apiRequest(`/admin/bookings/${id}`, { method: 'DELETE' }),
@@ -998,13 +1013,13 @@ export const adminAPI = {
  * Supervisor API: Dashboard, OTP verification, and Before/After photo uploads
  */
 export const supervisorAPI = {
-  getStats: (supervisorId) => apiRequest('/supervisor/stats', { method: 'GET', params: supervisorId ? { supervisorId } : {} }),
-  getSchedule: (date, supervisorId) => apiRequest('/supervisor/schedule', { method: 'GET', params: { ...(date ? { date } : {}), ...(supervisorId ? { supervisorId } : {}) } }),
-  getBookings: (params = {}) => apiRequest('/supervisor/bookings', { method: 'GET', params }),
-  getBookingDetails: (id) => apiRequest(`/supervisor/bookings/${id}`, { method: 'GET' }),
+  getStats: (supervisorId) => apiRequest('/supervisor/stats', { method: 'GET', noCache: true, params: supervisorId ? { supervisorId } : {} }),
+  getSchedule: (date, supervisorId) => apiRequest('/supervisor/schedule', { method: 'GET', noCache: true, params: { ...(date ? { date } : {}), ...(supervisorId ? { supervisorId } : {}) } }),
+  getBookings: (params = {}) => apiRequest('/supervisor/bookings', { method: 'GET', noCache: true, params }),
+  getBookingDetails: (id) => apiRequest(`/supervisor/bookings/${id}`, { method: 'GET', noCache: true }),
   verifyOtp: (id, otp) => apiRequest(`/supervisor/bookings/${id}/verify-otp`, { method: 'POST', body: { otp } }),
-  getSupervisors: () => apiRequest('/supervisor/supervisors', { method: 'GET' }),
-  getPool: () => apiRequest('/supervisor/pool', { method: 'GET' }),
+  getSupervisors: () => apiRequest('/supervisor/supervisors', { method: 'GET', noCache: true }),
+  getPool: () => apiRequest('/supervisor/pool', { method: 'GET', noCache: true }),
   claimBooking: (id) => apiRequest(`/supervisor/bookings/${id}/claim`, { method: 'POST' }),
   createQuickTestBooking: () => apiRequest('/supervisor/quick-test-booking', { method: 'POST' }),
   uploadPhoto: async (id, file, type = 'before', notes = '') => {

@@ -94,6 +94,7 @@ const bookingSchema = new mongoose.Schema({
     name: { type: String, trim: true },
     phone: { type: String, trim: true },
     email: { type: String, trim: true },
+    avatar: { type: String, trim: true, default: '' },
     assignedAt: { type: Date }
   },
   assignedSlot: {

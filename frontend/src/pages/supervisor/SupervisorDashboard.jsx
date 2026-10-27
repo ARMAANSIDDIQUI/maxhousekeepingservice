@@ -28,8 +28,6 @@ import {
   LuUser,
   LuZap,
   LuNavigation,
-  LuListChecks,
-  LuPlus,
   LuKey,
   LuSlidersHorizontal,
   LuCompass
@@ -40,6 +38,8 @@ import { useToast } from '../../context/ToastContext';
 import { supervisorAPI } from '../../api';
 import SEO from '../../components/common/SEO';
 import Modal from '../../components/common/Modal';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import { formatDateDMY } from '../../utils/date';
 
 function formatToday() {
   const d = new Date();
@@ -72,15 +72,7 @@ function getMapsUrl(address, cityName) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query || 'Moradabad')}`;
 }
 
-const SOP_ITEMS = [
-  { id: 'uniform', title: 'Uniform & ID Badges', desc: 'Crew wears clean Max Housekeeping uniform and official photo ID card.' },
-  { id: 'machinery', title: 'Industrial Scrubbers & Equipment', desc: 'Inspect single-disc scrubber, wet vacuum, and microfiber mop heads.' },
-  { id: 'chemicals', title: 'Certified Safe Chemistry', desc: 'Diversey/Taski eco-safe degreasers and descalers stocked & unexpired.' },
-  { id: 'greeting_otp', title: 'Customer Greeting & PIN', desc: 'Polite customer greeting and 4-digit arrival OTP verified before start.' },
-  { id: 'before_photos', title: 'Pre-Service Condition Photos', desc: 'Capture minimum 2 photos of dust, stains, and tiles before cleaning.' },
-  { id: 'after_inspection', title: 'Post-Cleaning Walk-Through', desc: 'Conduct room-by-room review with customer to guarantee 100% satisfaction.' },
-  { id: 'after_photos', title: 'Post-Service Proof Photos', desc: 'Capture shiny, restored surfaces and upload to job report.' }
-];
+
 
 export default function SupervisorDashboard() {
   const { user, isSupervisor, isAdmin, logout } = useAuth();
@@ -140,37 +132,19 @@ export default function SupervisorDashboard() {
   const [loadingPool, setLoadingPool] = useState(false);
   const [claimingId, setClaimingId] = useState(null);
 
-  // Quick Test Dispatch Generator
-  const [creatingTestJob, setCreatingTestJob] = useState(false);
+
 
   // Quick Inline OTP Verification Modal
   const [quickOtpBooking, setQuickOtpBooking] = useState(null);
   const [quickOtpInput, setQuickOtpInput] = useState('');
   const [verifyingQuickOtp, setVerifyingQuickOtp] = useState(false);
 
-  // Standard Operating Procedure (SOP) Checklist
-  const [sopModalOpen, setSopModalOpen] = useState(false);
-  const [sopChecks, setSopChecks] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`max_sop_${formatToday()}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
 
-  const handleToggleSop = (id) => {
-    setSopChecks(prev => {
-      const next = { ...prev, [id]: !prev[id] };
-      localStorage.setItem(`max_sop_${formatToday()}`, JSON.stringify(next));
-      return next;
-    });
-  };
 
   // Selected Booking Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeModalTab, setActiveModalTab] = useState('otp'); // 'otp' | 'before_photos' | 'after_photos' | 'details' | 'chat'
+  const [activeModalTab, setActiveModalTab] = useState('otp'); // 'otp' | 'before_photos' | 'after_photos' | 'details'
 
   // OTP Verification state
   const [otpInput, setOtpInput] = useState('');
@@ -181,16 +155,22 @@ export default function SupervisorDashboard() {
   const [photoNotes, setPhotoNotes] = useState('');
   const [lightboxImage, setLightboxImage] = useState(null);
 
-  // Chat state
-  const [chatMessage, setChatMessage] = useState('');
-  const [sendingMessage, setSendingMessage] = useState(false);
+  // Action Confirmation Modal State (replaces native window.confirm)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    confirmVariant: 'primary',
+    onConfirm: null
+  });
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusNote, setStatusNote] = useState('');
 
   // Daily Time Slot Allotment Run-Sheet & Schedule State
-  const [viewMode, setViewMode] = useState('timeline'); // 'timeline' | 'cards'
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'timeline'
   const [scheduleDate, setScheduleDate] = useState(formatToday());
   const [scheduleData, setScheduleData] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -244,8 +224,8 @@ export default function SupervisorDashboard() {
       const res = await supervisorAPI.claimBooking(bookingId);
       if (res?.success) {
         toast.success(res.message || 'Booking claimed and added to your schedule!');
-        await loadData();
-        await loadPool();
+        await Promise.all([loadData(), loadPool()]);
+        setActiveFilter('all');
       }
     } catch (err) {
       toast.error(err.message || 'Failed to claim booking.');
@@ -254,21 +234,7 @@ export default function SupervisorDashboard() {
     }
   };
 
-  // Create Quick Test Booking for Immediate Demonstration
-  const handleCreateTestBooking = async () => {
-    setCreatingTestJob(true);
-    try {
-      const res = await supervisorAPI.createQuickTestBooking();
-      if (res?.success) {
-        toast.success(res.message || 'Test appointment generated with OTP 4921!');
-        await loadData();
-      }
-    } catch (err) {
-      toast.error(err.message || 'Failed to create test appointment.');
-    } finally {
-      setCreatingTestJob(false);
-    }
-  };
+
 
   // Quick OTP Modal Verification Submit
   const handleQuickOtpSubmit = async (e) => {
@@ -438,32 +404,34 @@ export default function SupervisorDashboard() {
   };
 
   // 3. Delete Photo
-  const handleDeletePhoto = async (photoId) => {
-    if (!window.confirm('Are you sure you want to delete this inspection photo?')) return;
-    try {
-      const res = await supervisorAPI.deletePhoto(selectedBooking._id, photoId);
-      if (res?.success) {
-        toast.info('Photo removed.');
-        setSelectedBooking(prev => ({
-          ...prev,
-          photos: res.photos
-        }));
-        setBookings(prev => prev.map(b => b._id === selectedBooking._id ? { ...b, photos: res.photos } : b));
+  const handleDeletePhoto = (photoId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Inspection Photo',
+      message: 'Are you sure you want to permanently delete this inspection photo?',
+      confirmText: 'Delete Photo',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await supervisorAPI.deletePhoto(selectedBooking._id, photoId);
+          if (res?.success) {
+            toast.info('Photo removed.');
+            setSelectedBooking(prev => ({
+              ...prev,
+              photos: res.photos
+            }));
+            setBookings(prev => prev.map(b => b._id === selectedBooking._id ? { ...b, photos: res.photos } : b));
+          }
+        } catch {
+          toast.error('Failed to remove photo.');
+        }
       }
-    } catch (err) {
-      toast.error('Failed to remove photo.');
-    }
+    });
   };
 
   // 4. Update Status (In Progress or Completed)
-  const handleUpdateStatus = async (newStatus) => {
-    if (newStatus === 'completed' && !selectedBooking.otpVerified) {
-      const proceed = window.confirm(
-        'Warning: Customer OTP has not been verified yet! Urban Company safety protocol requires OTP verification. Do you still want to mark this booking as Completed?'
-      );
-      if (!proceed) return;
-    }
-
+  const executeUpdateStatus = async (newStatus) => {
     setUpdatingStatus(true);
     try {
       const res = await supervisorAPI.updateStatus(selectedBooking._id, newStatus, statusNote);
@@ -481,25 +449,71 @@ export default function SupervisorDashboard() {
     }
   };
 
-  // 5. Send Chat Message
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!chatMessage.trim()) return;
+  const handleUpdateStatus = (newStatus) => {
+    if (newStatus === 'completed' && !selectedBooking.otpVerified) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Customer OTP Not Verified',
+        message: 'Warning: Customer arrival OTP has not been verified yet! Do you still want to mark this booking as Completed?',
+        confirmText: 'Complete Job',
+        confirmVariant: 'warning',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          executeUpdateStatus(newStatus);
+        }
+      });
+      return;
+    }
+    executeUpdateStatus(newStatus);
+  };
 
-    setSendingMessage(true);
+  // 4b. One-Click Complete Service (Work Done Automation)
+  const [completingId, setCompletingId] = useState(null);
+
+  const executeMarkCompleted = async (b) => {
+    setCompletingId(b._id);
     try {
-      const res = await supervisorAPI.sendMessage(selectedBooking._id, chatMessage.trim());
+      const res = await supervisorAPI.updateStatus(b._id, 'completed', `Service marked as completed by supervisor ${user?.name || ''}`);
       if (res?.success) {
-        setSelectedBooking(prev => ({
-          ...prev,
-          messages: res.messages
-        }));
-        setChatMessage('');
+        toast.success(`Booking #${b.bookingCode} marked as COMPLETED!`);
+        if (selectedBooking && selectedBooking._id === b._id) {
+          setSelectedBooking(res.booking || { ...selectedBooking, status: 'completed' });
+        }
+        await loadData();
       }
     } catch (err) {
-      toast.error('Failed to send message.');
+      toast.error(err.message || 'Failed to complete booking.');
     } finally {
-      setSendingMessage(false);
+      setCompletingId(null);
+    }
+  };
+
+  const handleMarkCompleted = (b) => {
+    if (!b) return;
+    if (!b.otpVerified) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Customer OTP Not Verified',
+        message: `Warning: Customer arrival OTP for #${b.bookingCode} has not been verified yet! Do you still want to mark this booking as Completed?`,
+        confirmText: 'Complete Job',
+        confirmVariant: 'warning',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          executeMarkCompleted(b);
+        }
+      });
+    } else {
+      setConfirmModal({
+        isOpen: true,
+        title: 'Confirm Service Completion',
+        message: `Confirm service completion for #${b.bookingCode}? This will mark the booking as Completed and finalize the visit.`,
+        confirmText: 'Complete Job',
+        confirmVariant: 'primary',
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          executeMarkCompleted(b);
+        }
+      });
     }
   };
 
@@ -541,7 +555,7 @@ export default function SupervisorDashboard() {
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  {currentTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} • {currentTime.toLocaleTimeString('en-IN')}
+                  {formatDateDMY(currentTime)} • {currentTime.toLocaleTimeString('en-IN')}
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-display font-black text-[#F4EFE6] mt-0.5">
@@ -596,28 +610,9 @@ export default function SupervisorDashboard() {
               </div>
             )}
 
-            {/* Quick Test Booking Shortcut */}
-            <button
-              type="button"
-              onClick={handleCreateTestBooking}
-              disabled={creatingTestJob}
-              className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-              title="Create an on-demand test appointment in the current slot"
-            >
-              <LuPlus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{creatingTestJob ? 'Creating...' : '+ Test Job'}</span>
-            </button>
 
-            {/* Field SOP Checklist Button */}
-            <button
-              type="button"
-              onClick={() => setSopModalOpen(true)}
-              className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Open Daily Quality & Safety SOP Checklist"
-            >
-              <LuListChecks className="w-4 h-4 text-[#E9A23B]" />
-              <span className="hidden lg:inline">SOP</span>
-            </button>
+
+
 
             <button
               type="button"
@@ -702,7 +697,7 @@ export default function SupervisorDashboard() {
                         <p className="text-xs text-[#A3B8B0] mt-0.5">
                           {isToday
                             ? 'Ready for urgent calls or claim available unassigned jobs from the dispatch pool.'
-                            : `Inspecting schedule for ${scheduleDate}. Switch to "Today" for live routing.`}
+                            : `Inspecting schedule for ${formatDateDMY(scheduleDate)}. Switch to "Today" for live routing.`}
                         </p>
                       </div>
                     )}
@@ -775,15 +770,6 @@ export default function SupervisorDashboard() {
                       >
                         <LuZap className="w-3.5 h-3.5" />
                         <span>Dispatch Pool ({stats.openPoolCount || 0})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCreateTestBooking}
-                        disabled={creatingTestJob}
-                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <LuPlus className="w-3.5 h-3.5 text-[#E9A23B]" />
-                        <span>{creatingTestJob ? 'Creating...' : '+ Test Appointment'}</span>
                       </button>
                     </>
                   )}
@@ -866,14 +852,13 @@ export default function SupervisorDashboard() {
               { id: 'pending_otp', label: 'Pending OTP' },
               { id: 'in_progress', label: 'In-Progress' },
               { id: 'completed', label: 'Completed' },
-              { id: 'pool', label: `⚡ Dispatch Pool (${stats.openPoolCount || 0})` }
+              { id: 'pool', label: `Dispatch Pool (${stats.openPoolCount || 0})` }
             ].map(tab => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => {
                   setActiveFilter(tab.id);
-                  if (tab.id === 'today') setViewMode('timeline');
                   if (tab.id === 'pool') loadPool();
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
@@ -947,8 +932,9 @@ export default function SupervisorDashboard() {
             <div className="p-5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D] text-[10px] font-mono font-black uppercase">
-                    ⚡ Live Dispatch Pool
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#E9A23B] text-[#10231D] text-[10px] font-mono font-black uppercase inline-flex items-center gap-1">
+                    <LuZap className="w-3 h-3 text-[#10231D]" />
+                    <span>Live Dispatch Pool</span>
                   </span>
                   <span className="text-xs text-[#E9A23B] font-bold">
                     {poolBookings.length} Unclaimed Cleaning Appointment{poolBookings.length === 1 ? '' : 's'}
@@ -971,15 +957,6 @@ export default function SupervisorDashboard() {
                   <LuRotateCcw className="w-3.5 h-3.5 text-[#E9A23B]" />
                   <span>Refresh Pool</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleCreateTestBooking}
-                  disabled={creatingTestJob}
-                  className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <LuPlus className="w-4 h-4 stroke-[3]" />
-                  <span>{creatingTestJob ? 'Creating...' : '+ Quick Test Job (OTP 4921)'}</span>
-                </button>
               </div>
             </div>
 
@@ -993,17 +970,8 @@ export default function SupervisorDashboard() {
                 <LuZap className="w-12 h-12 text-[#E9A23B] mx-auto opacity-70" />
                 <h3 className="font-display font-bold text-lg text-[#10231D]">Dispatch Pool is Clear</h3>
                 <p className="text-xs text-[#6B8077] max-w-md mx-auto">
-                  All verified customer appointments are currently assigned to active supervisors. Generate a simulation appointment to test on-site OTP verification.
+                  All verified customer appointments are currently assigned to active supervisors or completed. New customer appointments will automatically appear here for real-time dispatch.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleCreateTestBooking}
-                  disabled={creatingTestJob}
-                  className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <LuPlus className="w-3.5 h-3.5" />
-                  <span>Create Test Simulation Booking</span>
-                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1173,8 +1141,9 @@ export default function SupervisorDashboard() {
                               {slotItem.bookingsCount} Allotted Job{slotItem.bookingsCount === 1 ? '' : 's'}
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-mono font-bold uppercase border border-emerald-200">
-                              ✓ Free / Open Slot
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-mono font-bold uppercase border border-emerald-200 inline-flex items-center gap-1">
+                              <LuCheck className="w-3 h-3 text-emerald-700" />
+                              <span>Free / Open Slot</span>
                             </span>
                           )}
                         </div>
@@ -1276,7 +1245,7 @@ export default function SupervisorDashboard() {
                                   <LuNavigation className="w-3.5 h-3.5 text-blue-600" />
                                 </a>
 
-                                {!b.otpVerified && (
+                                {!b.otpVerified ? (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1289,21 +1258,24 @@ export default function SupervisorDashboard() {
                                     <LuKey className="w-3.5 h-3.5" />
                                     <span>Verify OTP</span>
                                   </button>
+                                ) : b.status !== 'completed' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMarkCompleted(b)}
+                                    disabled={completingId === b._id}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                                    title="Mark Service as Completed"
+                                  >
+                                    <LuCircleCheck className="w-3.5 h-3.5 text-emerald-200" />
+                                    <span>{completingId === b._id ? 'Completing...' : 'Work Done'}</span>
+                                  </button>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200 flex items-center gap-1">
+                                    <LuCircleCheck className="w-3 h-3 text-emerald-600" />
+                                    <span>Completed</span>
+                                  </span>
                                 )}
 
-                                <label
-                                  className="p-2 rounded-xl bg-white border border-[#E2D9C8] hover:bg-[#ECE5D8] text-[#10231D] transition-colors cursor-pointer"
-                                  title="Quick Camera Photo Upload"
-                                >
-                                  <LuCamera className="w-3.5 h-3.5 text-[#10231D]" />
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="hidden"
-                                    onChange={(e) => handleDirectPhotoUpload(e, b._id, b.status === 'in_progress' ? 'after' : 'before')}
-                                  />
-                                </label>
 
                                 <button
                                   type="button"
@@ -1424,7 +1396,7 @@ export default function SupervisorDashboard() {
                           )}
                         </div>
                         <p className="text-[10px] text-[#6B8077]">
-                          Booked on: {new Date(b.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                          Booked on: {formatDateDMY(b.createdAt)}
                         </p>
                       </div>
 
@@ -1497,7 +1469,7 @@ export default function SupervisorDashboard() {
 
                       <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#6B8077]">
                         <LuClock className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
-                        <span>{b.assignedSlot?.date || b.slot?.date} • {b.assignedSlot?.timeWindow || b.slot?.window}</span>
+                        <span>{formatDateDMY(b.assignedSlot?.date || b.slot?.date)} • {b.assignedSlot?.timeWindow || b.slot?.window}</span>
                       </div>
 
                       {b.assignedSlot?.notes && (
@@ -1531,34 +1503,37 @@ export default function SupervisorDashboard() {
                   </div>
 
                   {/* Action Toolbar on Card */}
-                  <div className="mt-4 pt-3 border-t border-[#E2D9C8] flex items-center gap-2">
-                    {!b.otpVerified && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQuickOtpBooking(b);
-                          setQuickOtpInput('');
-                        }}
-                        className="py-2.5 px-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer animate-pulse shrink-0"
-                      >
-                        <LuKey className="w-3.5 h-3.5" />
-                        <span>Verify OTP</span>
-                      </button>
+                  <div className="mt-4 pt-3 border-t border-[#E2D9C8] flex flex-wrap items-center gap-2">
+                    {b.status !== 'completed' ? (
+                      !b.otpVerified ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickOtpBooking(b);
+                            setQuickOtpInput('');
+                          }}
+                          className="py-2.5 px-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer animate-pulse shrink-0"
+                        >
+                          <LuKey className="w-3.5 h-3.5" />
+                          <span>Verify OTP</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkCompleted(b)}
+                          disabled={completingId === b._id}
+                          className="py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
+                        >
+                          <LuCircleCheck className="w-4 h-4 text-emerald-200" />
+                          <span>{completingId === b._id ? 'Completing...' : 'Work Done'}</span>
+                        </button>
+                      )
+                    ) : (
+                      <div className="py-2 px-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5 shrink-0">
+                        <LuCircleCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Completed</span>
+                      </div>
                     )}
-
-                    <label
-                      className="p-2.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] transition-colors cursor-pointer shrink-0"
-                      title="Quick Camera Photo Upload"
-                    >
-                      <LuCamera className="w-4 h-4" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => handleDirectPhotoUpload(e, b._id, b.status === 'in_progress' ? 'after' : 'before')}
-                      />
-                    </label>
 
                     <button
                       type="button"
@@ -1642,19 +1617,6 @@ export default function SupervisorDashboard() {
               >
                 <LuCalendar className="w-3.5 h-3.5" />
                 <span>Job Details</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveModalTab('chat')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  activeModalTab === 'chat'
-                    ? 'bg-[#10231D] text-[#E9A23B]'
-                    : 'text-[#6B8077] hover:bg-[#ECE5D8]'
-                }`}
-              >
-                <LuMessageSquare className="w-3.5 h-3.5" />
-                <span>Messages ({selectedBooking.messages?.length || 0})</span>
               </button>
             </div>
 
@@ -1952,7 +1914,7 @@ export default function SupervisorDashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 rounded-xl bg-white border border-[#E2D9C8]">
                     <span className="text-[10px] font-mono uppercase text-[#6B8077] block">Scheduled Slot</span>
-                    <p className="font-bold text-[#10231D]">{selectedBooking.assignedSlot?.date || selectedBooking.slot?.date}</p>
+                    <p className="font-bold text-[#10231D]">{formatDateDMY(selectedBooking.assignedSlot?.date || selectedBooking.slot?.date)}</p>
                     <p className="text-[11px] text-[#6B8077]">{selectedBooking.assignedSlot?.timeWindow || selectedBooking.slot?.window}</p>
                     {selectedBooking.assignedSlot?.notes && (
                       <p className="text-[10px] text-[#E9A23B] mt-1 font-mono italic">
@@ -1974,59 +1936,57 @@ export default function SupervisorDashboard() {
               </div>
             )}
 
-            {/* TAB 5: MESSAGES / FIELD CHAT */}
-            {activeModalTab === 'chat' && (
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] h-64 overflow-y-auto space-y-2.5">
-                  {(selectedBooking.messages || []).length > 0 ? (
-                    selectedBooking.messages.map((m, idx) => {
-                      const isMe = m.sender === 'supervisor';
-                      return (
-                        <div
-                          key={idx}
-                          className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                        >
-                          <div
-                            className={`p-2.5 rounded-xl max-w-[85%] text-xs ${
-                              isMe
-                                ? 'bg-[#10231D] text-[#F4EFE6]'
-                                : 'bg-[#ECE5D8] text-[#10231D]'
-                            }`}
-                          >
-                            <p className="text-[9px] font-bold opacity-75 mb-0.5">
-                              {m.senderName || m.sender} • {new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <p className="leading-relaxed">{m.text}</p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#6B8077]">
-                      No messages in this job thread yet.
-                    </div>
-                  )}
-                </div>
 
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Type an update or note to customer/admin..."
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sendingMessage || !chatMessage.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                  >
-                    <LuSend className="w-3.5 h-3.5" />
-                    <span>Send</span>
-                  </button>
-                </form>
+
+            {/* Modal Action Footer */}
+            <div className="pt-4 border-t border-[#E2D9C8] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#6B8077]">Status:</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                  selectedBooking.status === 'completed'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : selectedBooking.status === 'in_progress'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-amber-100 text-amber-900'
+                }`}>
+                  {selectedBooking.status?.replace('_', ' ')}
+                </span>
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+                {selectedBooking.status !== 'completed' && (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkCompleted(selectedBooking)}
+                    disabled={completingId === selectedBooking._id}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    <LuCircleCheck className="w-4 h-4 text-emerald-200" />
+                    <span>{completingId === selectedBooking._id ? 'Completing...' : 'Work Done (Complete)'}</span>
+                  </button>
+                )}
+                {!selectedBooking.otpVerified && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickOtpBooking(selectedBooking);
+                      setQuickOtpInput('');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <LuKey className="w-4 h-4" />
+                    <span>Verify OTP</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </Modal>
       )}
@@ -2114,64 +2074,16 @@ export default function SupervisorDashboard() {
           </form>
         </Modal>
       )}
-
-      {/* FIELD QUALITY & SAFETY SOP CHECKLIST MODAL */}
-      {sopModalOpen && (
-        <Modal
-          isOpen={sopModalOpen}
-          onClose={() => setSopModalOpen(false)}
-          title="Daily Quality & Safety SOP Checklist"
-          subtitle="Urban Company & Max Housekeeping Field Excellence"
-          maxWidth="max-w-lg"
-        >
-          <div className="space-y-4">
-            <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between text-xs">
-              <div>
-                <span className="font-bold text-[#10231D] block">Daily Shift Compliance:</span>
-                <span className="text-[11px] text-[#6B8077]">Standard operating checklist for quality and safety</span>
-              </div>
-              <span className="font-mono font-black text-sm text-[#E9A23B] px-2.5 py-1 rounded-xl bg-[#10231D]">
-                {Object.values(sopChecks).filter(Boolean).length} / {SOP_ITEMS.length}
-              </span>
-            </div>
-
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-              {SOP_ITEMS.map((item) => {
-                const isChecked = Boolean(sopChecks[item.id]);
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleToggleSop(item.id)}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all select-none ${
-                      isChecked
-                        ? 'bg-emerald-500/10 border-emerald-300'
-                        : 'bg-white border-[#E2D9C8] hover:bg-[#F4EFE6]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => {}}
-                      className="w-4 h-4 accent-[#10231D] rounded cursor-pointer"
-                    />
-                    <span className={`text-xs font-medium leading-relaxed ${isChecked ? 'text-emerald-950 font-bold line-through opacity-85' : 'text-[#10231D]'}`}>
-                      {item.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSopModalOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] font-bold text-xs transition-colors cursor-pointer shadow-sm"
-            >
-              Done & Return to Operations
-            </button>
-          </div>
-        </Modal>
-      )}
+      {/* Themed Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        confirmVariant={confirmModal.confirmVariant}
+        onConfirm={confirmModal.onConfirm}
+      />
     </div>
   );
 }

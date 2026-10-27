@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Booking from '../models/Booking.js';
 import User from '../models/User.js';
 import Service from '../models/Service.js';
@@ -22,37 +23,66 @@ function escapeRegex(str) {
  */
 export async function getSupervisorStats(req, res, next) {
   try {
-    let queryFilter = {};
+    const andConditions = [];
+
     if (req.user.role === 'supervisor') {
-      queryFilter = { supervisor: req.user._id };
+      andConditions.push({
+        $or: [
+          { supervisor: req.user._id },
+          { 'assignedSupervisor.id': req.user._id }
+        ]
+      });
     } else if (req.user.role === 'admin') {
       if (req.query.supervisorId && req.query.supervisorId !== 'all') {
-        queryFilter = { supervisor: req.query.supervisorId };
+        andConditions.push({
+          $or: [
+            { supervisor: req.query.supervisorId },
+            { 'assignedSupervisor.id': req.query.supervisorId }
+          ]
+        });
       }
     }
 
+    const baseFilter = andConditions.length > 0 ? { $and: [...andConditions] } : {};
     const todayStr = getTodayString();
 
-    const totalAssigned = await Booking.countDocuments(queryFilter);
-    const todayBookings = await Booking.countDocuments({
-      ...queryFilter,
-      $or: [
-        { 'assignedSlot.date': todayStr },
-        { 'slot.date': todayStr }
-      ]
-    });
+    const totalAssigned = await Booking.countDocuments(baseFilter);
+
+    const todayFilter = andConditions.length > 0
+      ? {
+          $and: [
+            ...andConditions,
+            {
+              $or: [
+                { 'assignedSlot.date': new RegExp('^' + todayStr) },
+                { 'slot.date': new RegExp('^' + todayStr) }
+              ]
+            }
+          ]
+        }
+      : {
+          $or: [
+            { 'assignedSlot.date': new RegExp('^' + todayStr) },
+            { 'slot.date': new RegExp('^' + todayStr) }
+          ]
+        };
+
+    const todayBookings = await Booking.countDocuments(todayFilter);
+
     const inProgress = await Booking.countDocuments({
-      ...queryFilter,
+      ...baseFilter,
       status: 'in_progress'
     });
+
     const completed = await Booking.countDocuments({
-      ...queryFilter,
+      ...baseFilter,
       status: 'completed'
     });
+
     const pendingOtp = await Booking.countDocuments({
-      ...queryFilter,
+      ...baseFilter,
       otpVerified: false,
-      status: { $in: ['confirmed', 'assigned', 'in_progress'] }
+      status: { $in: ['confirmed', 'assigned', 'in_progress', 'pending'] }
     });
 
     const openPoolCount = await Booking.countDocuments({
@@ -83,19 +113,34 @@ export async function getSupervisorStats(req, res, next) {
 export async function getSupervisorSchedule(req, res, next) {
   try {
     const targetDate = req.query.date || getTodayString();
+    const datePrefix = String(targetDate).slice(0, 10);
 
-    let scheduleFilter = {
-      $or: [
-        { 'assignedSlot.date': targetDate },
-        { 'slot.date': targetDate }
-      ]
-    };
+    const andConditions = [
+      {
+        $or: [
+          { 'assignedSlot.date': new RegExp('^' + datePrefix) },
+          { 'slot.date': new RegExp('^' + datePrefix) }
+        ]
+      }
+    ];
 
     if (req.user.role === 'supervisor') {
-      scheduleFilter.supervisor = req.user._id;
+      andConditions.push({
+        $or: [
+          { supervisor: req.user._id },
+          { 'assignedSupervisor.id': req.user._id }
+        ]
+      });
     } else if (req.user.role === 'admin' && req.query.supervisorId && req.query.supervisorId !== 'all') {
-      scheduleFilter.supervisor = req.query.supervisorId;
+      andConditions.push({
+        $or: [
+          { supervisor: req.query.supervisorId },
+          { 'assignedSupervisor.id': req.query.supervisorId }
+        ]
+      });
     }
+
+    const scheduleFilter = { $and: andConditions };
 
     const STANDARD_SLOTS = [
       '08:00 AM - 10:00 AM',
@@ -107,8 +152,8 @@ export async function getSupervisorSchedule(req, res, next) {
     ];
 
     const bookings = await Booking.find(scheduleFilter)
-      .select('bookingCode serviceTitle customer address status slot assignedSlot serviceOtp otpVerified photos messages totalAmount supervisor')
-      .populate('supervisor', 'name phone email')
+      .select('bookingCode serviceTitle customer address status slot assignedSlot serviceOtp otpVerified photos messages totals supervisor assignedSupervisor')
+      .populate('supervisor', 'name phone email avatar')
       .sort({ createdAt: 1 })
       .lean();
 
@@ -156,50 +201,74 @@ export async function getSupervisorSchedule(req, res, next) {
  */
 export async function getSupervisorBookings(req, res, next) {
   try {
-    const { filter, search, page = 1, limit = 50 } = req.query;
-    let query = {};
-    if (req.user.role === 'supervisor') {
-      query.supervisor = req.user._id;
-    } else if (req.user.role === 'admin' && req.query.supervisorId && req.query.supervisorId !== 'all') {
-      query.supervisor = req.query.supervisorId;
+    const { filter, search, page = 1, limit = 50, supervisorId } = req.query;
+    const andConditions = [];
+
+    if (filter === 'pool') {
+      // Unassigned bookings pool - available to any supervisor
+      andConditions.push({
+        $or: [{ supervisor: null }, { supervisor: { $exists: false } }],
+        status: { $nin: ['completed', 'cancelled'] }
+      });
+    } else {
+      if (req.user.role === 'supervisor') {
+        andConditions.push({
+          $or: [
+            { supervisor: req.user._id },
+            { 'assignedSupervisor.id': req.user._id }
+          ]
+        });
+      } else if (req.user.role === 'admin' && supervisorId && supervisorId !== 'all') {
+        andConditions.push({
+          $or: [
+            { supervisor: supervisorId },
+            { 'assignedSupervisor.id': supervisorId }
+          ]
+        });
+      }
     }
 
     const todayStr = getTodayString();
 
     if (filter === 'today') {
-      query.$or = [
-        { 'assignedSlot.date': todayStr },
-        { 'slot.date': todayStr }
-      ];
+      andConditions.push({
+        $or: [
+          { 'assignedSlot.date': new RegExp('^' + todayStr) },
+          { 'slot.date': new RegExp('^' + todayStr) }
+        ]
+      });
     } else if (filter === 'pending_otp') {
-      query.otpVerified = false;
-      query.status = { $in: ['confirmed', 'assigned', 'in_progress'] };
+      andConditions.push({
+        otpVerified: false,
+        status: { $in: ['confirmed', 'assigned', 'in_progress', 'pending'] }
+      });
     } else if (filter === 'in_progress') {
-      query.status = 'in_progress';
+      andConditions.push({ status: 'in_progress' });
     } else if (filter === 'completed') {
-      query.status = 'completed';
-    } else if (filter === 'pool') {
-      query.supervisor = null;
-      query.status = { $nin: ['completed', 'cancelled'] };
-    } else if (filter && filter !== 'all') {
-      query.status = filter;
+      andConditions.push({ status: 'completed' });
+    } else if (filter && filter !== 'all' && filter !== 'pool') {
+      andConditions.push({ status: filter });
     }
 
     if (search && search.trim()) {
       const regex = new RegExp(escapeRegex(search.trim()), 'i');
-      query.$or = [
-        { bookingCode: regex },
-        { 'customer.name': regex },
-        { 'customer.phone': regex },
-        { cityName: regex },
-        { 'address.line1': regex }
-      ];
+      andConditions.push({
+        $or: [
+          { bookingCode: regex },
+          { 'customer.name': regex },
+          { 'customer.phone': regex },
+          { cityName: regex },
+          { 'address.line1': regex }
+        ]
+      });
     }
 
+    const query = andConditions.length > 0 ? { $and: andConditions } : {};
     const skip = (Number(page) - 1) * Number(limit);
     const total = await Booking.countDocuments(query);
     const bookings = await Booking.find(query)
-      .sort({ 'slot.date': 1, createdAt: -1 })
+      .populate('supervisor', 'name phone email avatar status')
+      .sort({ 'assignedSlot.date': 1, 'slot.date': 1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
 
@@ -261,7 +330,13 @@ export async function verifyBookingOtp(req, res, next) {
       });
     }
 
-    const booking = await Booking.findById(id);
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingCode: id });
+    }
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
@@ -290,15 +365,13 @@ export async function verifyBookingOtp(req, res, next) {
     booking.otpVerified = true;
     booking.otpVerifiedAt = new Date();
 
-    // Automatically transition to in_progress if still pending/confirmed/assigned
-    if (['pending', 'confirmed', 'assigned'].includes(booking.status)) {
-      booking.status = 'in_progress';
-    }
+    // Automatically transition to in_progress upon OTP verification
+    booking.status = 'in_progress';
 
     booking.statusHistory.push({
-      status: booking.status,
+      status: 'in_progress',
       timestamp: new Date(),
-      note: `Customer service verification OTP successfully verified on visit by supervisor ${req.user.name}.`,
+      note: `Customer service verification OTP successfully verified on visit by supervisor ${req.user.name}. Service status transitioned to In-Progress.`,
       updatedBy: req.user._id
     });
 
@@ -476,7 +549,13 @@ export async function updateSupervisorBookingStatus(req, res, next) {
     const { id } = req.params;
     const { status, note } = req.body;
 
-    const booking = await Booking.findById(id);
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingCode: id });
+    }
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
@@ -601,14 +680,29 @@ export async function getUnassignedPool(req, res, next) {
 export async function claimSupervisorBooking(req, res, next) {
   try {
     const { id } = req.params;
-    const booking = await Booking.findById(id);
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingCode: id });
+    }
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
     const todayStr = getTodayString();
     booking.supervisor = req.user._id;
-    booking.status = 'assigned';
+    booking.assignedSupervisor = {
+      id: req.user._id,
+      name: req.user.name,
+      phone: req.user.phone || '',
+      email: req.user.email || '',
+      avatar: req.user.avatar || req.user.avatarUrl || '',
+      assignedAt: new Date()
+    };
+    // Automatically transition to confirmed when supervisor is assigned/claims
+    booking.status = 'confirmed';
     booking.assignedSlot = {
       date: booking.slot?.date || todayStr,
       timeWindow: booking.slot?.window || '10:00 AM - 12:00 PM',
@@ -621,9 +715,9 @@ export async function claimSupervisorBooking(req, res, next) {
     }
 
     booking.statusHistory.push({
-      status: 'assigned',
+      status: 'confirmed',
       timestamp: new Date(),
-      note: `Self-claimed by supervisor ${req.user.name} from operational dispatch queue.`,
+      note: `Self-claimed by supervisor ${req.user.name} from operational dispatch queue. Status confirmed.`,
       updatedBy: req.user._id
     });
 
@@ -631,7 +725,7 @@ export async function claimSupervisorBooking(req, res, next) {
 
     res.status(200).json({
       success: true,
-      message: `Booking #${booking.bookingCode} claimed and added to your active schedule!`,
+      message: `Booking #${booking.bookingCode} claimed and confirmed! Added to your active schedule.`,
       booking
     });
   } catch (err) {

@@ -194,16 +194,47 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
 
   if (coupon && coupon.isActive !== false) {
     const minAmount = coupon.minBookingAmount || coupon.minOrderValue || 0;
-    if (subtotal < minAmount) {
-      couponError = `Coupon requires a minimum booking amount of ₹${minAmount}`;
-    } else {
-      if (coupon.discountType === 'percentage') {
-        couponDiscount = Math.round((subtotal * (coupon.discountValue || 0)) / 100);
-        if (coupon.maxDiscount && couponDiscount > coupon.maxDiscount) {
-          couponDiscount = coupon.maxDiscount;
+
+    // Check service-specific restriction
+    const applicableServiceIds = (coupon.applicableServices || []).map(s => String(s?._id || s));
+    const applicableCategoryIds = (coupon.applicableCategories || []).map(c => String(c?._id || c));
+
+    let eligibleItems = calculatedItems;
+
+    if (applicableServiceIds.length > 0) {
+      eligibleItems = calculatedItems.filter(item => applicableServiceIds.includes(String(item.serviceId)));
+      if (eligibleItems.length === 0) {
+        const allowedTitles = (coupon.applicableServices || [])
+          .map(s => (typeof s === 'object' && s?.title ? s.title : null))
+          .filter(Boolean);
+        couponError = allowedTitles.length > 0
+          ? `Coupon is only valid for: ${allowedTitles.join(', ')}`
+          : 'This coupon is valid only for specific services that are not in your cart';
+      }
+    } else if (applicableCategoryIds.length > 0) {
+      eligibleItems = calculatedItems.filter(item => {
+        const catId = String(item.category?._id || item.category || '');
+        return applicableCategoryIds.includes(catId);
+      });
+      if (eligibleItems.length === 0) {
+        couponError = 'This coupon is not applicable to any service in your cart';
+      }
+    }
+
+    if (!couponError) {
+      if (subtotal < minAmount) {
+        couponError = `Coupon requires a minimum booking amount of ₹${minAmount}`;
+      } else {
+        const eligibleSubtotal = eligibleItems.reduce((acc, cur) => acc + cur.totalPrice, 0);
+
+        if (coupon.discountType === 'percentage') {
+          couponDiscount = Math.round((eligibleSubtotal * (coupon.discountValue || 0)) / 100);
+          if (coupon.maxDiscount && couponDiscount > coupon.maxDiscount) {
+            couponDiscount = coupon.maxDiscount;
+          }
+        } else if (coupon.discountType === 'flat') {
+          couponDiscount = Math.min(eligibleSubtotal, coupon.discountValue || 0);
         }
-      } else if (coupon.discountType === 'flat') {
-        couponDiscount = Math.min(subtotal, coupon.discountValue || 0);
       }
     }
   }
@@ -225,7 +256,10 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
     },
     coupon: coupon && !couponError ? {
       code: coupon.code,
-      discount: couponDiscount
+      discount: couponDiscount,
+      description: coupon.description || '',
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue
     } : null,
     couponError
   };

@@ -63,12 +63,95 @@ export async function findBookingByIdOrCode(idOrCode) {
 }
 
 /**
+ * Helper to validate smart coupon rules:
+ * - Active & expiry date
+ * - Usage limit
+ * - firstBookingOnly
+ * - oncePerUser
+ * Returns { coupon, error }
+ */
+export async function validateSmartCoupon(couponCode, { user = null, customer = null, phone = null, email = null } = {}) {
+  if (!couponCode || !String(couponCode).trim()) return { coupon: null, error: null };
+
+  const code = String(couponCode).trim().toUpperCase();
+  const now = new Date();
+
+  const coupon = await Coupon.findOne({
+    code,
+    isActive: true,
+    $or: [
+      { validUntil: { $gte: now } },
+      { expiryDate: { $gte: now } },
+      { expiryDate: { $exists: false }, validUntil: { $exists: false } }
+    ]
+  }).populate('applicableServices', 'title slug price');
+
+  if (!coupon) {
+    return { coupon: null, error: `Invalid or expired coupon code "${code}".` };
+  }
+
+  if (coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
+    return { coupon: null, error: `Coupon "${code}" has reached its maximum redemption limit.` };
+  }
+
+  // Identify customer markers across phone, email, and user account
+  const rawPhone = customer?.phone || phone || user?.phone;
+  const cleanPhone = rawPhone ? String(rawPhone).replace(/\D/g, '').slice(-10) : null;
+  const cleanEmail = (customer?.email || email || user?.email || '').trim().toLowerCase();
+  const userId = user?._id || user?.id;
+
+  const identityQueries = [];
+  if (userId) identityQueries.push({ user: userId });
+  if (cleanPhone && cleanPhone.length === 10) {
+    identityQueries.push({ 'customer.phone': new RegExp(cleanPhone + '$') });
+  }
+  if (cleanEmail && cleanEmail.includes('@')) {
+    identityQueries.push({ 'customer.email': new RegExp(`^${cleanEmail}$`, 'i') });
+  }
+
+  // Rule 1: firstBookingOnly (1st booking only for new users)
+  if (coupon.firstBookingOnly) {
+    if (identityQueries.length > 0) {
+      const priorBookings = await Booking.countDocuments({
+        $or: identityQueries,
+        status: { $ne: 'cancelled' }
+      });
+      if (priorBookings > 0) {
+        return {
+          coupon: null,
+          error: `Coupon "${coupon.code}" is exclusively for new customers on their 1st booking. Prior bookings were found with your details.`
+        };
+      }
+    }
+  }
+
+  // Rule 2: oncePerUser (Once per user)
+  if (coupon.oncePerUser) {
+    if (identityQueries.length > 0) {
+      const redeemedBefore = await Booking.countDocuments({
+        'appliedCoupon.code': coupon.code,
+        $or: identityQueries,
+        status: { $ne: 'cancelled' }
+      });
+      if (redeemedBefore > 0) {
+        return {
+          coupon: null,
+          error: `Coupon "${coupon.code}" can only be redeemed once per customer. It has already been applied to a previous booking.`
+        };
+      }
+    }
+  }
+
+  return { coupon, error: null };
+}
+
+/**
  * Generate Live Price Quote with Dual-Pricing Breakdown
  * POST /api/v1/bookings/quote
  */
 export async function getQuote(req, res, next) {
   try {
-    const { items = [], citySlug, couponCode } = req.body;
+    const { items = [], citySlug, couponCode, customer, phone, email } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({
@@ -102,25 +185,26 @@ export async function getQuote(req, res, next) {
       });
     }
 
-    // Check coupon if provided
+    // Check smart coupon rules if provided
     let coupon = null;
+    let preCouponError = null;
     if (couponCode && couponCode.trim()) {
-      const now = new Date();
-      coupon = await Coupon.findOne({
-        code: couponCode.trim().toUpperCase(),
-        isActive: true,
-        $or: [
-          { validUntil: { $gte: now } },
-          { expiryDate: { $gte: now } },
-          { expiryDate: { $exists: false }, validUntil: { $exists: false } }
-        ]
+      const validated = await validateSmartCoupon(couponCode, {
+        user: req.user,
+        customer,
+        phone,
+        email
       });
-      if (coupon && coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
-        coupon = null;
-      }
+      coupon = validated.coupon;
+      preCouponError = validated.error;
     }
 
     const calculation = calculateQuote(enrichedItems, citySlug, coupon);
+
+    // If pre-validation failed (e.g. not 1st booking or already used), convey clear error
+    if (preCouponError && !calculation.couponError) {
+      calculation.couponError = preCouponError;
+    }
 
     res.status(200).json({
       success: true,
@@ -235,22 +319,29 @@ export async function createBooking(req, res, next) {
 
     let coupon = null;
     if (couponCode && couponCode.trim()) {
-      const now = new Date();
-      coupon = await Coupon.findOne({
-        code: couponCode.trim().toUpperCase(),
-        isActive: true,
-        $or: [
-          { validUntil: { $gte: now } },
-          { expiryDate: { $gte: now } },
-          { expiryDate: { $exists: false }, validUntil: { $exists: false } }
-        ]
+      const validated = await validateSmartCoupon(couponCode, {
+        user: req.user,
+        customer,
+        phone: customer?.phone,
+        email: customer?.email
       });
-      if (coupon && coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
-        coupon = null;
+      if (validated.error) {
+        return res.status(400).json({
+          success: false,
+          message: validated.error
+        });
       }
+      coupon = validated.coupon;
     }
 
     const quote = calculateQuote(enrichedItems, cityDoc?.slug, coupon);
+
+    if (couponCode && quote.couponError) {
+      return res.status(400).json({
+        success: false,
+        message: quote.couponError
+      });
+    }
 
     // Generate foolproof, guaranteed non-repeating unique Booking Code
     const bookingCode = await generateUniqueBookingCode();
@@ -326,20 +417,49 @@ export async function createBooking(req, res, next) {
       console.warn('[Email Automation Notice]:', emailErr.message);
     });
 
-    // Save to user address book if authenticated, asked to save, and NOT temporary
-    if (req.user && saveAddressToProfile && !isTempAddress) {
-      const user = await User.findById(req.user._id);
-      if (user) {
-        user.addresses.push({
-          label: address.label || 'Home',
-          line1: address.line1.trim(),
-          landmark: address.landmark ? address.landmark.trim() : '',
-          city: address.cityText.trim(),
-          state: address.stateText || 'Uttar Pradesh',
-          pincode: address.pincode.trim(),
-          isDefault: user.addresses.length === 0
-        });
-        await user.save();
+    // Address Book Management: Auto-clean existing duplicates and only add if genuinely new
+    if (req.user) {
+      const userDoc = await User.findById(req.user._id);
+      if (userDoc && Array.isArray(userDoc.addresses)) {
+        let changed = false;
+        // 1. Deduplicate any existing duplicates in user's saved addresses
+        const seen = new Set();
+        const cleanAddresses = [];
+        for (const addr of userDoc.addresses) {
+          const key = `${(addr.line1 || '').toLowerCase().replace(/[\W_]+/g, ' ').trim()}|${String(addr.pincode || '').trim().replace(/\D/g, '')}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            cleanAddresses.push(addr);
+          } else {
+            changed = true;
+          }
+        }
+
+        // 2. Only append if saveAddressToProfile is true, not temporary, and NOT already saved
+        if (saveAddressToProfile && !isTempAddress) {
+          const normLine1 = (address.line1 || '').toLowerCase().replace(/[\W_]+/g, ' ').trim();
+          const normPincode = String(address.pincode || '').trim().replace(/\D/g, '');
+          const newKey = `${normLine1}|${normPincode}`;
+
+          if (!seen.has(newKey)) {
+            seen.add(newKey);
+            cleanAddresses.push({
+              label: address.label || 'Home',
+              line1: address.line1.trim(),
+              landmark: address.landmark ? address.landmark.trim() : '',
+              city: address.cityText.trim(),
+              state: address.stateText || 'Uttar Pradesh',
+              pincode: address.pincode.trim(),
+              isDefault: cleanAddresses.length === 0
+            });
+            changed = true;
+          }
+        }
+
+        if (changed || cleanAddresses.length !== userDoc.addresses.length) {
+          userDoc.addresses = cleanAddresses;
+          await userDoc.save();
+        }
       }
     }
 
@@ -568,7 +688,12 @@ export async function getBookingMessages(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (!isAuthorizedForBooking(booking, req.user)) {
+    const verifyPhone = req.query.phone ? String(req.query.phone).trim().replace(/\D/g, '') : null;
+    const isPhoneMatch = verifyPhone && booking.customer?.phone && (
+      booking.customer.phone.endsWith(verifyPhone) || verifyPhone.endsWith(booking.customer.phone)
+    );
+
+    if (!isAuthorizedForBooking(booking, req.user) && !isPhoneMatch) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: You are not authorized to view messages for this booking.'
@@ -595,13 +720,13 @@ export async function getBookingMessages(req, res, next) {
 }
 
 /**
- * Add message to booking communication thread (Customer <-> Admin)
+ * Add message to booking communication thread (Customer <-> Supervisor / Admin)
  * POST /api/v1/bookings/:id/messages
  */
 export async function addBookingMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const { text, senderName } = req.body;
+    const { text, senderName, phone } = req.body;
 
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'Message text cannot be empty.' });
@@ -612,15 +737,29 @@ export async function addBookingMessage(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (!isAuthorizedForBooking(booking, req.user)) {
+    const verifyPhone = phone ? String(phone).trim().replace(/\D/g, '') : (req.query.phone ? String(req.query.phone).trim().replace(/\D/g, '') : null);
+    const isPhoneMatch = verifyPhone && booking.customer?.phone && (
+      booking.customer.phone.endsWith(verifyPhone) || verifyPhone.endsWith(booking.customer.phone)
+    );
+
+    if (!isAuthorizedForBooking(booking, req.user) && !isPhoneMatch) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: You are not authorized to send messages for this booking.'
       });
     }
 
-    const senderRole = req.user?.role === 'admin' ? 'admin' : 'customer';
-    const authorName = senderName || req.user?.name || (senderRole === 'admin' ? 'Max Housekeeping Admin' : booking.customer.name);
+    let senderRole = 'customer';
+    if (req.user?.role === 'admin') senderRole = 'admin';
+    else if (req.user?.role === 'supervisor') senderRole = 'supervisor';
+
+    const authorName = senderName || req.user?.name || (
+      senderRole === 'admin'
+        ? 'Max Housekeeping Admin'
+        : senderRole === 'supervisor'
+        ? (booking.assignedSupervisor?.name || booking.supervisor?.name || 'Field Supervisor')
+        : (booking.customer?.name || 'Customer')
+    );
 
     // Prune messages older than 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -731,8 +870,41 @@ export async function deleteBooking(req, res, next) {
   }
 }
 
+/**
+ * Get Publicly Available Promotional Coupons
+ * GET /api/v1/bookings/coupons
+ */
+export async function getPublicCoupons(req, res, next) {
+  try {
+    const now = new Date();
+    const coupons = await Coupon.find({
+      isActive: true,
+      showInOffers: true,
+      $or: [
+        { validUntil: { $gte: now } },
+        { expiryDate: { $gte: now } },
+        { expiryDate: { $exists: false }, validUntil: { $exists: false } }
+      ]
+    })
+      .populate('applicableServices', 'title slug price')
+      .populate('applicableCategories', 'name slug')
+      .sort({ createdAt: -1 });
+
+    const eligibleCoupons = coupons.filter(c => !c.usageLimit || (c.usedCount || 0) < c.usageLimit);
+
+    res.status(200).json({
+      success: true,
+      coupons: eligibleCoupons
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
+  validateSmartCoupon,
   getQuote,
+  getPublicCoupons,
   createBooking,
   trackBooking,
   getMyBookings,
