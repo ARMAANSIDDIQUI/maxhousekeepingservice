@@ -16,7 +16,8 @@
     "test:pricing": "node scripts/testPricing.js",
     "test:email": "node scripts/testFunctions.js",
     "test:supervisor": "node scripts/test-supervisor-system.js",
-    "generate-hash": "node scripts/generateHashOrSecret.js"
+    "generate-hash": "node scripts/generateHashOrSecret.js",
+    "sync:atlas": "node scripts/syncToAtlas.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

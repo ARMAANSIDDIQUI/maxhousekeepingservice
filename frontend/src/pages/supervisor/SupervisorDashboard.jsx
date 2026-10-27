@@ -42,6 +42,7 @@ import Modal from '../../components/common/Modal';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
 import { formatDateDMY } from '../../utils/date';
+import { calculateDistanceKm, getEtaInfo } from '../../utils/geoUtils';
 
 function formatToday() {
   const d = new Date();
@@ -165,8 +166,38 @@ export default function SupervisorDashboard() {
   const [sharingBookingId, setSharingBookingId] = useState(null);
   const [sharingClosedPrompt, setSharingClosedPrompt] = useState(null);
   const [lastGpsCoords, setLastGpsCoords] = useState(null);
+  const [deviceGpsCoords, setDeviceGpsCoords] = useState(null);
   const locationWatchIdRef = useRef(null);
   const lastSentGpsRef = useRef(null);
+
+  // Background device location fix for zero-cost distance calculation
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setDeviceGpsCoords({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          });
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
+      );
+    }
+  }, []);
+
+  const effectiveSupervisorCoords = lastGpsCoords || deviceGpsCoords;
+
+  const getBookingDistanceEta = (bookingItem) => {
+    if (!effectiveSupervisorCoords || !bookingItem?.address?.coordinates?.lat) return null;
+    const dist = calculateDistanceKm(
+      effectiveSupervisorCoords.lat,
+      effectiveSupervisorCoords.lng,
+      bookingItem.address.coordinates.lat,
+      bookingItem.address.coordinates.lng
+    );
+    return getEtaInfo(dist);
+  };
 
   const startBroadcastingGps = (booking) => {
     if (!booking?._id) return;
@@ -857,6 +888,19 @@ export default function SupervisorDashboard() {
                         <p className="text-xs text-[#A3B8B0] mt-0.5">
                           {activeBooking.customer?.name} ({activeBooking.customer?.phone}) · {activeBooking.address?.line1}, {activeBooking.cityName}
                         </p>
+                        {(() => {
+                          const eta = getBookingDistanceEta(activeBooking);
+                          if (!eta) return null;
+                          return (
+                            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-black/40 border border-[#E9A23B]/40 text-[#F4EFE6] text-xs font-bold shadow-xs">
+                              <span className="w-2 h-2 rounded-full bg-[#E9A23B] animate-ping" />
+                              <span className="text-[#E9A23B] uppercase tracking-wide">{eta.distanceText}</span>
+                              <span className="text-[#A3B8B0]">·</span>
+                              <span className="text-emerald-300 font-mono">{eta.etaText} drive</span>
+                              <span className="text-[11px] text-[#A3B8B0]">({eta.statusText})</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div>
@@ -1403,6 +1447,16 @@ export default function SupervisorDashboard() {
                                       <span>GPS Pinpoint</span>
                                     </span>
                                   )}
+                                  {(() => {
+                                    const eta = getBookingDistanceEta(b);
+                                    if (!eta) return null;
+                                    return (
+                                      <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 text-[9px] font-mono font-bold flex items-center gap-1" title={`${eta.distanceText} • ${eta.etaText}`}>
+                                        <LuNavigation className="w-2.5 h-2.5 text-[#E9A23B]" />
+                                        <span>{eta.distanceText} · {eta.etaText}</span>
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
 
                                 {b.assignedSlot?.notes && (
@@ -2134,6 +2188,26 @@ export default function SupervisorDashboard() {
                         Pinpoint: {selectedBooking.address.coordinates.lat.toFixed(5)}, {selectedBooking.address.coordinates.lng.toFixed(5)}
                       </p>
                     )}
+                    {(() => {
+                      const eta = getBookingDistanceEta(selectedBooking);
+                      if (!eta) return null;
+                      return (
+                        <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 mt-2 ${
+                          eta.isArrived
+                            ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+                            : 'bg-[#10231D] border-[#E9A23B]/40 text-[#F4EFE6]'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <LuNavigation className={`w-3.5 h-3.5 ${eta.isArrived ? 'text-emerald-400' : 'text-[#E9A23B]'}`} />
+                            <span className="font-bold text-xs uppercase tracking-wide">{eta.distanceText}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-[#E9A23B] font-bold">
+                              {eta.etaText}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-[#A3B8B0]">{eta.statusText}</span>
+                        </div>
+                      );
+                    })()}
                     <div className="pt-1 flex flex-wrap items-center gap-2">
                       <a
                         href={getMapsUrl(selectedBooking.address, selectedBooking.cityName)}

@@ -21,6 +21,7 @@ import { useBooking } from '../context/BookingContext';
 import { FaInstagram } from 'react-icons/fa6';
 import SEO from '../components/common/SEO';
 import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
+import { calculateDistanceKm, getEtaInfo } from '../utils/geoUtils';
 
 import { formatDateDMY } from '../utils/date';
 
@@ -253,6 +254,23 @@ export default function TrackBookingPage() {
                       <p className="text-[11px] text-[#6B8077]">
                         Scheduled Window: <span className="font-semibold text-[#10231D]">{formatDateDMY(booking.assignedSlot?.date || booking.slot?.date)} ({booking.assignedSlot?.timeWindow || booking.slot?.window})</span>
                       </p>
+                      {(() => {
+                        const cust = booking.address?.coordinates;
+                        const supLoc = booking.supervisorLiveLocation;
+                        if (!cust?.lat || !supLoc?.lat) return null;
+                        const dist = calculateDistanceKm(cust.lat, cust.lng, supLoc.lat, supLoc.lng);
+                        const eta = getEtaInfo(dist);
+                        if (!eta) return null;
+                        return (
+                          <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#10231D] text-[#F4EFE6] text-xs font-bold shadow-xs">
+                            <span className={`w-2 h-2 rounded-full ${eta.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B] animate-ping'}`} />
+                            <span className="text-[#E9A23B]">{eta.distanceText}</span>
+                            <span className="text-stone-400">·</span>
+                            <span className="text-emerald-300 font-mono">{eta.etaText}</span>
+                            <span className="text-[10px] text-stone-300 font-normal">({eta.statusText})</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
