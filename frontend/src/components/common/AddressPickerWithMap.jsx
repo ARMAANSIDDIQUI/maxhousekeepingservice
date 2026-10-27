@@ -361,7 +361,73 @@ export default function AddressPickerWithMap({
     }
   }, [mapLoaded]);
 
-  // Debounced search dynamically fetched via Google Places Autocomplete API with Nearest Location Biasing
+  // Live geocoding API fallback over the network (zero static/seeded data)
+  const fetchLiveGeocodingApi = async (query, refLat, refLng) => {
+    try {
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${refLat}&lon=${refLng}&limit=8`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const mapped = data.features.map((f, idx) => {
+            const p = f.properties;
+            const [fLng, fLat] = f.geometry?.coordinates || [refLng, refLat];
+
+            // Haversine straight-line distance in meters from current coordinates
+            const dLat = (fLat - refLat) * (Math.PI / 180);
+            const dLon = (fLng - refLng) * (Math.PI / 180);
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(refLat * (Math.PI / 180)) *
+                Math.cos(fLat * (Math.PI / 180)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+            const distKm = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+            const distMeters = Math.round(distKm * 1000);
+
+            const mainText = p.name || p.street || query;
+            const parts = [p.street, p.district, p.city, p.state, p.country].filter(Boolean);
+            const secondaryText = parts.slice(0, 3).join(', ');
+
+            return {
+              place_id: `api_${idx}_${p.osm_id || idx}`,
+              description: `${mainText}${secondaryText ? ', ' + secondaryText : ''}`,
+              distance_meters: distMeters,
+              geometry: {
+                location: {
+                  lat: () => fLat,
+                  lng: () => fLng
+                }
+              },
+              address_components: [
+                { types: ['locality'], long_name: p.city || p.district || '' },
+                { types: ['administrative_area_level_1'], long_name: p.state || '' },
+                { types: ['postal_code'], long_name: p.postcode || '' }
+              ],
+              structured_formatting: {
+                main_text: mainText,
+                secondary_text: secondaryText || p.city || ''
+              }
+            };
+          });
+
+          mapped.sort((a, b) => a.distance_meters - b.distance_meters);
+          setPredictions(mapped.slice(0, 8));
+          setShowPredictions(true);
+          setIsSearching(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[Live Geocoding API Error]:', err);
+    }
+
+    setIsSearching(false);
+    setPredictions([]);
+    setShowPredictions(false);
+  };
+
+  // Debounced search dynamically fetched via live APIs (Google Places API + Live Geocoding API)
   const handleStreetInputChange = (e) => {
     const query = e.target.value;
     setStreetQuery(query);
@@ -375,84 +441,66 @@ export default function AddressPickerWithMap({
       return;
     }
 
-    debounceTimerRef.current = setTimeout(() => {
-      if (!autocompleteServiceRef.current || disabled) {
+    debounceTimerRef.current = setTimeout(async () => {
+      setIsSearching(true);
+
+      const refLat = coordinates?.lat || 28.8389;
+      const refLng = coordinates?.lng || 78.7768;
+
+      // 1. Try Google Places Autocomplete API if initialized
+      if (autocompleteServiceRef.current && !disabled) {
+        const request = {
+          input: query,
+          componentRestrictions: { country: 'in' }
+        };
+
+        if (sessionTokenRef.current) {
+          request.sessionToken = sessionTokenRef.current;
+        }
+
+        if (window.google?.maps?.LatLng) {
+          try {
+            request.origin = new window.google.maps.LatLng(refLat, refLng);
+          } catch (_) {}
+        }
+
+        if (window.google?.maps?.Circle) {
+          try {
+            request.locationBias = new window.google.maps.Circle({
+              center: { lat: refLat, lng: refLng },
+              radius: 40000
+            });
+          } catch (_) {}
+        }
+
+        autocompleteServiceRef.current.getPlacePredictions(
+          request,
+          async (results, status) => {
+            const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
+
+            if (status === isOk && results && results.length > 0) {
+              setIsSearching(false);
+              const sorted = [...results].sort((a, b) => {
+                if (a.distance_meters != null && b.distance_meters != null) {
+                  return a.distance_meters - b.distance_meters;
+                }
+                return 0;
+              });
+              setPredictions(sorted.slice(0, 8));
+              setShowPredictions(true);
+              return;
+            }
+
+            // 2. If Google Places returned REQUEST_DENIED or ZERO_RESULTS, fetch live from online API
+            console.warn('[Google Places API status]:', status, '- querying live geocoding API over network');
+            await fetchLiveGeocodingApi(query, refLat, refLng);
+          }
+        );
         return;
       }
 
-      setIsSearching(true);
-
-      const request = {
-        input: query,
-        sessionToken: sessionTokenRef.current,
-        componentRestrictions: { country: 'in' }
-      };
-
-      // Dynamic nearest-location biasing: prioritize places closest to the user's doorstep / city
-      if (coordinates && typeof coordinates.lat === 'number') {
-        if (window.google?.maps?.LatLng) {
-          request.origin = new window.google.maps.LatLng(coordinates.lat, coordinates.lng);
-        }
-        request.locationBias = {
-          radius: 35000,
-          center: { lat: coordinates.lat, lng: coordinates.lng }
-        };
-      }
-
-      autocompleteServiceRef.current.getPlacePredictions(
-        request,
-        (results, status) => {
-          setIsSearching(false);
-          const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
-
-          if (status === isOk && results && results.length > 0) {
-            // Sort dynamically fetched places by nearest distance from current location
-            const sorted = [...results].sort((a, b) => {
-              if (a.distance_meters != null && b.distance_meters != null) {
-                return a.distance_meters - b.distance_meters;
-              }
-              return 0;
-            });
-            setPredictions(sorted.slice(0, 8));
-            setShowPredictions(true);
-          } else {
-            // Dynamic fallback: Query Google Geocoder API over the network
-            if (geocoderRef.current) {
-              const fullSearch = cityText && !query.toLowerCase().includes(cityText.toLowerCase())
-                ? `${query}, ${cityText}`
-                : query;
-              geocoderRef.current.geocode(
-                {
-                  address: fullSearch,
-                  componentRestrictions: { country: 'in' }
-                },
-                (geoResults, geoStatus) => {
-                  if (geoStatus === 'OK' && geoResults && geoResults.length > 0) {
-                    const mapped = geoResults.slice(0, 6).map((g) => ({
-                      place_id: g.place_id,
-                      description: g.formatted_address,
-                      geometry: g.geometry,
-                      address_components: g.address_components,
-                      structured_formatting: {
-                        main_text: g.formatted_address.split(',')[0],
-                        secondary_text: g.formatted_address.split(',').slice(1).join(',').trim()
-                      }
-                    }));
-                    setPredictions(mapped);
-                    setShowPredictions(true);
-                  } else {
-                    setPredictions([]);
-                    setShowPredictions(false);
-                  }
-                }
-              );
-            } else {
-              setPredictions([]);
-              setShowPredictions(false);
-            }
-          }
-        }
-      );
+      // If Google AutocompleteService is not available, query live geocoding API directly
+      await fetchLiveGeocodingApi(query, refLat, refLng);
     }, 300);
   };
 

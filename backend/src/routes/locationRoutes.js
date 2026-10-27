@@ -7,3 +7,5 @@ router.get('/cities', getCities);
 router.post('/detect', detectCoverage);
 
 export default router;
+
+
