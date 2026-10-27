@@ -60,9 +60,10 @@ const serviceSchema = new mongoose.Schema({
   cityRates: [{
     citySlug: { type: String },
     cityName: { type: String },
-    rate: { type: Number }
+    rate: { type: Number },
+    mrp: { type: Number }
   }],
-  cityExtraCharge: { type: Number, default: 0 },
+  cityExtraCharge: { type: Number, default: 100 },
   moradabadOnly: { type: Boolean, default: false },
   videoUrl: { type: String, trim: true },
   videoPublicId: { type: String, trim: true },

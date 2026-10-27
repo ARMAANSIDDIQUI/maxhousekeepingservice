@@ -37,8 +37,26 @@ function getYouTubeEmbedUrl(url) {
 }
 
 // Helper to compute exact variant pricing for any service and variant key
-function getVariantPricingInfo(service, optKey, groupKey) {
+function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad') {
   if (!service) return { price: 0, mrp: 0, duration: '1 hr' };
+  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
+
+  // Check custom city-specific rates
+  let cityRateMatched = false;
+  let cityMatchedRate = null;
+  let cityMatchedMrp = null;
+
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && citySlug) {
+    const targetSlug = String(citySlug).toLowerCase().trim();
+    const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+    if (match && typeof match.rate === 'number' && match.rate > 0) {
+      cityRateMatched = true;
+      cityMatchedRate = match.rate;
+      if (typeof match.mrp === 'number' && match.mrp > 0) {
+        cityMatchedMrp = match.mrp;
+      }
+    }
+  }
 
   // 1. Matrix row match
   if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
@@ -47,9 +65,27 @@ function getVariantPricingInfo(service, optKey, groupKey) {
       const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
       const rowVal = String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase().trim();
       if (rowVal === String(optKey).toLowerCase().trim()) {
+        let p = row.price;
+        let m = row.mrp || row.price;
+
+        if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+          const ratio = cityMatchedRate / service.price;
+          p = Math.round(row.price * ratio);
+          const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+          m = Math.round((row.mrp || row.price) * mrpRatio);
+        }
+
+        if (!isMoradabad) {
+          const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+            ? service.cityExtraCharge
+            : 100;
+          p += outstationExtra;
+          m += outstationExtra;
+        }
+
         return {
-          price: row.price,
-          mrp: row.mrp || row.price,
+          price: p,
+          mrp: m,
           duration: row.duration || service.duration || '1 hr'
         };
       }
@@ -57,8 +93,11 @@ function getVariantPricingInfo(service, optKey, groupKey) {
   }
 
   // 2. Option group delta / multiplier match
-  const basePrice = service.price || 0;
-  const baseMrp = service.mrp || service.price || 0;
+  let basePrice = (cityRateMatched && cityMatchedRate !== null) ? cityMatchedRate : (service.price || 0);
+  let baseMrp = (cityRateMatched && cityMatchedMrp !== null)
+    ? cityMatchedMrp
+    : (service.mrp || service.price || 0);
+
   const group = service.optionGroups?.find(g => g.key === groupKey) || service.optionGroups?.[0];
   const opt = group?.options?.find(o => o.key === optKey);
   if (opt) {
@@ -68,11 +107,26 @@ function getVariantPricingInfo(service, optKey, groupKey) {
       p = Math.round(p * opt.multiplier);
       m = Math.round(m * opt.multiplier);
     }
+    if (!isMoradabad) {
+      const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+        ? service.cityExtraCharge
+        : 100;
+      p += outstationExtra;
+      m += outstationExtra;
+    }
     return {
       price: p,
       mrp: m,
       duration: opt.durationDelta || service.duration || '1 hr'
     };
+  }
+
+  if (!isMoradabad) {
+    const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+      ? service.cityExtraCharge
+      : 100;
+    basePrice += outstationExtra;
+    baseMrp += outstationExtra;
   }
 
   return { price: basePrice, mrp: baseMrp, duration: service.duration || '1 hr' };
@@ -85,7 +139,7 @@ export default function ServiceDetailPage() {
   const [selectedVariant, setSelectedVariant] = useState('');
   const [sliderPosition, setSliderPosition] = useState(50); // Before/After slider
 
-  const { addItem, settings } = useBooking();
+  const { addItem, selectedCity, settings } = useBooking();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -135,7 +189,7 @@ export default function ServiceDetailPage() {
   // Calculate pricing based on selected variant
   const optionGroup = service.optionGroups?.[0];
   const activeVariantKey = selectedVariant || optionGroup?.options?.[0]?.key || '';
-  const currentPricing = getVariantPricingInfo(service, activeVariantKey, optionGroup?.key || 'size');
+  const currentPricing = getVariantPricingInfo(service, activeVariantKey, optionGroup?.key || 'size', selectedCity?.slug);
 
   const currentPrice = currentPricing.price;
   const currentMrp = currentPricing.mrp;
@@ -233,7 +287,7 @@ export default function ServiceDetailPage() {
                 </label>
                 <div className="flex flex-wrap gap-2.5">
                   {optionGroup.options.map((opt) => {
-                    const optPrice = getVariantPricingInfo(service, opt.key, optionGroup.key);
+                    const optPrice = getVariantPricingInfo(service, opt.key, optionGroup.key, selectedCity?.slug);
                     const isSelected = activeVariantKey === opt.key;
                     return (
                       <button

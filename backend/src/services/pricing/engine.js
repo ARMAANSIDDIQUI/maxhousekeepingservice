@@ -5,19 +5,40 @@
  */
 
 export function calculateItemPrice(service, selections = {}, citySlug = null, qty = 1) {
-  const isMoradabad = !citySlug || citySlug.toLowerCase() === 'moradabad';
-  let unitPrice = service.price;
-  let unitMrp = service.mrp;
+  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
+  let unitPrice = service.price || 0;
+  let unitMrp = service.mrp || service.price || 0;
   let duration = service.duration || '1 hr';
   let matchedMatrixRow = null;
 
+  // Check custom city-specific rates configured for this service (e.g. per sq ft, per ltr, or normal service rates)
+  let cityRateMatched = false;
+  let cityMatchedRate = null;
+  let cityMatchedMrp = null;
+
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && citySlug) {
+    const targetSlug = String(citySlug).toLowerCase().trim();
+    const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+    if (match && typeof match.rate === 'number' && match.rate > 0) {
+      cityRateMatched = true;
+      cityMatchedRate = match.rate;
+      if (typeof match.mrp === 'number' && match.mrp > 0) {
+        cityMatchedMrp = match.mrp;
+      }
+    }
+  }
+
   // 0. Dynamic Per Sq. Ft. / Per Unit Calculation
   if (service.pricingType === 'unit' || (service.pricingUnit && service.pricingUnit !== 'fixed')) {
-    const rateMbd = typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price;
-    const rateOther = typeof service.unitRateOther === 'number'
-      ? service.unitRateOther
-      : (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price);
-    const activeRate = isMoradabad ? rateMbd : rateOther;
+    let activeRate = isMoradabad
+      ? (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price)
+      : (typeof service.unitRateOther === 'number'
+        ? service.unitRateOther
+        : (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : service.price));
+
+    if (cityRateMatched && cityMatchedRate !== null) {
+      activeRate = cityMatchedRate;
+    }
 
     const unitCount = Number(
       selections.units ??
@@ -31,13 +52,17 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
 
     unitPrice = Math.round(activeRate * unitCount);
     const mrpFactor = (service.mrp && service.price && service.mrp > service.price) ? (service.mrp / service.price) : 1.25;
-    unitMrp = Math.round(unitPrice * mrpFactor);
-  }
-
-  // City-specific surcharge (e.g. outstation surcharge)
-  if (!isMoradabad && service.cityExtraCharge) {
-    unitPrice += service.cityExtraCharge;
-    unitMrp += service.cityExtraCharge;
+    unitMrp = cityMatchedMrp ? Math.round(cityMatchedMrp * unitCount) : Math.round(unitPrice * mrpFactor);
+  } else {
+    // Normal flat service (or base tier before variants)
+    if (cityRateMatched && cityMatchedRate !== null) {
+      unitPrice = cityMatchedRate;
+      unitMrp = cityMatchedMrp !== null
+        ? cityMatchedMrp
+        : ((service.mrp && service.price && service.mrp > service.price)
+          ? Math.round(cityMatchedRate * (service.mrp / service.price))
+          : Math.round(cityMatchedRate * 1.25));
+    }
   }
 
   // 1. Matrix match (e.g. size: '2-bhk')
@@ -57,8 +82,16 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
 
         if (isMatch) {
           matchedMatrixRow = row;
-          unitPrice = row.price;
-          unitMrp = row.mrp;
+          if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+            // Proportional scaling for city rate relative to base price
+            const ratio = cityMatchedRate / service.price;
+            unitPrice = Math.round(row.price * ratio);
+            const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+            unitMrp = Math.round((row.mrp || row.price) * mrpRatio);
+          } else {
+            unitPrice = row.price;
+            unitMrp = row.mrp;
+          }
           if (row.duration) duration = row.duration;
           break;
         }
@@ -128,6 +161,17 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
     }
   }
 
+  // 4. Outstation Extra Dispatch Surcharge (₹ added for cities outside Moradabad)
+  // Applied AFTER matrix / option calculation so it is never overwritten
+  let outstationSurcharge = 0;
+  if (!isMoradabad) {
+    outstationSurcharge = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+      ? service.cityExtraCharge
+      : 100; // Default outstation surcharge is ₹100
+    unitPrice += outstationSurcharge;
+    unitMrp += outstationSurcharge;
+  }
+
   // Ensure MRP is at least equal to offered price
   if (unitMrp < unitPrice) {
     unitMrp = unitPrice;
@@ -142,6 +186,7 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
   return {
     unitPrice,
     unitMrp,
+    outstationSurcharge,
     qty: quantity,
     totalPrice,
     totalMrp,
@@ -159,6 +204,7 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
  * @param {Object} coupon - Optional active coupon object
  */
 export function calculateQuote(items = [], citySlug = null, coupon = null) {
+  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
   let subtotal = 0;
   let mrpTotal = 0;
   const calculatedItems = [];
@@ -181,6 +227,7 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
       duration: itemCalc.duration,
       unitPrice: itemCalc.unitPrice,
       unitMrp: itemCalc.unitMrp,
+      outstationSurcharge: itemCalc.outstationSurcharge || 0,
       qty: itemCalc.qty,
       totalPrice: itemCalc.totalPrice,
       totalMrp: itemCalc.totalMrp,
@@ -188,6 +235,10 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
       discountPct: itemCalc.discountPct
     });
   }
+
+  const totalOutstationSurcharge = !isMoradabad
+    ? calculatedItems.reduce((acc, it) => acc + ((it.outstationSurcharge || 0) * (it.qty || 1)), 0)
+    : 0;
 
   let couponDiscount = 0;
   let couponError = null;
@@ -248,6 +299,7 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
     totals: {
       subtotal,
       mrpTotal,
+      outstationSurcharge: totalOutstationSurcharge,
       discount: mrpTotal - subtotal,
       couponDiscount,
       total: finalTotal,

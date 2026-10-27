@@ -308,6 +308,22 @@ async function resolveCategoriesPayload(payload) {
  * Helper to normalize and synchronize service variants, option groups, and matrix
  */
 function processVariantsPayload(payload) {
+  // Normalize city-specific rates and outstation surcharge across all service types
+  payload.hasCitySpecificRates = Boolean(payload.hasCitySpecificRates);
+  if (Array.isArray(payload.cityRates)) {
+    payload.cityRates = payload.cityRates.map(cr => ({
+      citySlug: String(cr.citySlug || '').trim().toLowerCase(),
+      cityName: String(cr.cityName || cr.citySlug || '').trim(),
+      rate: Math.max(0, Number(cr.rate) || 0),
+      mrp: cr.mrp ? Math.max(0, Number(cr.mrp) || 0) : undefined
+    })).filter(cr => cr.citySlug && cr.rate > 0);
+  }
+  if (payload.cityExtraCharge !== undefined && payload.cityExtraCharge !== null) {
+    payload.cityExtraCharge = Math.max(0, Number(payload.cityExtraCharge) || 0);
+  } else {
+    payload.cityExtraCharge = 100;
+  }
+
   if (payload.pricingType === 'unit') {
     payload.pricingMode = 'combination';
     const rateMbd = Number(payload.unitRateMoradabad) || Number(payload.price) || 0;
@@ -320,13 +336,6 @@ function processVariantsPayload(payload) {
     }
     if (payload.mrp > payload.price) {
       payload.discountPct = Math.round(((payload.mrp - payload.price) / payload.mrp) * 100);
-    }
-    if (Array.isArray(payload.cityRates)) {
-      payload.cityRates = payload.cityRates.map(cr => ({
-        citySlug: String(cr.citySlug || '').trim().toLowerCase(),
-        cityName: String(cr.cityName || cr.citySlug || '').trim(),
-        rate: Math.max(0, Number(cr.rate) || 0)
-      })).filter(cr => cr.citySlug && cr.rate > 0);
     }
     // If no variants provided for unit pricing, keep matrix empty
     if (!Array.isArray(payload.variants) || payload.variants.length === 0) {

@@ -175,7 +175,7 @@ export default function AdminDashboard() {
     minUnitQuantity: 1,
     hasCitySpecificRates: false,
     cityRates: [],
-    cityExtraCharge: 0,
+    cityExtraCharge: 100,
     moradabadOnly: false,
     cityAvailability: ['moradabad'],
     videoUrl: '',
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
     minUnitQuantity: 1,
     hasCitySpecificRates: false,
     cityRates: [],
-    cityExtraCharge: 0,
+    cityExtraCharge: 100,
     moradabadOnly: false,
     cityAvailability: ['moradabad'],
     videoUrl: '',
@@ -913,6 +913,154 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* City-Wise Pricing Configuration for Normal Service */}
+            <div className="pt-2 border-t border-[#E2D9C8] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="block text-xs font-black text-[#10231D] uppercase tracking-wide">
+                  Pricing & Rates Overrides:
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-[#ECE5D8] px-3 py-1.5 rounded-xl border border-[#E2D9C8]">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.hasCitySpecificRates)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setter(prev => ({
+                        ...prev,
+                        hasCitySpecificRates: checked
+                      }));
+                    }}
+                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-[#10231D]">
+                    Different rates for different cities?
+                  </span>
+                </label>
+              </div>
+
+              {/* City-by-City Rates Grid when hasCitySpecificRates is enabled */}
+              {form.hasCitySpecificRates ? (
+                <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] block">
+                        City-Wise Custom Rates & Pricing
+                      </span>
+                      <span className="text-[10px] text-[#6B8077]">
+                        Enter specific rate and MRP for each city. Unset cities use the base price (₹{form.price || 0}). For variant services, variant prices automatically scale relative to this city's base rate.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {cities.filter(c => c.status === 'active' || !c.status).map(city => {
+                      const citySlug = (city.slug || city.name.toLowerCase()).trim();
+                      const currentCityRate = Array.isArray(form.cityRates)
+                        ? form.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug)
+                        : undefined;
+                      const displayPrice = currentCityRate?.rate !== undefined
+                        ? currentCityRate.rate
+                        : (citySlug === 'moradabad' ? (form.price || 0) : (form.price || 0));
+                      const displayMrp = currentCityRate?.mrp !== undefined
+                        ? currentCityRate.mrp
+                        : (citySlug === 'moradabad' ? (form.mrp || 0) : (form.mrp || 0));
+
+                      return (
+                        <div key={city._id || citySlug} className="p-2.5 rounded-lg bg-white border border-[#E2D9C8] space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#10231D]">{city.name}</span>
+                            <span className="text-[10px] font-mono text-[#6B8077] uppercase">{city.state || 'UP'}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div>
+                              <label className="block text-[9px] font-bold text-[#10231D]">Price (₹)</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={displayPrice}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setter(prev => {
+                                      const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
+                                      const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                      const prevMrp = existingRates[idx]?.mrp || displayMrp;
+                                      const entry = {
+                                        cityId: city._id,
+                                        cityName: city.name,
+                                        citySlug: citySlug,
+                                        rate: val,
+                                        mrp: prevMrp
+                                      };
+                                      if (idx >= 0) {
+                                        existingRates[idx] = entry;
+                                      } else {
+                                        existingRates.push(entry);
+                                      }
+                                      const updates = { ...prev, cityRates: existingRates };
+                                      if (citySlug === 'moradabad') {
+                                        updates.price = val;
+                                      }
+                                      return updates;
+                                    });
+                                  }}
+                                  className="w-full pl-5 pr-1.5 py-1 rounded bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-black text-[#10231D] tnum"
+                                  placeholder="Rate"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-bold text-[#6B8077]">MRP (₹)</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1.5 text-[#6B8077] font-bold text-[11px]">₹</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={displayMrp}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value) || 0;
+                                    setter(prev => {
+                                      const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
+                                      const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                      const prevRate = existingRates[idx]?.rate || displayPrice;
+                                      const entry = {
+                                        cityId: city._id,
+                                        cityName: city.name,
+                                        citySlug: citySlug,
+                                        rate: prevRate,
+                                        mrp: val
+                                      };
+                                      if (idx >= 0) {
+                                        existingRates[idx] = entry;
+                                      } else {
+                                        existingRates.push(entry);
+                                      }
+                                      const updates = { ...prev, cityRates: existingRates };
+                                      if (citySlug === 'moradabad') {
+                                        updates.mrp = val;
+                                      }
+                                      return updates;
+                                    });
+                                  }}
+                                  className="w-full pl-5 pr-1.5 py-1 rounded bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-bold text-[#6B8077] line-through tnum"
+                                  placeholder="MRP"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-[#ECE5D8]/50 border border-[#E2D9C8] text-[11px] text-[#6B8077]">
+                  All serviceable cities currently use the uniform base price of <strong>₹{form.price || 0}</strong>. Check "Different rates for different cities?" above to customize prices per city.
+                </div>
+              )}
+            </div>
+
             {/* Dynamic Service Variants & Tiered Rates */}
             <div className="pt-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -1504,8 +1652,8 @@ export default function AdminDashboard() {
               <input
                 type="number"
                 min={0}
-                placeholder="e.g. 100 or 0"
-                value={form.cityExtraCharge || 0}
+                placeholder="100"
+                value={form.cityExtraCharge !== undefined && form.cityExtraCharge !== null ? form.cityExtraCharge : 100}
                 onChange={(e) => setter(prev => ({ ...prev, cityExtraCharge: Number(e.target.value) || 0 }))}
                 className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D] tnum"
               />
@@ -1841,7 +1989,7 @@ export default function AdminDashboard() {
       minUnitQuantity: service.minUnitQuantity || (service.pricingUnit === 'sq_ft' ? 100 : service.pricingUnit === 'litre' ? 500 : 1),
       hasCitySpecificRates: Boolean(service.hasCitySpecificRates),
       cityRates: Array.isArray(service.cityRates) ? service.cityRates : [],
-      cityExtraCharge: service.cityExtraCharge || 0,
+      cityExtraCharge: typeof service.cityExtraCharge === 'number' ? service.cityExtraCharge : 100,
       moradabadOnly: Boolean(service.moradabadOnly || (allAvailableCities.length === 1 && allAvailableCities[0] === 'moradabad')),
       cityAvailability: allAvailableCities,
       videoUrl: service.videoUrl || '',
@@ -1924,7 +2072,7 @@ export default function AdminDashboard() {
         minUnitQuantity: Number(serviceForm.minUnitQuantity) || 1,
         hasCitySpecificRates: Boolean(serviceForm.hasCitySpecificRates),
         cityRates: Array.isArray(serviceForm.cityRates) ? serviceForm.cityRates : [],
-        cityExtraCharge: Number(serviceForm.cityExtraCharge) || 0,
+        cityExtraCharge: serviceForm.cityExtraCharge !== undefined && serviceForm.cityExtraCharge !== null ? Number(serviceForm.cityExtraCharge) : 100,
         moradabadOnly: Boolean(serviceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: serviceForm.videoUrl || '',
@@ -2042,7 +2190,7 @@ export default function AdminDashboard() {
         minUnitQuantity: Number(newServiceForm.minUnitQuantity) || 1,
         hasCitySpecificRates: Boolean(newServiceForm.hasCitySpecificRates),
         cityRates: Array.isArray(newServiceForm.cityRates) ? newServiceForm.cityRates : [],
-        cityExtraCharge: Number(newServiceForm.cityExtraCharge) || 0,
+        cityExtraCharge: newServiceForm.cityExtraCharge !== undefined && newServiceForm.cityExtraCharge !== null ? Number(newServiceForm.cityExtraCharge) : 100,
         moradabadOnly: Boolean(newServiceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: newServiceForm.videoUrl || '',
@@ -6898,6 +7046,17 @@ export default function AdminDashboard() {
                       <span>Subtotal:</span>
                       <span className="font-mono">₹{(viewBookingDetails.totals?.subtotal || 0).toLocaleString('en-IN')}</span>
                     </div>
+                    {viewBookingDetails.totals?.outstationSurcharge > 0 && (
+                      <div className="flex justify-between text-[#3D524A] font-semibold">
+                        <span className="flex items-center gap-1">
+                          <LuTruck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                          <span>Outstation Surcharge:</span>
+                        </span>
+                        <span className="font-mono text-[#10231D]">
+                          +₹{viewBookingDetails.totals.outstationSurcharge.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
                     {viewBookingDetails.appliedCoupon?.code && (
                       <div className="flex justify-between text-emerald-700 font-semibold">
                         <span>Coupon ({viewBookingDetails.appliedCoupon.code}):</span>

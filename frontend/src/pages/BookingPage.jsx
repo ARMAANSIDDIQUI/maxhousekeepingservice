@@ -79,7 +79,24 @@ export function isServiceAvailableInCity(service, citySlug) {
 // Helper to calculate exact variant unit price and MRP
 function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad', selections = {}) {
   if (!service) return { price: 0, mrp: 0 };
-  const isMoradabad = !citySlug || citySlug.toLowerCase() === 'moradabad';
+  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
+
+  // Check custom city-specific rates
+  let cityRateMatched = false;
+  let cityMatchedRate = null;
+  let cityMatchedMrp = null;
+
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && citySlug) {
+    const targetSlug = String(citySlug).toLowerCase().trim();
+    const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+    if (match && typeof match.rate === 'number' && match.rate > 0) {
+      cityRateMatched = true;
+      cityMatchedRate = match.rate;
+      if (typeof match.mrp === 'number' && match.mrp > 0) {
+        cityMatchedMrp = match.mrp;
+      }
+    }
+  }
 
   // 1. Dynamic Per Sq. Ft. / Unit Calculation (ONLY for dedicated unit services without static matrix variants)
   if (service.pricingType === 'unit' && (!service.matrix || service.matrix.length === 0)) {
@@ -87,13 +104,8 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
       ? (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : (service.price || 10))
       : (typeof service.unitRateOther === 'number' ? service.unitRateOther : (service.unitRateMoradabad || service.price || 15));
 
-    // Check specific cityRates override if configured
-    if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
-      const targetSlug = (citySlug || 'moradabad').toLowerCase().trim();
-      const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
-      if (match && typeof match.rate === 'number' && match.rate > 0) {
-        activeRate = match.rate;
-      }
+    if (cityRateMatched && cityMatchedRate !== null) {
+      activeRate = cityMatchedRate;
     }
 
     const minQty = Number(service.minUnitQuantity) || 100;
@@ -112,16 +124,21 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
 
     let p = Math.round(activeRate * effectiveUnits);
     const mrpFactor = (service.mrp && service.price && service.mrp > service.price) ? (service.mrp / service.price) : 1.25;
-    let m = Math.round(p * mrpFactor);
+    let m = cityMatchedMrp ? Math.round(cityMatchedMrp * effectiveUnits) : Math.round(p * mrpFactor);
 
-    if (!isMoradabad && service.cityExtraCharge) {
-      p += service.cityExtraCharge;
-      m += service.cityExtraCharge;
+    let outstationExtra = 0;
+    if (!isMoradabad) {
+      outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+        ? service.cityExtraCharge
+        : 100;
+      p += outstationExtra;
+      m += outstationExtra;
     }
 
     return {
       price: p,
       mrp: m,
+      outstationSurcharge: outstationExtra,
       duration: service.duration || '1-2 hrs',
       activeRate,
       unitCount: userEntered,
@@ -131,10 +148,15 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     };
   }
 
-  // 2. Matrix row match
+  // 2. Normal Service / Matrix row match
   let basePrice = service.price || 0;
   let baseMrp = service.mrp || service.price || 0;
   let duration = service.duration || '1.5 hrs';
+
+  if (cityRateMatched && cityMatchedRate !== null) {
+    basePrice = cityMatchedRate;
+    baseMrp = cityMatchedMrp !== null ? cityMatchedMrp : (service.mrp && service.price ? Math.round(cityMatchedRate * (service.mrp / service.price)) : Math.round(cityMatchedRate * 1.25));
+  }
 
   if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
     for (const row of service.matrix) {
@@ -142,8 +164,15 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
       const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
       const rowVal = String(sel[groupKey] || '').toLowerCase().trim();
       if (rowVal === String(optKey).toLowerCase().trim()) {
-        basePrice = row.price;
-        baseMrp = row.mrp || row.price;
+        if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+          const ratio = cityMatchedRate / service.price;
+          basePrice = Math.round(row.price * ratio);
+          const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+          baseMrp = Math.round((row.mrp || row.price) * mrpRatio);
+        } else {
+          basePrice = row.price;
+          baseMrp = row.mrp || row.price;
+        }
         if (row.duration) duration = row.duration;
         break;
       }
@@ -177,13 +206,17 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     }
   }
 
-  // Outstation surcharge
-  if (!isMoradabad && service.cityExtraCharge) {
-    basePrice += service.cityExtraCharge;
-    baseMrp += service.cityExtraCharge;
+  // Outstation dispatch surcharge (automatically added for cities outside Moradabad)
+  let outstationExtra = 0;
+  if (!isMoradabad) {
+    outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
+      ? service.cityExtraCharge
+      : 100;
+    basePrice += outstationExtra;
+    baseMrp += outstationExtra;
   }
 
-  return { price: basePrice, mrp: baseMrp, duration };
+  return { price: basePrice, mrp: baseMrp, outstationSurcharge: outstationExtra, duration };
 }
 
 export default function BookingPage() {
@@ -1757,11 +1790,28 @@ export default function BookingPage() {
                   </div>
 
                   <div className="flex justify-between text-[#10231D]">
-                    <span>Service Subtotal:</span>
+                    <span>{quote?.totals?.outstationSurcharge > 0 ? 'Services Subtotal:' : 'Service Subtotal:'}</span>
                     <span className="font-bold tnum">
-                      ₹{(quote?.totals?.subtotal || 0).toLocaleString('en-IN')}
+                      ₹{((quote?.totals?.subtotal || 0) - (quote?.totals?.outstationSurcharge || 0)).toLocaleString('en-IN')}
                     </span>
                   </div>
+
+                  {quote?.totals?.outstationSurcharge > 0 && (
+                    <div className="p-2.5 rounded-xl bg-[#F4EFE6] border border-[#E9A23B]/40 space-y-1 my-1">
+                      <div className="flex justify-between text-[#10231D] font-bold text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <LuTruck className="w-4 h-4 text-[#E9A23B]" />
+                          <span>Outstation Dispatch Surcharge:</span>
+                        </span>
+                        <span className="tnum text-[#10231D] font-black">
+                          +₹{quote.totals.outstationSurcharge.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#6B8077] pl-5.5">
+                        Automatically added on checkout for service in <strong>{selectedCity?.name || 'outstation'}</strong> (outside Moradabad).
+                      </p>
+                    </div>
+                  )}
 
                   {quote?.totals?.couponDiscount > 0 && (
                     <div className="flex justify-between text-[#C2512D] font-bold">

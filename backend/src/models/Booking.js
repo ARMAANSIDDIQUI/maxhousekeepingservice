@@ -49,6 +49,7 @@ const bookingSchema = new mongoose.Schema({
   totals: {
     subtotal: { type: Number, required: true },
     mrpTotal: { type: Number, required: true },
+    outstationSurcharge: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     couponDiscount: { type: Number, default: 0 },
     total: { type: Number, required: true },

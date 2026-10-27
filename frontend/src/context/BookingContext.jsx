@@ -214,18 +214,40 @@ export function BookingProvider({ children }) {
       return null;
     } catch {
       // Offline fallback: calculate accurate variant price locally
-      const isMbd = !selectedCity || selectedCity.slug === 'moradabad';
+      const isMbd = !selectedCity || (selectedCity.slug || '').toLowerCase() === 'moradabad';
+      const citySlug = (selectedCity?.slug || 'moradabad').toLowerCase().trim();
+
       const enriched = currentItems.map(i => {
         let p = i.service.price || 0;
         let m = i.service.mrp || i.service.price || 0;
 
+        // Check custom city-specific rates
+        let cityRateMatched = false;
+        let cityMatchedRate = null;
+        let cityMatchedMrp = null;
+
+        if (i.service.hasCitySpecificRates && Array.isArray(i.service.cityRates) && i.service.cityRates.length > 0) {
+          const match = i.service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === citySlug);
+          if (match && typeof match.rate === 'number' && match.rate > 0) {
+            cityRateMatched = true;
+            cityMatchedRate = match.rate;
+            if (typeof match.mrp === 'number' && match.mrp > 0) {
+              cityMatchedMrp = match.mrp;
+            }
+          }
+        }
+
         // Dynamic Unit Pricing
         if (i.service.pricingType === 'unit' || (i.service.pricingUnit && i.service.pricingUnit !== 'fixed')) {
-          const rateMbd = typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : (i.service.price || 0);
-          const rateOther = typeof i.service.unitRateOther === 'number'
-            ? i.service.unitRateOther
-            : (typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : i.service.price || 0);
-          const activeRate = isMbd ? rateMbd : rateOther;
+          let activeRate = isMbd
+            ? (typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : (i.service.price || 0))
+            : (typeof i.service.unitRateOther === 'number'
+              ? i.service.unitRateOther
+              : (typeof i.service.unitRateMoradabad === 'number' ? i.service.unitRateMoradabad : i.service.price || 0));
+
+          if (cityRateMatched && cityMatchedRate !== null) {
+            activeRate = cityMatchedRate;
+          }
 
           const unitCount = Number(
             i.selections?.units ??
@@ -239,9 +261,17 @@ export function BookingProvider({ children }) {
 
           p = Math.round(activeRate * unitCount);
           const mrpFactor = (i.service.mrp && i.service.price && i.service.mrp > i.service.price) ? (i.service.mrp / i.service.price) : 1.25;
-          m = Math.round(p * mrpFactor);
-        } else if (i.service.matrix && Array.isArray(i.service.matrix)) {
-          // Matrix match
+          m = cityMatchedMrp ? Math.round(cityMatchedMrp * unitCount) : Math.round(p * mrpFactor);
+        } else {
+          // Normal service
+          if (cityRateMatched && cityMatchedRate !== null) {
+            p = cityMatchedRate;
+            m = cityMatchedMrp !== null ? cityMatchedMrp : (i.service.mrp && i.service.price ? Math.round(cityMatchedRate * (i.service.mrp / i.service.price)) : Math.round(cityMatchedRate * 1.25));
+          }
+        }
+
+        // Matrix match
+        if (i.service.matrix && Array.isArray(i.service.matrix) && i.service.matrix.length > 0) {
           const match = i.service.matrix.find(row => {
             if (row.isActive === false) return false;
             const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
@@ -249,15 +279,26 @@ export function BookingProvider({ children }) {
             return keys.length > 0 && keys.every(k => String(sel[k]).toLowerCase().trim() === String((i.selections || {})[k] || '').toLowerCase().trim());
           });
           if (match) {
-            p = match.price;
-            m = match.mrp || match.price;
+            if (cityRateMatched && cityMatchedRate !== null && i.service.price && i.service.price > 0) {
+              const ratio = cityMatchedRate / i.service.price;
+              p = Math.round(match.price * ratio);
+              const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (i.service.mrp || i.service.price)) : ratio;
+              m = Math.round((match.mrp || match.price) * mrpRatio);
+            } else {
+              p = match.price;
+              m = match.mrp || match.price;
+            }
           }
         }
 
-        // Outstation surcharge
-        if (!isMbd && i.service.cityExtraCharge) {
-          p += i.service.cityExtraCharge;
-          m += i.service.cityExtraCharge;
+        // Outstation extra surcharge
+        let outstationExtra = 0;
+        if (!isMbd) {
+          outstationExtra = (typeof i.service.cityExtraCharge === 'number' && i.service.cityExtraCharge >= 0)
+            ? i.service.cityExtraCharge
+            : 100;
+          p += outstationExtra;
+          m += outstationExtra;
         }
 
         const qty = i.qty || 1;
@@ -266,6 +307,7 @@ export function BookingProvider({ children }) {
           title: i.service.title,
           unitPrice: p,
           unitMrp: m,
+          outstationSurcharge: outstationExtra,
           totalPrice: p * qty,
           totalMrp: m * qty,
           qty,
@@ -276,11 +318,16 @@ export function BookingProvider({ children }) {
 
       const subtotal = enriched.reduce((acc, it) => acc + it.totalPrice, 0);
       const mrpTotal = enriched.reduce((acc, it) => acc + it.totalMrp, 0);
+      const totalOutstationSurcharge = !isMbd
+        ? enriched.reduce((acc, it) => acc + ((it.outstationSurcharge || 0) * (it.qty || 1)), 0)
+        : 0;
+
       setQuote({
         items: enriched,
         totals: {
           subtotal,
           mrpTotal,
+          outstationSurcharge: totalOutstationSurcharge,
           discount: Math.max(0, mrpTotal - subtotal),
           couponDiscount: 0,
           total: subtotal,

@@ -158,13 +158,21 @@ export default function ServicesPage() {
 
     let price = service.price || 0;
     let mrp = service.mrp || 0;
-    if (citySlug && citySlug !== 'moradabad' && citySlug !== 'all' && Array.isArray(service.cityOverrides)) {
-      const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === citySlug && o.isActive !== false);
-      if (override) {
-        if (override.priceOverride) price = override.priceOverride;
-        if (override.mrpOverride) mrp = override.mrpOverride;
-        else if (override.multiplier) {
-          price = Math.round(price * override.multiplier);
+    if (citySlug && citySlug !== 'moradabad' && citySlug !== 'all') {
+      if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
+        const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+        if (match && typeof match.rate === 'number' && match.rate > 0) {
+          price = match.rate;
+          if (match.mrp && match.mrp > 0) mrp = match.mrp;
+        }
+      } else if (Array.isArray(service.cityOverrides)) {
+        const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === citySlug && o.isActive !== false);
+        if (override) {
+          if (override.priceOverride) price = override.priceOverride;
+          if (override.mrpOverride) mrp = override.mrpOverride;
+          else if (override.multiplier) {
+            price = Math.round(price * override.multiplier);
+          }
         }
       }
     }
