@@ -445,7 +445,7 @@ export default function LiveTrackingRadar({
 
         {destinationAddress && (
           <div className="text-left sm:text-right max-w-sm truncate text-[11px] text-[#A3B8B0]">
-            <span className="text-[#6B8077] block font-mono text-[10px] uppercase font-bold">Doorstep Destination</span>
+            <span className="text-[#6B8077] block font-mono text-[10px] uppercase font-bold">Address</span>
             <span className="truncate block font-medium text-[#F4EFE6]">{destinationAddress}</span>
           </div>
         )}

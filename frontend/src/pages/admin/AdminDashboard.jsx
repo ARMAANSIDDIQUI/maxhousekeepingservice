@@ -7789,13 +7789,13 @@ export default function AdminDashboard() {
           </Modal>
         )}
 
-        {/* Admin Live Tracking Radar Modal */}
+        {/* Admin Live Tracking Modal */}
         {trackingBookingAdmin && (
           <Modal
             isOpen={Boolean(trackingBookingAdmin)}
             onClose={() => setTrackingBookingAdmin(null)}
-            title={`Live Tracking · Booking #${trackingBookingAdmin.bookingCode}`}
-            subtitle="Supervisor live GPS telemetry and transit route towards destination doorstep"
+            title={`Track Location · #${trackingBookingAdmin.bookingCode}`}
+            subtitle="Live location and route of the supervisor"
             maxWidth="max-w-2xl"
           >
             <div className="space-y-4">
@@ -7807,7 +7807,7 @@ export default function AdminDashboard() {
                 supervisorInfo={{
                   name: trackingBookingAdmin.assignedSupervisor?.name || trackingBookingAdmin.supervisor?.name || 'Field Supervisor',
                   phone: trackingBookingAdmin.assignedSupervisor?.phone || trackingBookingAdmin.supervisor?.phone || '',
-                  role: 'Assigned Field Lead'
+                  role: 'Supervisor'
                 }}
               />
               <div className="flex items-center justify-between pt-2">
@@ -7817,7 +7817,7 @@ export default function AdminDashboard() {
                   rel="noopener noreferrer"
                   className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
                 >
-                  <span>Open Standalone Tracker</span>
+                  <span>Open Fullscreen</span>
                   <LuExternalLink className="w-3.5 h-3.5" />
                 </a>
                 <button
@@ -7825,7 +7825,7 @@ export default function AdminDashboard() {
                   onClick={() => setTrackingBookingAdmin(null)}
                   className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
                 >
-                  Close Radar
+                  Close
                 </button>
               </div>
             </div>

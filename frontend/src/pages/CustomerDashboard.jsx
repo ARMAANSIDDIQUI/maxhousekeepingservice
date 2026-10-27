@@ -2389,8 +2389,8 @@ export default function CustomerDashboard() {
           <Modal
             isOpen={Boolean(trackingModalBooking)}
             onClose={() => setTrackingModalBooking(null)}
-            title={`Live Tracking · Booking #${trackingModalBooking.bookingCode}`}
-            subtitle="Real-time GPS tracking and arrival route of your assigned supervisor"
+            title={`Track Location · #${trackingModalBooking.bookingCode}`}
+            subtitle="Live location and route to your address"
             maxWidth="max-w-2xl"
           >
             <div className="space-y-4">
@@ -2402,7 +2402,7 @@ export default function CustomerDashboard() {
                 supervisorInfo={{
                   name: trackingModalBooking.assignedSupervisor?.name || trackingModalBooking.supervisor?.name || 'Field Supervisor',
                   phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
-                  role: 'Assigned Lead Supervisor'
+                  role: 'Supervisor'
                 }}
               />
               <div className="flex items-center justify-between pt-2">
@@ -2411,7 +2411,7 @@ export default function CustomerDashboard() {
                   target="_blank"
                   className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
                 >
-                  <span>Open Fullscreen Tracking Window</span>
+                  <span>Open Fullscreen</span>
                   <LuNavigation className="w-3 h-3" />
                 </Link>
                 <button
@@ -2419,7 +2419,7 @@ export default function CustomerDashboard() {
                   onClick={() => setTrackingModalBooking(null)}
                   className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
                 >
-                  Close Radar
+                  Close
                 </button>
               </div>
             </div>
