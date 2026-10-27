@@ -23,6 +23,13 @@ const bookingSchema = new mongoose.Schema({
   cityName: { type: String, required: true },
   address: {
     line1: { type: String, required: true, trim: true },
+    houseOrFlat: { type: String, trim: true },
+    formattedAddress: { type: String, trim: true },
+    placeId: { type: String, trim: true },
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number }
+    },
     landmark: { type: String, trim: true },
     cityText: { type: String, required: true, trim: true },
     stateText: { type: String, default: 'Uttar Pradesh' },
@@ -102,6 +109,15 @@ const bookingSchema = new mongoose.Schema({
     date: { type: String },
     timeWindow: { type: String },
     notes: { type: String }
+  },
+  supervisorLiveLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    heading: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    accuracy: { type: Number, default: 0 },
+    updatedAt: { type: Date },
+    isSharing: { type: Boolean, default: false }
   },
   serviceOtp: {
     type: String,

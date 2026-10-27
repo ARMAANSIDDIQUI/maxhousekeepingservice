@@ -548,7 +548,7 @@ export async function logout(req, res) {
  */
 export async function addAddress(req, res, next) {
   try {
-    const { label, line1, landmark, city, state, pincode, isDefault } = req.body;
+    const { label, line1, houseOrFlat, formattedAddress, placeId, coordinates, landmark, city, state, pincode, isDefault } = req.body;
 
     if (!line1 || !city || !pincode) {
       return res.status(400).json({
@@ -586,6 +586,13 @@ export async function addAddress(req, res, next) {
     const newAddress = {
       label: label || 'Home',
       line1: line1.trim(),
+      houseOrFlat: houseOrFlat ? houseOrFlat.trim() : '',
+      formattedAddress: formattedAddress ? formattedAddress.trim() : '',
+      placeId: placeId ? placeId.trim() : '',
+      coordinates: (coordinates && typeof coordinates.lat === 'number' && typeof coordinates.lng === 'number') ? {
+        lat: coordinates.lat,
+        lng: coordinates.lng
+      } : undefined,
       landmark: landmark ? landmark.trim() : '',
       city: city.trim(),
       state: state ? state.trim() : 'Uttar Pradesh',
@@ -657,7 +664,7 @@ export async function setDefaultAddress(req, res, next) {
  */
 export async function updateAddress(req, res, next) {
   try {
-    const { label, line1, landmark, city, state, pincode, isDefault } = req.body;
+    const { label, line1, houseOrFlat, formattedAddress, placeId, coordinates, landmark, city, state, pincode, isDefault } = req.body;
 
     if (!line1 || !city || !pincode) {
       return res.status(400).json({
@@ -682,6 +689,15 @@ export async function updateAddress(req, res, next) {
 
     user.addresses[addrIndex].label = label ? label.trim() : (user.addresses[addrIndex].label || 'Home');
     user.addresses[addrIndex].line1 = line1.trim();
+    if (houseOrFlat !== undefined) user.addresses[addrIndex].houseOrFlat = houseOrFlat.trim();
+    if (formattedAddress !== undefined) user.addresses[addrIndex].formattedAddress = formattedAddress.trim();
+    if (placeId !== undefined) user.addresses[addrIndex].placeId = placeId.trim();
+    if (coordinates && typeof coordinates.lat === 'number' && typeof coordinates.lng === 'number') {
+      user.addresses[addrIndex].coordinates = {
+        lat: coordinates.lat,
+        lng: coordinates.lng
+      };
+    }
     user.addresses[addrIndex].landmark = landmark ? landmark.trim() : '';
     user.addresses[addrIndex].city = city.trim();
     user.addresses[addrIndex].state = state ? state.trim() : 'Uttar Pradesh';

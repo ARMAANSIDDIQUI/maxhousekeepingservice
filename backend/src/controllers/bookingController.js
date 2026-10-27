@@ -373,6 +373,13 @@ export async function createBooking(req, res, next) {
       cityName: cityDoc.name,
       address: {
         line1: address.line1.trim(),
+        houseOrFlat: address.houseOrFlat ? address.houseOrFlat.trim() : '',
+        formattedAddress: address.formattedAddress ? address.formattedAddress.trim() : '',
+        placeId: address.placeId ? address.placeId.trim() : '',
+        coordinates: (address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') ? {
+          lat: address.coordinates.lat,
+          lng: address.coordinates.lng
+        } : undefined,
         landmark: address.landmark ? address.landmark.trim() : '',
         cityText: address.cityText.trim(),
         stateText: address.stateText || 'Uttar Pradesh',
@@ -446,6 +453,13 @@ export async function createBooking(req, res, next) {
             cleanAddresses.push({
               label: address.label || 'Home',
               line1: address.line1.trim(),
+              houseOrFlat: address.houseOrFlat ? address.houseOrFlat.trim() : '',
+              formattedAddress: address.formattedAddress ? address.formattedAddress.trim() : '',
+              placeId: address.placeId ? address.placeId.trim() : '',
+              coordinates: (address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') ? {
+                lat: address.coordinates.lat,
+                lng: address.coordinates.lng
+              } : undefined,
               landmark: address.landmark ? address.landmark.trim() : '',
               city: address.cityText.trim(),
               state: address.stateText || 'Uttar Pradesh',
@@ -649,6 +663,15 @@ export async function editBookingDetails(req, res, next) {
     if (customer?.email) booking.customer.email = customer.email.trim();
 
     if (address?.line1) booking.address.line1 = address.line1.trim();
+    if (address?.houseOrFlat !== undefined) booking.address.houseOrFlat = address.houseOrFlat.trim();
+    if (address?.formattedAddress !== undefined) booking.address.formattedAddress = address.formattedAddress.trim();
+    if (address?.placeId !== undefined) booking.address.placeId = address.placeId.trim();
+    if (address?.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') {
+      booking.address.coordinates = {
+        lat: address.coordinates.lat,
+        lng: address.coordinates.lng
+      };
+    }
     if (address?.landmark !== undefined) booking.address.landmark = address.landmark.trim();
     if (address?.pincode) booking.address.pincode = address.pincode.trim();
     if (address?.cityText) booking.address.cityText = address.cityText.trim();
@@ -813,6 +836,11 @@ export async function cancelBooking(req, res, next) {
     }
 
     booking.status = 'cancelled';
+    if (!booking.supervisorLiveLocation) {
+      booking.supervisorLiveLocation = {};
+    }
+    booking.supervisorLiveLocation.isSharing = false;
+    booking.supervisorLiveLocation.updatedAt = new Date();
     booking.statusHistory.push({
       status: 'cancelled',
       timestamp: new Date(),
@@ -901,12 +929,59 @@ export async function getPublicCoupons(req, res, next) {
   }
 }
 
+/**
+ * Real-time Supervisor Live Location Tracker for Customer & Admin
+ * GET /api/v1/bookings/:code/live-location
+ */
+export async function getBookingLiveLocation(req, res, next) {
+  try {
+    const { code } = req.params;
+    const booking = await Booking.findOne({ bookingCode: code.toUpperCase() })
+      .select('bookingCode status address supervisorLiveLocation assignedSupervisor supervisor customer.name customer.phone');
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
+    }
+
+    const liveLoc = booking.supervisorLiveLocation;
+    const isLive = Boolean(liveLoc && liveLoc.isSharing && ['assigned', 'confirmed', 'in_progress'].includes(booking.status));
+
+    res.status(200).json({
+      success: true,
+      bookingCode: booking.bookingCode,
+      status: booking.status,
+      isSharing: isLive,
+      supervisor: {
+        name: booking.assignedSupervisor?.name || 'Assigned Lead',
+        phone: booking.assignedSupervisor?.phone || '',
+        avatar: booking.assignedSupervisor?.avatar || ''
+      },
+      supervisorLocation: isLive ? {
+        lat: liveLoc.lat,
+        lng: liveLoc.lng,
+        heading: liveLoc.heading || 0,
+        speed: liveLoc.speed || 0,
+        accuracy: liveLoc.accuracy || 0,
+        updatedAt: liveLoc.updatedAt
+      } : null,
+      customerLocation: (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number') ? {
+        lat: booking.address.coordinates.lat,
+        lng: booking.address.coordinates.lng
+      } : null,
+      destinationAddress: `${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.address?.cityText || ''}`.trim()
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   validateSmartCoupon,
   getQuote,
   getPublicCoupons,
   createBooking,
   trackBooking,
+  getBookingLiveLocation,
   getMyBookings,
   editBookingDetails,
   addBookingMessage,

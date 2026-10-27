@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LuShieldCheck,
@@ -30,7 +30,8 @@ import {
   LuNavigation,
   LuKey,
   LuSlidersHorizontal,
-  LuCompass
+  LuCompass,
+  LuRadio
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext';
@@ -39,6 +40,7 @@ import { supervisorAPI } from '../../api';
 import SEO from '../../components/common/SEO';
 import Modal from '../../components/common/Modal';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
 import { formatDateDMY } from '../../utils/date';
 
 function formatToday() {
@@ -68,7 +70,10 @@ function getWhatsAppUrl(phone, customerName, bookingCode, serviceTitle) {
 }
 
 function getMapsUrl(address, cityName) {
-  const query = `${address?.line1 || ''} ${address?.line2 || ''} ${cityName || ''} ${address?.pincode || ''}`.trim();
+  if (address?.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') {
+    return `https://www.google.com/maps/dir/?api=1&destination=${address.coordinates.lat},${address.coordinates.lng}`;
+  }
+  const query = `${address?.houseOrFlat ? address.houseOrFlat + ', ' : ''}${address?.line1 || ''} ${address?.line2 || ''} ${cityName || ''} ${address?.pincode || ''}`.trim();
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query || 'Moradabad')}`;
 }
 
@@ -154,7 +159,127 @@ export default function SupervisorDashboard() {
   // Selected Booking Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeModalTab, setActiveModalTab] = useState('otp'); // 'otp' | 'before_photos' | 'after_photos' | 'details'
+  const [activeModalTab, setActiveModalTab] = useState('otp'); // 'otp' | 'before_photos' | 'after_photos' | 'details' | 'live_radar'
+
+  // Live GPS Broadcast State for assigned field supervisors
+  const [sharingBookingId, setSharingBookingId] = useState(null);
+  const [sharingClosedPrompt, setSharingClosedPrompt] = useState(null);
+  const [lastGpsCoords, setLastGpsCoords] = useState(null);
+  const locationWatchIdRef = useRef(null);
+  const lastSentGpsRef = useRef(null);
+
+  const startBroadcastingGps = (booking) => {
+    if (!booking?._id) return;
+    if (booking.status === 'completed' || booking.status === 'cancelled') {
+      toast.error('Cannot share live location for a completed or cancelled service visit.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setSharingClosedPrompt(null);
+    setSharingBookingId(booking._id);
+    toast.success('Live location sharing started. The customer and office can now see your arrival route.');
+
+    const onPosSuccess = (pos) => {
+      const lat = Number(pos.coords.latitude.toFixed(6));
+      const lng = Number(pos.coords.longitude.toFixed(6));
+      const heading = pos.coords.heading || 0;
+      const speed = pos.coords.speed || 0;
+      const accuracy = pos.coords.accuracy || 10;
+      const now = Date.now();
+
+      setLastGpsCoords({ lat, lng, heading, speed, accuracy, updatedAt: new Date() });
+
+      const last = lastSentGpsRef.current;
+      const timeDiff = last ? now - last.time : 999999;
+      let movedDistanceM = 0;
+      if (last) {
+        const dLat = (lat - last.lat) * 111000;
+        const dLng = (lng - last.lng) * 111000 * Math.cos((lat * Math.PI) / 180);
+        movedDistanceM = Math.sqrt(dLat * dLat + dLng * dLng);
+      }
+
+      // Throttle: Send if first fix OR >12 seconds elapsed OR moved >15 meters (0 Google API cost)
+      if (!last || timeDiff >= 12000 || movedDistanceM >= 15) {
+        lastSentGpsRef.current = { lat, lng, time: now };
+        supervisorAPI.updateLiveLocation(booking._id, {
+          lat,
+          lng,
+          heading,
+          speed,
+          accuracy,
+          isSharing: true
+        }).catch((err) => {
+          console.warn('[Supervisor GPS update notice]:', err.message);
+        });
+      }
+    };
+
+    const onPosError = (err) => {
+      console.warn('[Supervisor GPS error]:', err.message);
+      if (err.code === 1) {
+        toast.error('Location permission was denied. Please allow location access in your browser settings.');
+        stopBroadcastingGps(booking._id, false);
+      }
+    };
+
+    // Immediate first fix
+    navigator.geolocation.getCurrentPosition(onPosSuccess, onPosError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    });
+
+    // Start watch
+    if (locationWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+    }
+    locationWatchIdRef.current = navigator.geolocation.watchPosition(onPosSuccess, onPosError, {
+      enableHighAccuracy: true,
+      maximumAge: 4000,
+      timeout: 20000
+    });
+  };
+
+  const stopBroadcastingGps = (bookingId, notify = true, reason = 'manually') => {
+    if (locationWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      locationWatchIdRef.current = null;
+    }
+    const targetId = bookingId || sharingBookingId;
+    setSharingBookingId(null);
+    setLastGpsCoords(null);
+    lastSentGpsRef.current = null;
+
+    if (targetId) {
+      supervisorAPI.updateLiveLocation(targetId, { isSharing: false }).catch(() => {});
+    }
+
+    const matchedBooking = bookings?.find(b => b._id === targetId);
+    setSharingClosedPrompt({
+      bookingCode: matchedBooking?.bookingCode || 'Visit',
+      reason: reason === 'completed'
+        ? 'Service visit completed. Location sharing has been closed automatically.'
+        : 'Live location sharing has been stopped.',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+
+    if (notify) {
+      toast.info('Location sharing closed. Your real-time location is now private.');
+    }
+  };
+
+  // Cleanup GPS watch on unmount
+  useEffect(() => {
+    return () => {
+      if (locationWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      }
+    };
+  }, []);
 
   // OTP Verification state
   const [otpInput, setOtpInput] = useState('');
@@ -464,6 +589,10 @@ export default function SupervisorDashboard() {
       const res = await supervisorAPI.updateStatus(selectedBooking._id, newStatus, statusNote);
       if (res?.success && res.booking) {
         toast.success(`Booking status marked as ${newStatus.replace('_', ' ').toUpperCase()}`);
+        // As soon as booking is marked completed, automatically stop live location sharing
+        if (newStatus === 'completed' && sharingBookingId === selectedBooking._id) {
+          stopBroadcastingGps(selectedBooking._id, true, 'completed');
+        }
         setSelectedBooking(res.booking);
         setBookings(prev => prev.map(b => b._id === res.booking._id ? res.booking : b));
         setStatusNote('');
@@ -511,6 +640,10 @@ export default function SupervisorDashboard() {
       const res = await supervisorAPI.updateStatus(b._id, 'completed', `Service marked as completed by supervisor ${user?.name || ''}`);
       if (res?.success) {
         toast.success(`Booking #${b.bookingCode} marked as COMPLETED!`);
+        // As soon as booking is marked completed, automatically stop live location sharing
+        if (sharingBookingId === b._id) {
+          stopBroadcastingGps(b._id, true, 'completed');
+        }
         if (selectedBooking && selectedBooking._id === b._id) {
           setSelectedBooking(res.booking || { ...selectedBooking, status: 'completed' });
         }
@@ -773,6 +906,29 @@ export default function SupervisorDashboard() {
                         <LuNavigation className="w-3.5 h-3.5" />
                         <span>Directions</span>
                       </a>
+                      {isAssignedToMe(activeBooking) && (
+                        activeBooking.status === 'completed' ? null : sharingBookingId === activeBooking._id ? (
+                          <button
+                            type="button"
+                            onClick={() => stopBroadcastingGps(activeBooking._id, true, 'manually')}
+                            className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer animate-pulse"
+                            title="Stop sharing live location"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                            <span>Sharing Location (Stop)</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startBroadcastingGps(activeBooking)}
+                            className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            title="Share live location with customer and office"
+                          >
+                            <LuRadio className="w-3.5 h-3.5 text-purple-200" />
+                            <span>Share Live Location</span>
+                          </button>
+                        )
+                      )}
                       {!activeBooking.otpVerified && (
                         <button
                           type="button"
@@ -1239,8 +1395,14 @@ export default function SupervisorDashboard() {
                                   )}
                                   <span className="flex items-center gap-1 line-clamp-1">
                                     <LuMapPin className="w-3 h-3 text-[#E9A23B] shrink-0" />
-                                    {b.address?.line1 || b.address?.line2 || 'Customer address'}, {b.cityName || ''}
+                                    {b.address?.houseOrFlat ? `${b.address.houseOrFlat}, ` : ''}{b.address?.line1 || b.address?.line2 || 'Customer address'}, {b.cityName || ''}
                                   </span>
+                                  {b.address?.coordinates?.lat && (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-mono font-bold flex items-center gap-1">
+                                      <LuMapPin className="w-2.5 h-2.5 text-emerald-600" />
+                                      <span>GPS Pinpoint</span>
+                                    </span>
+                                  )}
                                 </div>
 
                                 {b.assignedSlot?.notes && (
@@ -1670,6 +1832,22 @@ export default function SupervisorDashboard() {
                 <LuCalendar className="w-3.5 h-3.5" />
                 <span>Job Details</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('live_radar')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeModalTab === 'live_radar'
+                    ? 'bg-[#10231D] text-[#E9A23B]'
+                    : 'text-[#6B8077] hover:bg-[#ECE5D8]'
+                }`}
+              >
+                <LuCompass className="w-3.5 h-3.5" />
+                <span>Live Route & GPS</span>
+                {sharingBookingId === selectedBooking._id && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                )}
+              </button>
             </div>
 
             {/* TAB 1: OTP VERIFICATION ON VISIT */}
@@ -1754,35 +1932,6 @@ export default function SupervisorDashboard() {
                   </div>
                 )}
 
-                {/* Quick Status Advancement */}
-                {isAssignedToMe(selectedBooking) && (
-                  <div className="p-4 rounded-xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div>
-                      <h5 className="font-bold text-xs text-[#10231D]">Update Service Visit Status</h5>
-                      <p className="text-[11px] text-[#6B8077]">
-                        Current: <span className="font-bold uppercase text-[#E9A23B]">{selectedBooking.status}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateStatus('in_progress')}
-                        disabled={updatingStatus || selectedBooking.status === 'in_progress'}
-                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
-                      >
-                        Mark In-Progress
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateStatus('completed')}
-                        disabled={updatingStatus || selectedBooking.status === 'completed'}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
-                      >
-                        Mark Completed
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1959,25 +2108,69 @@ export default function SupervisorDashboard() {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-white border border-[#E2D9C8] space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-[#6B8077] font-bold">Address & Navigation</span>
+                  <div className="p-3.5 rounded-xl bg-white border border-[#E2D9C8] space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono uppercase text-[#6B8077] font-bold">Doorstep Navigation</span>
+                      {selectedBooking.address?.coordinates?.lat && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold font-mono flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          GPS Verified
+                        </span>
+                      )}
+                    </div>
+                    {selectedBooking.address?.houseOrFlat && (
+                      <p className="font-bold text-xs text-[#10231D] bg-[#ECE5D8] px-2 py-0.5 rounded inline-block">
+                        {selectedBooking.address.houseOrFlat}
+                      </p>
+                    )}
                     <p className="font-semibold text-[#10231D] leading-tight">
-                      {selectedBooking.address?.line1}
+                      {selectedBooking.address?.line1} {selectedBooking.address?.line2 || ''}
                     </p>
                     <p className="text-[11px] text-[#6B8077]">
                       {selectedBooking.cityName} ({selectedBooking.address?.pincode})
                     </p>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        `${selectedBooking.address?.line1}, ${selectedBooking.cityName}, ${selectedBooking.address?.pincode}`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#10231D] bg-[#ECE5D8] px-2.5 py-1 rounded-lg hover:bg-[#E2D9C8]"
-                    >
-                      <LuExternalLink className="w-3 h-3 text-[#E9A23B]" />
-                      <span>Open in Google Maps</span>
-                    </a>
+                    {selectedBooking.address?.coordinates?.lat && (
+                      <p className="text-[10px] font-mono text-[#6B8077]">
+                        Pinpoint: {selectedBooking.address.coordinates.lat.toFixed(5)}, {selectedBooking.address.coordinates.lng.toFixed(5)}
+                      </p>
+                    )}
+                    <div className="pt-1 flex flex-wrap items-center gap-2">
+                      <a
+                        href={getMapsUrl(selectedBooking.address, selectedBooking.cityName)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl shadow-xs transition-colors"
+                      >
+                        <LuNavigation className="w-3.5 h-3.5" />
+                        <span>Start Turn-by-Turn GPS</span>
+                      </a>
+                      {isAssignedToMe(selectedBooking) && (
+                        selectedBooking.status === 'completed' ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl">
+                            <LuCircleCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Service Completed • Sharing Ended</span>
+                          </span>
+                        ) : sharingBookingId === selectedBooking._id ? (
+                          <button
+                            type="button"
+                            onClick={() => stopBroadcastingGps(selectedBooking._id, true, 'manually')}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-xl shadow-xs transition-colors animate-pulse cursor-pointer"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                            <span>Stop Sharing Location</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startBroadcastingGps(selectedBooking)}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+                          >
+                            <LuRadio className="w-3.5 h-3.5" />
+                            <span>Share Live Location</span>
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -2021,6 +2214,98 @@ export default function SupervisorDashboard() {
                       {selectedBooking.paymentMode?.replace('_', ' ')} • {selectedBooking.paymentStatus}
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: LIVE ROUTE & LOCATION MAP */}
+            {activeModalTab === 'live_radar' && (
+              <div className="space-y-4">
+                {/* Supervisor GPS Broadcast Action Banner */}
+                <div className="p-4 rounded-2xl bg-stone-900 text-[#F4EFE6] border border-[#E2D9C8]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-2.5 h-2.5 rounded-full ${
+                        selectedBooking.status === 'completed'
+                          ? 'bg-emerald-400'
+                          : sharingBookingId === selectedBooking._id
+                          ? 'bg-emerald-400 animate-ping'
+                          : 'bg-stone-500'
+                      }`} />
+                      <h4 className="font-bold text-sm text-[#F4EFE6]">
+                        {selectedBooking.status === 'completed'
+                          ? 'Service Visit Completed · Location Sharing Ended'
+                          : sharingBookingId === selectedBooking._id
+                          ? 'Sharing Live Location with Customer'
+                          : 'Location Sharing Off'}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-[#A3B8B0]">
+                      {selectedBooking.status === 'completed'
+                        ? 'Job marked as completed. Real-time location sharing is automatically closed for this visit.'
+                        : sharingBookingId === selectedBooking._id
+                        ? `Live coordinates transmitting (${lastGpsCoords ? `${lastGpsCoords.lat.toFixed(5)}, ${lastGpsCoords.lng.toFixed(5)}` : 'acquiring'})`
+                        : 'When departing for the visit, start sharing so the customer can track your arrival in real time.'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {selectedBooking.status === 'completed' ? (
+                      <span className="px-3.5 py-2 rounded-xl bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-1.5 shadow-sm">
+                        <LuCircleCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Completed • Sharing Ended</span>
+                      </span>
+                    ) : isAssignedToMe(selectedBooking) ? (
+                      sharingBookingId === selectedBooking._id ? (
+                        <button
+                          type="button"
+                          onClick={() => stopBroadcastingGps(selectedBooking._id, true, 'manually')}
+                          className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-colors"
+                        >
+                          <LuRadio className="w-4 h-4" />
+                          <span>Stop Sharing Location</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startBroadcastingGps(selectedBooking)}
+                          className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-black text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                        >
+                          <LuRadio className="w-4 h-4" />
+                          <span>Share My Live Location</span>
+                        </button>
+                      )
+                    ) : (
+                      <span className="text-xs font-bold text-[#A3B8B0] bg-white/10 px-3 py-1.5 rounded-xl">
+                        Lead: {selectedBooking.assignedSupervisor?.name || 'Other Supervisor'}
+                      </span>
+                    )}
+
+                    <a
+                      href={getMapsUrl(selectedBooking.address, selectedBooking.cityName)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <LuNavigation className="w-3.5 h-3.5" />
+                      <span>Google Maps</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Live Route Map */}
+                <div className="rounded-2xl overflow-hidden border border-[#E2D9C8] shadow-sm">
+                  <LiveTrackingRadar
+                    bookingCode={selectedBooking.bookingCode}
+                    initialSupervisorLocation={selectedBooking.supervisorLiveLocation}
+                    customerLocation={selectedBooking.address?.coordinates}
+                    destinationAddress={`${selectedBooking.address?.houseOrFlat ? selectedBooking.address.houseOrFlat + ', ' : ''}${selectedBooking.address?.line1 || ''}, ${selectedBooking.cityName}`}
+                    supervisorInfo={{
+                      name: user?.name,
+                      phone: user?.phone,
+                      role: 'Assigned Field Supervisor'
+                    }}
+                  />
                 </div>
               </div>
             )}
@@ -2173,6 +2458,78 @@ export default function SupervisorDashboard() {
         confirmVariant={confirmModal.confirmVariant}
         onConfirm={confirmModal.onConfirm}
       />
+
+      {/* PERSISTENT FLOATING LOCATION SHARING SIDE BADGE FOR SUPERVISOR */}
+      {sharingBookingId && (
+        <aside
+          aria-label="Active Location Sharing Status"
+          className="fixed bottom-6 right-6 z-50 max-w-sm"
+        >
+          <div className="bg-[#10231D] text-[#F4EFE6] border-2 border-emerald-500/90 p-3.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md">
+            <div className="relative flex items-center justify-center shrink-0">
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 block" />
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 absolute inset-0 animate-ping opacity-75" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                  <LuRadio className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Sharing Location</span>
+                </span>
+                <span className="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-700 px-1 rounded font-mono font-bold">
+                  LIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-[#A3B8B0] truncate">
+                {lastGpsCoords
+                  ? `Active • ${lastGpsCoords.lat.toFixed(4)}, ${lastGpsCoords.lng.toFixed(4)}`
+                  : 'Customer can view your arrival route'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => stopBroadcastingGps(sharingBookingId, true, 'manually')}
+              className="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
+              title="Stop sharing live location"
+            >
+              Stop Sharing
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* SHARING CLOSED CONFIRMATION PROMPT */}
+      {sharingClosedPrompt && (
+        <aside
+          aria-label="Location Sharing Ended Notification"
+          className="fixed top-6 right-6 z-50 max-w-sm w-full"
+        >
+          <div className="p-4 rounded-2xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B] shadow-2xl flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#2D453B] flex items-center justify-center shrink-0 mt-0.5">
+                <LuRadio className="w-4 h-4 text-[#E9A23B]" />
+              </div>
+              <div>
+                <h5 className="font-bold text-xs text-[#F4EFE6] flex items-center gap-1.5">
+                  <span>Location Sharing Closed</span>
+                  <span className="text-[10px] font-mono text-[#E9A23B]">({sharingClosedPrompt.time})</span>
+                </h5>
+                <p className="text-[11px] text-[#A3B8B0] mt-0.5">
+                  {sharingClosedPrompt.reason} Your real-time location is now private.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSharingClosedPrompt(null)}
+              className="text-[#A3B8B0] hover:text-white p-1 rounded-lg text-xs font-bold cursor-pointer"
+              title="Dismiss prompt"
+            >
+              ✕
+            </button>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

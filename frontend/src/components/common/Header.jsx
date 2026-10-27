@@ -8,7 +8,12 @@ import {
   LuChevronDown,
   LuCalendar,
   LuMenu,
-  LuX
+  LuX,
+  LuNavigation,
+  LuCompass,
+  LuLoader,
+  LuSearch,
+  LuCheck
 } from 'react-icons/lu';
 import { FaInstagram } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext';
@@ -20,15 +25,69 @@ import UserAvatar from './UserAvatar';
 
 export default function Header() {
   const { user, logout, isAdmin } = useAuth();
-  const { selectedCity, setSelectedCity, cities: contextCities, items, settings } = useBooking();
+  const {
+    selectedCity,
+    setSelectedCity,
+    cities: contextCities,
+    items,
+    settings,
+    detectAndSelectCity,
+    isDetectingCity
+  } = useBooking();
   const [cities, setCities] = useState(contextCities || []);
   const [servicesList, setServicesList] = useState([]);
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
+  const [citySearchQuery, setCitySearchQuery] = useState('');
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [isServicesDropdownOpen, setIsServicesDropdownOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Prompt user for location permission if choice has not been made yet
+  useEffect(() => {
+    const choiceMade = localStorage.getItem('max_location_choice_made');
+    const promptDismissed = sessionStorage.getItem('max_location_prompt_dismissed');
+
+    if (!choiceMade && !promptDismissed) {
+      if (navigator.permissions?.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+          if (result.state === 'prompt') {
+            setShowLocationPrompt(true);
+          } else if (result.state === 'granted') {
+            detectAndSelectCity({ silent: true, showToast: false });
+          }
+        }).catch(() => {
+          setShowLocationPrompt(true);
+        });
+      } else {
+        setShowLocationPrompt(true);
+      }
+    }
+  }, [detectAndSelectCity]);
+
+  const handleAllowLocationPrompt = async () => {
+    const detected = await detectAndSelectCity({ silent: false, showToast: true });
+    setShowLocationPrompt(false);
+    if (!detected) {
+      setIsCityModalOpen(true);
+    }
+  };
+
+  const handleDismissLocationPrompt = () => {
+    setShowLocationPrompt(false);
+    try {
+      sessionStorage.setItem('max_location_prompt_dismissed', 'true');
+    } catch {}
+  };
+
+  // Filter cities by search term
+  const filteredCities = useMemo(() => {
+    if (!citySearchQuery.trim()) return cities;
+    const q = citySearchQuery.toLowerCase().trim();
+    return cities.filter(c => c.name?.toLowerCase().includes(q) || c.slug?.toLowerCase().includes(q));
+  }, [cities, citySearchQuery]);
 
   // Memoize sorted services
   const sortedServices = useMemo(() => {
@@ -85,6 +144,63 @@ export default function Header() {
 
   return (
     <>
+      {/* Location Permission & City Auto-Detection Prompt Banner */}
+      {showLocationPrompt && (
+        <div className="bg-gradient-to-r from-[#10231D] via-[#162D25] to-[#1C3A30] text-[#F4EFE6] px-3 sm:px-4 py-2 text-xs border-b border-[#E9A23B]/30 shadow-md animate-fadeIn">
+          <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 text-center sm:text-left">
+              <span className="p-1.5 rounded-lg bg-[#E9A23B]/20 text-[#E9A23B] shrink-0">
+                <LuCompass className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
+              </span>
+              <div>
+                <p className="font-semibold text-xs text-[#F4EFE6]">
+                  Allow location permission to automatically select your nearest city?
+                </p>
+                <p className="text-[10px] text-[#A3B8B0]">
+                  Get instant doorstep pricing and verified service slots for your locality.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleAllowLocationPrompt}
+                disabled={isDetectingCity}
+                className="px-3 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isDetectingCity ? (
+                  <LuLoader className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <LuNavigation className="w-3.5 h-3.5" />
+                )}
+                <span>{isDetectingCity ? 'Detecting...' : 'Allow & Auto-Select'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLocationPrompt(false);
+                  setIsCityModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-[#F4EFE6] font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Choose Manually
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDismissLocationPrompt}
+                className="p-1.5 rounded-lg text-[#A3B8B0] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <LuX className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Announcement Bar (Static at top of page, scrolls naturally away) */}
       <div className="bg-[#10231D] text-[#F4EFE6] px-3 sm:px-4 py-1.5 text-xs font-medium border-b border-[#2C4A3E]">
         <div className="container mx-auto flex items-center justify-between gap-2">
@@ -386,6 +502,24 @@ export default function Header() {
         {/* Mobile Dropdown Nav */}
         {isMobileMenuOpen && (
           <div className="md:hidden bg-[#F4EFE6] border-b border-[#E2D9C8] px-4 py-3 space-y-2">
+            {/* Quick City Switcher in Mobile Drawer */}
+            <div className="py-2 px-3 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs text-[#10231D]">
+                <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                <span>City: <strong>{selectedCity?.name || 'Select City'}</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsCityModalOpen(true);
+                }}
+                className="text-[11px] font-bold text-[#10231D] bg-[#E9A23B] px-2 py-0.5 rounded-lg shadow-xs cursor-pointer"
+              >
+                Change
+              </button>
+            </div>
+
             <Link
               to="/"
               onClick={() => setIsMobileMenuOpen(false)}
@@ -486,42 +620,98 @@ export default function Header() {
         isOpen={isCityModalOpen}
         onClose={() => setIsCityModalOpen(false)}
         title="Select Your Service City"
-        subtitle="Max Housekeeping operates active crews in Western Uttar Pradesh"
+        subtitle="Max Housekeeping operates active crews across Western Uttar Pradesh"
         maxWidth="max-w-md"
       >
-        <div className="grid grid-cols-2 gap-2.5 mt-2">
-          {cities && cities.length > 0 ? (
-            cities.map((city) => {
-              const isSelected = selectedCity?.slug === city.slug;
-              return (
-                <button
-                  key={city.slug || city.name}
-                  type="button"
-                  onClick={() => {
-                    setSelectedCity(city);
-                    setIsCityModalOpen(false);
-                  }}
-                  className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
-                    isSelected
-                      ? 'border-[#E9A23B] bg-[#ECE5D8] font-bold text-[#10231D] ring-2 ring-[#E9A23B]/30'
-                      : 'border-[#E2D9C8] bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D]'
-                  }`}
-                >
-                  <div>
-                    <p className="text-sm">{city.name}</p>
-                    <p className="text-[11px] text-[#6B8077]">UP, India</p>
-                  </div>
-                  {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-[#E9A23B]" />
-                  )}
-                </button>
-              );
-            })
-          ) : (
-            <div className="col-span-2 text-center text-xs text-[#6B8077] py-6">
-              No service cities currently loaded.
+        <div className="space-y-3 mt-1">
+          {/* Automatic GPS Location Detection Button */}
+          <button
+            type="button"
+            onClick={async () => {
+              const detected = await detectAndSelectCity({ silent: false, showToast: true });
+              if (detected) {
+                setIsCityModalOpen(false);
+              }
+            }}
+            disabled={isDetectingCity}
+            className="w-full p-3 rounded-xl bg-gradient-to-r from-[#10231D] to-[#1F3D33] hover:from-[#162D25] hover:to-[#274E41] text-[#F4EFE6] font-bold text-xs flex items-center justify-between transition-all cursor-pointer shadow-sm border border-[#2C4A3E] disabled:opacity-50"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-lg bg-[#E9A23B]/20 text-[#E9A23B]">
+                {isDetectingCity ? (
+                  <LuLoader className="w-4 h-4 animate-spin text-[#E9A23B]" />
+                ) : (
+                  <LuNavigation className="w-4 h-4 text-[#E9A23B]" />
+                )}
+              </span>
+              <div className="text-left">
+                <p className="font-bold">{isDetectingCity ? 'Locating nearest hub...' : 'Detect My City (Current GPS Location)'}</p>
+                <p className="text-[10px] text-[#A3B8B0]">Auto-detect city via browser location permission</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono font-bold bg-[#E9A23B] text-[#10231D] px-2 py-0.5 rounded-full">
+              Auto
+            </span>
+          </button>
+
+          <div className="flex items-center gap-2 pt-1">
+            <div className="h-px bg-[#E2D9C8] flex-1" />
+            <span className="text-[10px] uppercase font-mono text-[#6B8077] font-bold">Or Select Manually</span>
+            <div className="h-px bg-[#E2D9C8] flex-1" />
+          </div>
+
+          {/* Search Filter if multiple cities */}
+          {cities && cities.length > 4 && (
+            <div className="relative">
+              <LuSearch className="w-3.5 h-3.5 text-[#6B8077] absolute left-3 top-3" />
+              <input
+                type="text"
+                value={citySearchQuery}
+                onChange={(e) => setCitySearchQuery(e.target.value)}
+                placeholder="Search city (e.g. Moradabad, Rampur, Sambhal)..."
+                className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-[#E2D9C8] bg-white text-[#10231D] focus:outline-none focus:ring-1 focus:ring-[#E9A23B]"
+              />
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+            {filteredCities && filteredCities.length > 0 ? (
+              filteredCities.map((city) => {
+                const isSelected = selectedCity?.slug === city.slug || selectedCity?.name === city.name;
+                return (
+                  <button
+                    key={city.slug || city.name}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCity(city);
+                      try {
+                        localStorage.setItem('max_selected_city', JSON.stringify(city));
+                        localStorage.setItem('max_location_choice_made', 'true');
+                      } catch {}
+                      setIsCityModalOpen(false);
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-[#E9A23B] bg-[#ECE5D8] font-bold text-[#10231D] ring-2 ring-[#E9A23B]/30 shadow-xs'
+                        : 'border-[#E2D9C8] bg-white hover:bg-[#ECE5D8] text-[#10231D]'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">{city.name}</p>
+                      <p className="text-[11px] text-[#6B8077]">UP, India</p>
+                    </div>
+                    {isSelected && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#E9A23B] ring-2 ring-white" />
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="col-span-2 text-center text-xs text-[#6B8077] py-6">
+                No matching service cities found.
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
     </>

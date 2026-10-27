@@ -638,6 +638,14 @@ export async function updateSupervisorBookingStatus(req, res, next) {
 
     if (status) {
       booking.status = status;
+      // Immediately terminate live location sharing as soon as service is completed or cancelled
+      if (['completed', 'cancelled'].includes(status)) {
+        if (!booking.supervisorLiveLocation) {
+          booking.supervisorLiveLocation = {};
+        }
+        booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.updatedAt = new Date();
+      }
     }
 
     const logNote = note || `Status updated to ${status} by supervisor ${req.user.name}`;
@@ -913,6 +921,70 @@ export async function createQuickTestBooking(req, res, next) {
   }
 }
 
+/**
+ * Update Supervisor Live GPS Location for a Booking
+ * POST /api/v1/supervisor/bookings/:id/location
+ */
+export async function updateSupervisorLiveLocation(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { lat, lng, heading = 0, speed = 0, accuracy = 0, isSharing = true } = req.body;
+
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingCode: id });
+    }
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only the assigned supervisor can broadcast live location for this booking.'
+      });
+    }
+
+    if (!['assigned', 'confirmed', 'in_progress'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Live location can only be broadcast for active (assigned, confirmed, or in-progress) bookings.'
+      });
+    }
+
+    if (isSharing && (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid latitude (-90 to 90) and longitude (-180 to 180) are required.'
+      });
+    }
+
+    booking.supervisorLiveLocation = {
+      lat: isSharing ? lat : (booking.supervisorLiveLocation?.lat || 0),
+      lng: isSharing ? lng : (booking.supervisorLiveLocation?.lng || 0),
+      heading: Number(heading) || 0,
+      speed: Number(speed) || 0,
+      accuracy: Number(accuracy) || 0,
+      updatedAt: new Date(),
+      isSharing: Boolean(isSharing)
+    };
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: isSharing ? 'Live location updated successfully.' : 'Live location sharing paused.',
+      liveLocation: booking.supervisorLiveLocation
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export default {
   getSupervisorStats,
   getSupervisorBookings,
@@ -921,6 +993,7 @@ export default {
   uploadBookingPhoto,
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
+  updateSupervisorLiveLocation,
   addSupervisorBookingMessage,
   getSupervisorSchedule,
   getSupervisorsList,
@@ -928,3 +1001,4 @@ export default {
   claimSupervisorBooking,
   createQuickTestBooking
 };
+

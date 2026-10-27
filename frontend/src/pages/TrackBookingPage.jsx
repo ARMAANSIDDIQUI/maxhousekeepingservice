@@ -20,6 +20,7 @@ import { useToast } from '../context/ToastContext';
 import { useBooking } from '../context/BookingContext';
 import { FaInstagram } from 'react-icons/fa6';
 import SEO from '../components/common/SEO';
+import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
 
 import { formatDateDMY } from '../utils/date';
 
@@ -85,7 +86,7 @@ export default function TrackBookingPage() {
         {/* Title */}
         <div className="text-center mb-8">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
-            LIVE DISPATCH STATUS
+            ORDER STATUS & TRACKING
           </span>
           <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] mt-1">
             Track Your Cleaning Order
@@ -280,6 +281,17 @@ export default function TrackBookingPage() {
                   </div>
                 </div>
               )
+            )}
+
+            {/* REAL-TIME SUPERVISOR LIVE TRACKING RADAR */}
+            {booking.status !== 'cancelled' && (booking.supervisor || booking.assignedSupervisor?.name) && (
+              <LiveTrackingRadar
+                bookingCode={booking.bookingCode}
+                initialSupervisorLocation={booking.supervisorLiveLocation}
+                customerLocation={booking.address?.coordinates}
+                destinationAddress={`${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.cityName || ''}`}
+                supervisorInfo={booking.assignedSupervisor || (typeof booking.supervisor === 'object' ? booking.supervisor : null)}
+              />
             )}
 
             {/* Cancelled Notice Banner */}

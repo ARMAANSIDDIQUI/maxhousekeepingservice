@@ -880,7 +880,8 @@ export const bookingsAPI = {
   deleteBooking: (id) => apiRequest(`/bookings/${id}`, { method: 'DELETE' }),
   getMessages: (bookingId) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'GET' }),
   sendMessage: (bookingId, text, senderName) => apiRequest(`/bookings/${bookingId}/messages`, { method: 'POST', body: { text, senderName } }),
-  getPublicCoupons: () => apiRequest('/bookings/coupons', { method: 'GET' })
+  getPublicCoupons: () => apiRequest('/bookings/coupons', { method: 'GET' }),
+  getLiveLocation: (code) => apiRequest(`/bookings/${encodeURIComponent(code)}/live-location`, { method: 'GET', noCache: true })
 };
 
 export const authAPI = {
@@ -1036,7 +1037,8 @@ export const supervisorAPI = {
   },
   deletePhoto: (id, photoId) => apiRequest(`/supervisor/bookings/${id}/photos/${photoId}`, { method: 'DELETE' }),
   updateStatus: (id, status, note) => apiRequest(`/supervisor/bookings/${id}/status`, { method: 'PUT', body: { status, note } }),
-  sendMessage: (id, text) => apiRequest(`/supervisor/bookings/${id}/message`, { method: 'POST', body: { text } })
+  sendMessage: (id, text) => apiRequest(`/supervisor/bookings/${id}/message`, { method: 'POST', body: { text } }),
+  updateLiveLocation: (id, locationData) => apiRequest(`/supervisor/bookings/${id}/location`, { method: 'POST', body: locationData })
 };
 
 // Export api Axios instance as default for direct use if desired

@@ -4,6 +4,7 @@ import {
   getPublicCoupons,
   createBooking,
   trackBooking,
+  getBookingLiveLocation,
   getMyBookings,
   editBookingDetails,
   addBookingMessage,

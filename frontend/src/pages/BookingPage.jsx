@@ -30,6 +30,7 @@ import { useToast } from '../context/ToastContext';
 import { apiRequest, FALLBACK_SERVICES } from '../api';
 import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
+import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
 
 // Central Dynamic Helper: Check if a service is available in the target city
 export function isServiceAvailableInCity(service, citySlug) {
@@ -386,7 +387,11 @@ export default function BookingPage() {
   const [isTemporaryAddress, setIsTemporaryAddress] = useState(false);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
   const [addressForm, setAddressForm] = useState({
+    houseOrFlat: '',
     line1: '',
+    formattedAddress: '',
+    placeId: '',
+    coordinates: null,
     landmark: '',
     cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : ''),
     pincode: '',
@@ -505,7 +510,11 @@ export default function BookingPage() {
     setSelectedSavedAddressId(addressId);
     if (addressId === 'new') {
       setAddressForm({
+        houseOrFlat: '',
         line1: '',
+        formattedAddress: '',
+        placeId: '',
+        coordinates: null,
         landmark: '',
         cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
         pincode: '',
@@ -515,7 +524,11 @@ export default function BookingPage() {
       const addr = user?.addresses?.find(a => a._id === addressId);
       if (addr) {
         setAddressForm({
+          houseOrFlat: addr.houseOrFlat || '',
           line1: addr.line1,
+          formattedAddress: addr.formattedAddress || addr.line1,
+          placeId: addr.placeId || '',
+          coordinates: addr.coordinates || null,
           landmark: addr.landmark || '',
           cityText: addr.city,
           pincode: addr.pincode,
@@ -538,7 +551,11 @@ export default function BookingPage() {
       setSelectedSavedAddressId('');
       // Wipe/remove default details so user enters fresh temporary address
       setAddressForm({
+        houseOrFlat: '',
         line1: '',
+        formattedAddress: '',
+        placeId: '',
+        coordinates: null,
         landmark: '',
         cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
         pincode: '',
@@ -550,7 +567,11 @@ export default function BookingPage() {
         const defaultAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
         setSelectedSavedAddressId(defaultAddr._id);
         setAddressForm({
+          houseOrFlat: defaultAddr.houseOrFlat || '',
           line1: defaultAddr.line1,
+          formattedAddress: defaultAddr.formattedAddress || defaultAddr.line1,
+          placeId: defaultAddr.placeId || '',
+          coordinates: defaultAddr.coordinates || null,
           landmark: defaultAddr.landmark || '',
           cityText: defaultAddr.city,
           pincode: defaultAddr.pincode,
@@ -573,6 +594,13 @@ export default function BookingPage() {
 
     const addressPayload = {
       line1: addressForm.line1.trim(),
+      houseOrFlat: addressForm.houseOrFlat ? addressForm.houseOrFlat.trim() : '',
+      formattedAddress: addressForm.formattedAddress || addressForm.line1.trim(),
+      placeId: addressForm.placeId || '',
+      coordinates: (addressForm.coordinates && typeof addressForm.coordinates.lat === 'number') ? {
+        lat: addressForm.coordinates.lat,
+        lng: addressForm.coordinates.lng
+      } : undefined,
       landmark: addressForm.landmark?.trim() || '',
       cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
       pincode: addressForm.pincode.trim(),
@@ -1380,143 +1408,55 @@ export default function BookingPage() {
                 </label>
               </div>
 
-              {/* Address Fields: Typing disabled in case of saved address, allowed for temporary or new address */}
               <div className="space-y-4">
-                {isSavedAddressSelected && (
-                  <div className="p-2.5 rounded-xl bg-[#ECE5D8] border border-[#D2C8B8] flex items-center gap-2 text-xs text-[#3D524A]">
-                    <LuShieldCheck className="w-4 h-4 text-[#10231D] shrink-0" />
-                    <span>
-                      Address details locked from your saved profile. To edit or enter a different location, select <strong>"+ Enter a different address"</strong> or check <strong>"Use temporary address"</strong> above.
-                    </span>
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-[#10231D]">
-                      Street Address / House No. / Flat / Society: <span className="text-[#C2512D]">*</span>
-                    </label>
-                    <span className="text-[10px] text-[#6B8077]">Min. 5 characters</span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="e.g. Flat 302, Green Valley Apartments"
-                      value={addressForm.line1}
-                      readOnly={isSavedAddressSelected}
-                      disabled={isSavedAddressSelected || !user}
-                      onChange={handleLine1Change}
-                      onBlur={() => setTouchedFields(prev => ({ ...prev, line1: true }))}
-                      className={`w-full p-3 rounded-xl border text-sm transition-colors ${
-                        isSavedAddressSelected || !user
-                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
-                          : fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0)
-                          ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
-                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
-                      }`}
-                      required
-                    />
-                    {fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0) && !isSavedAddressSelected && (
-                      <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3 top-3.5" />
-                    )}
-                  </div>
-                  {fieldErrors.line1 && (touchedFields.line1 || addressForm.line1.length > 0) && !isSavedAddressSelected && (
-                    <p className="text-[11px] font-semibold text-[#C2512D] mt-1 flex items-center gap-1">
-                      <span>{fieldErrors.line1}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Service City:
-                    </label>
-                    {isSavedAddressSelected || !user ? (
-                      <input
-                        type="text"
-                        value={addressForm.cityText}
-                        readOnly
-                        disabled
-                        className="w-full p-2.5 rounded-xl border bg-[#ECE5D8]/70 border-[#D2C8B8] text-sm text-[#10231D] cursor-not-allowed select-none"
-                      />
-                    ) : (
-                      <CustomSelect
-                        value={addressForm.cityText}
-                        onChange={(val) => {
-                          setAddressForm({ ...addressForm, cityText: val });
-                          const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name) === val);
-                          if (matchedCity && typeof matchedCity === 'object') {
-                            setSelectedCity(matchedCity);
-                          }
-                        }}
-                        options={cities.map(c => {
-                          const name = typeof c === 'string' ? c : (c.name || c.slug);
-                          return { value: name, label: name };
-                        })}
-                        placeholder="Select City..."
-                      />
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#10231D] mb-1">
-                      Landmark (Optional):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Near Water Tank"
-                      value={addressForm.landmark}
-                      readOnly={isSavedAddressSelected}
-                      disabled={isSavedAddressSelected || !user}
-                      onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
-                      className={`w-full p-2.5 rounded-xl border text-sm transition-colors ${
-                        isSavedAddressSelected || !user
-                          ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
-                          : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold text-[#10231D]">
-                        6-Digit Pincode: <span className="text-[#C2512D]">*</span>
-                      </label>
-                      {addressForm.pincode && (
-                        <span className="text-[10px] text-[#6B8077]">{addressForm.pincode.length}/6</span>
+                {isSavedAddressSelected ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-[#ECE5D8] border border-[#D2C8B8] flex items-center justify-between text-xs text-[#3D524A]">
+                      <div className="flex items-center gap-2">
+                        <LuShieldCheck className="w-4 h-4 text-[#10231D] shrink-0" />
+                        <span>Address locked from saved profile.</span>
+                      </div>
+                      {addressForm.coordinates && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#10231D] text-[#25D366] text-[10px] font-mono font-bold flex items-center gap-1">
+                          <LuMapPin className="w-3 h-3 text-[#E9A23B]" />
+                          <span>Pinpoint Verified</span>
+                        </span>
                       )}
                     </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="e.g. 244001"
-                        maxLength={6}
-                        value={addressForm.pincode}
-                        readOnly={isSavedAddressSelected}
-                        disabled={isSavedAddressSelected || !user}
-                        onChange={handlePincodeChange}
-                        onBlur={() => setTouchedFields(prev => ({ ...prev, pincode: true }))}
-                        className={`w-full p-2.5 rounded-xl border text-sm font-mono transition-colors ${
-                          isSavedAddressSelected || !user
-                            ? 'bg-[#ECE5D8]/70 border-[#D2C8B8] text-[#10231D] cursor-not-allowed select-none'
-                            : fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0)
-                            ? 'bg-[#F9ECE8] border-[#C2512D] text-[#10231D] focus:border-[#C2512D] focus:ring-1 focus:ring-[#C2512D] focus:outline-none'
-                            : 'bg-[#F4EFE6] border-[#E2D9C8] text-[#10231D] focus:border-[#E9A23B] focus:outline-none'
-                        }`}
-                        required
-                      />
-                      {fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0) && !isSavedAddressSelected && (
-                        <LuCircleAlert className="w-4 h-4 text-[#C2512D] absolute right-3 top-3" />
+
+                    <div className="p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-1.5 text-xs text-[#10231D]">
+                      {addressForm.houseOrFlat && (
+                        <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-[#E9A23B]/20 text-[#8C4F00] text-[11px] font-bold">Door</span>
+                          <span>{addressForm.houseOrFlat}</span>
+                        </p>
                       )}
-                    </div>
-                    {fieldErrors.pincode && (touchedFields.pincode || addressForm.pincode.length > 0) && !isSavedAddressSelected && (
-                      <p className="text-[11px] font-semibold text-[#C2512D] mt-1">
-                        {fieldErrors.pincode}
+                      <p className="font-medium text-[#3D524A]">{addressForm.line1}</p>
+                      {addressForm.landmark && (
+                        <p className="text-[11px] text-[#6B8077]">Landmark: {addressForm.landmark}</p>
+                      )}
+                      <p className="text-[11px] font-semibold text-[#10231D]">
+                        {addressForm.cityText}, {addressForm.pincode}
                       </p>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <AddressPickerWithMap
+                    value={addressForm}
+                    onChange={(newFields) => {
+                      setAddressForm(prev => ({ ...prev, ...newFields }));
+                      if (newFields.cityText) {
+                        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === newFields.cityText?.toLowerCase());
+                        if (matchedCity && typeof matchedCity === 'object') {
+                          setSelectedCity(matchedCity);
+                        }
+                      }
+                    }}
+                    defaultCity={selectedCity?.name || 'Moradabad'}
+                    disabled={!user}
+                    error={fieldErrors.line1}
+                  />
+                )}
               </div>
             </div>
 

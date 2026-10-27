@@ -7,6 +7,7 @@ import {
   uploadBookingPhoto,
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
+  updateSupervisorLiveLocation,
   addSupervisorBookingMessage,
   getSupervisorSchedule,
   getSupervisorsList,
@@ -43,8 +44,9 @@ router.post('/quick-test-booking', createQuickTestBooking);
 router.post('/bookings/:id/photos', uploadPhoto.single('photo'), uploadBookingPhoto);
 router.delete('/bookings/:id/photos/:photoId', deleteBookingPhoto);
 
-// Status & Communication
+// Status & Communication & Live GPS
 router.put('/bookings/:id/status', updateSupervisorBookingStatus);
+router.post('/bookings/:id/location', updateSupervisorLiveLocation);
 router.post('/bookings/:id/message', addSupervisorBookingMessage);
 
 export default router;

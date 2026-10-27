@@ -124,6 +124,13 @@ export async function updateBooking(req, res, next) {
 
     if (status && status !== booking.status) {
       booking.status = status;
+      if (['completed', 'cancelled'].includes(status)) {
+        if (!booking.supervisorLiveLocation) {
+          booking.supervisorLiveLocation = {};
+        }
+        booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.updatedAt = new Date();
+      }
       booking.statusHistory.push({
         status,
         timestamp: new Date(),

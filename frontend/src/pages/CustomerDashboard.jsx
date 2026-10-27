@@ -38,6 +38,8 @@ import { useBooking } from '../context/BookingContext';
 import Modal from '../components/common/Modal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import UserAvatar from '../components/common/UserAvatar';
+import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
+import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
 import { formatDateDMY } from '../utils/date';
 
 export default function CustomerDashboard() {
@@ -294,10 +296,16 @@ export default function CustomerDashboard() {
   const handleOpenAddAddress = () => {
     setNewAddressForm({
       label: 'Home',
+      houseOrFlat: '',
       line1: '',
+      formattedAddress: '',
+      placeId: '',
+      coordinates: null,
       landmark: '',
       city: 'Moradabad',
+      cityText: 'Moradabad',
       state: 'Uttar Pradesh',
+      stateText: 'Uttar Pradesh',
       pincode: '',
       isDefault: (!user?.addresses || user.addresses.length === 0)
     });
@@ -306,7 +314,7 @@ export default function CustomerDashboard() {
 
   const handleCreateAddress = async (e) => {
     e.preventDefault();
-    if (!newAddressForm.line1.trim() || !newAddressForm.city.trim() || !newAddressForm.pincode.trim()) {
+    if (!newAddressForm.line1?.trim() || !newAddressForm.city?.trim() || !newAddressForm.pincode?.trim()) {
       toast.error('Street address, city, and pincode are required.');
       return;
     }
@@ -343,10 +351,16 @@ export default function CustomerDashboard() {
     setEditingAddress(addr);
     setEditAddressForm({
       label: addr.label || 'Home',
+      houseOrFlat: addr.houseOrFlat || '',
       line1: addr.line1 || '',
+      formattedAddress: addr.formattedAddress || addr.line1 || '',
+      placeId: addr.placeId || '',
+      coordinates: addr.coordinates || null,
       landmark: addr.landmark || '',
       city: addr.city || 'Moradabad',
+      cityText: addr.city || 'Moradabad',
       state: addr.state || 'Uttar Pradesh',
+      stateText: addr.state || 'Uttar Pradesh',
       pincode: addr.pincode || '',
       isDefault: Boolean(addr.isDefault)
     });
@@ -1346,6 +1360,11 @@ export default function CustomerDashboard() {
                       </div>
 
                       {/* Address Text */}
+                      {addr.houseOrFlat && (
+                        <p className="text-xs font-bold text-[#8C4F00] bg-[#E9A23B]/20 px-2 py-0.5 rounded-md w-fit mb-1.5 border border-[#E9A23B]/40">
+                          Unit: {addr.houseOrFlat}
+                        </p>
+                      )}
                       <p className="font-bold text-sm text-[#10231D] leading-snug">
                         {addr.line1}
                       </p>
@@ -1360,6 +1379,12 @@ export default function CustomerDashboard() {
                       <p className="text-xs font-mono text-[#6B8077] mt-0.5">
                         Pincode: <span className="font-bold text-[#10231D]">{addr.pincode}</span>
                       </p>
+                      {addr.coordinates && typeof addr.coordinates.lat === 'number' && (
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10231D] text-[#25D366] text-[10px] font-mono font-bold">
+                          <LuMapPin className="w-3 h-3 text-[#E9A23B]" />
+                          <span>Pin: {addr.coordinates.lat.toFixed(4)}, {addr.coordinates.lng.toFixed(4)}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -2192,7 +2217,7 @@ export default function CustomerDashboard() {
             onClose={() => setIsAddAddressModalOpen(false)}
             title="Add New Service Address"
             subtitle="Save an address to your profile for faster checkout"
-            maxWidth="max-w-md"
+            maxWidth="max-w-xl"
           >
             <form onSubmit={handleCreateAddress} className="space-y-4">
               {/* Address Label Presets */}
@@ -2226,80 +2251,12 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              {/* Line 1 */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  House / Flat / Street / Society:
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Flat 402, Royal Palms, Kanth Road"
-                  value={newAddressForm.line1}
-                  onChange={(e) => setNewAddressForm({ ...newAddressForm, line1: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
-
-              {/* Landmark */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Landmark (Optional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Behind Vivekanand Hospital"
-                  value={newAddressForm.landmark}
-                  onChange={(e) => setNewAddressForm({ ...newAddressForm, landmark: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                />
-              </div>
-
-              {/* City & Pincode */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    City:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Moradabad"
-                    value={newAddressForm.city}
-                    onChange={(e) => setNewAddressForm({ ...newAddressForm, city: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Pincode:
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="244001"
-                    value={newAddressForm.pincode}
-                    onChange={(e) => setNewAddressForm({ ...newAddressForm, pincode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* State */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  State:
-                </label>
-                <input
-                  type="text"
-                  value={newAddressForm.state}
-                  onChange={(e) => setNewAddressForm({ ...newAddressForm, state: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
+              {/* Interactive Google Autocomplete & Doorstep Pinpoint */}
+              <AddressPickerWithMap
+                value={newAddressForm}
+                onChange={(newFields) => setNewAddressForm(prev => ({ ...prev, ...newFields }))}
+                defaultCity={newAddressForm.city || 'Moradabad'}
+              />
 
               {/* Set as Default Checkbox */}
               <div className="flex items-center gap-2 pt-1">
@@ -2345,7 +2302,7 @@ export default function CustomerDashboard() {
             onClose={() => setEditingAddress(null)}
             title="Edit Saved Address"
             subtitle={`Update address details for "${editingAddress.label || 'Saved Location'}"`}
-            maxWidth="max-w-md"
+            maxWidth="max-w-xl"
           >
             <form onSubmit={handleUpdateAddressSubmit} className="space-y-4">
               {/* Address Label Presets */}
@@ -2379,80 +2336,12 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              {/* Line 1 */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  House / Flat / Street / Society:
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Flat 402, Royal Palms, Kanth Road"
-                  value={editAddressForm.line1}
-                  onChange={(e) => setEditAddressForm({ ...editAddressForm, line1: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
-
-              {/* Landmark */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Landmark (Optional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Behind Vivekanand Hospital"
-                  value={editAddressForm.landmark}
-                  onChange={(e) => setEditAddressForm({ ...editAddressForm, landmark: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                />
-              </div>
-
-              {/* City & Pincode */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    City:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Moradabad"
-                    value={editAddressForm.city}
-                    onChange={(e) => setEditAddressForm({ ...editAddressForm, city: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Pincode:
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="244001"
-                    value={editAddressForm.pincode}
-                    onChange={(e) => setEditAddressForm({ ...editAddressForm, pincode: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* State */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  State:
-                </label>
-                <input
-                  type="text"
-                  value={editAddressForm.state}
-                  onChange={(e) => setEditAddressForm({ ...editAddressForm, state: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
-              </div>
+              {/* Interactive Google Autocomplete & Doorstep Pinpoint */}
+              <AddressPickerWithMap
+                value={editAddressForm}
+                onChange={(newFields) => setEditAddressForm(prev => ({ ...prev, ...newFields }))}
+                defaultCity={editAddressForm.city || 'Moradabad'}
+              />
 
               {/* Set as Default Checkbox */}
               <div className="flex items-center gap-2 pt-1">

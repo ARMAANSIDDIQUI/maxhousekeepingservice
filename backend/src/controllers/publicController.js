@@ -58,6 +58,11 @@ export async function getPublicSettings(req, res, next) {
       publicSettings.razorpayKeyId = process.env.RAZORPAY_KEY_ID;
     }
 
+    // Expose public Google Maps API Key if set in environment or DB settings
+    if (!publicSettings.googleMapsApiKey && process.env.GOOGLE_MAPS_API_KEY) {
+      publicSettings.googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+    }
+
     res.status(200).json({ success: true, settings: publicSettings });
   } catch (err) {
     next(err);

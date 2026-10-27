@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { apiRequest } from '../api';
 import { useToast } from './ToastContext';
 
@@ -30,6 +30,128 @@ export function BookingProvider({ children }) {
   });
 
   const [cities, setCities] = useState([]);
+  const [isDetectingCity, setIsDetectingCity] = useState(false);
+  const { toast } = useToast();
+
+  // Known coordinates of active service cities in Western UP
+  const CITY_COORDINATES = useMemo(() => ({
+    moradabad: { lat: 28.8386, lng: 78.7733 },
+    rampur: { lat: 28.8033, lng: 79.0250 },
+    amroha: { lat: 28.9044, lng: 78.4678 },
+    gajraula: { lat: 28.8500, lng: 78.2333 },
+    sambhal: { lat: 28.5833, lng: 78.5667 },
+    chandausi: { lat: 28.4500, lng: 78.7833 },
+    noorpur: { lat: 29.1500, lng: 78.4000 },
+    dhampur: { lat: 29.3100, lng: 78.5100 },
+    bijnor: { lat: 29.3732, lng: 78.1352 }
+  }), []);
+
+  // Detect city via browser geolocation
+  const detectAndSelectCity = useCallback(async ({ silent = false, showToast = true } = {}) => {
+    if (!navigator.geolocation) {
+      if (!silent) toast.error('Geolocation is not supported by your browser.');
+      return null;
+    }
+
+    setIsDetectingCity(true);
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          setIsDetectingCity(false);
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          let matchedCity = null;
+
+          // 1. Check with Google Maps Geocoder if loaded
+          try {
+            if (window.google?.maps?.Geocoder) {
+              const geocoder = new window.google.maps.Geocoder();
+              const response = await geocoder.geocode({ location: { lat, lng } });
+              if (response?.results?.[0]?.address_components) {
+                const comps = response.results[0].address_components;
+                const locality = comps.find(c =>
+                  c.types.includes('locality') ||
+                  c.types.includes('administrative_area_level_2')
+                );
+                if (locality?.long_name) {
+                  const targetName = locality.long_name.toLowerCase();
+                  matchedCity = cities.find(c =>
+                    c.name.toLowerCase() === targetName ||
+                    targetName.includes(c.name.toLowerCase()) ||
+                    c.slug === targetName
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[City Geocoder lookup notice]:', e.message);
+          }
+
+          // 2. Haversine distance proximity fallback against active service cities
+          if (!matchedCity && cities.length > 0) {
+            let closest = null;
+            let minDistance = Infinity;
+
+            for (const c of cities) {
+              const coords = CITY_COORDINATES[c.slug] || CITY_COORDINATES[c.name.toLowerCase()];
+              if (coords) {
+                const dLat = (lat - coords.lat) * (Math.PI / 180);
+                const dLng = (lng - coords.lng) * (Math.PI / 180);
+                const a =
+                  Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat * (Math.PI / 180)) * Math.cos(coords.lat * (Math.PI / 180)) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                const d = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                if (d < minDistance) {
+                  minDistance = d;
+                  closest = c;
+                }
+              }
+            }
+
+            if (closest && minDistance <= 85) {
+              matchedCity = closest;
+            } else if (closest) {
+              matchedCity = cities.find(c => c.slug === 'moradabad') || closest;
+            }
+          }
+
+          if (!matchedCity && cities.length > 0) {
+            matchedCity = cities.find(c => c.slug === 'moradabad') || cities[0];
+          }
+
+          if (matchedCity) {
+            setSelectedCity(matchedCity);
+            try {
+              localStorage.setItem('max_selected_city', JSON.stringify(matchedCity));
+              localStorage.setItem('max_location_choice_made', 'true');
+            } catch {}
+
+            if (showToast) {
+              toast.success(`Location detected: Selected ${matchedCity.name} as your service city.`);
+            }
+            resolve(matchedCity);
+          } else {
+            resolve(null);
+          }
+        },
+        (err) => {
+          setIsDetectingCity(false);
+          console.warn('[Geolocation error]:', err.message);
+          if (!silent) {
+            if (err.code === 1) {
+              toast.error('Location permission was denied. You can select your city manually from the list.');
+            } else {
+              toast.error('Unable to retrieve current location. Please choose your city manually.');
+            }
+          }
+          resolve(null);
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  }, [cities, CITY_COORDINATES, toast]);
 
   // Load cities dynamically from MongoDB
   useEffect(() => {
@@ -48,6 +170,15 @@ export function BookingProvider({ children }) {
           } else {
             const mbd = res.cities.find(c => c.slug === 'moradabad') || res.cities[0];
             setSelectedCity(mbd);
+          }
+
+          // If location permission was already granted in browser, auto-detect city silently
+          if (!localStorage.getItem('max_location_choice_made') && navigator.permissions?.query) {
+            navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+              if (status.state === 'granted') {
+                detectAndSelectCity({ silent: true, showToast: false });
+              }
+            }).catch(() => {});
           }
         } else {
           setCities([]);
@@ -168,8 +299,6 @@ export function BookingProvider({ children }) {
     email: '',
     notes: ''
   });
-
-  const { toast } = useToast();
 
   // Fetch Live Dual-Price Quote from Server
   const refreshQuote = useCallback(async (currentItems, citySlug, coupon) => {
@@ -481,6 +610,8 @@ export function BookingProvider({ children }) {
         applyCoupon,
         removeCoupon,
         refreshQuote,
+        detectAndSelectCity,
+        isDetectingCity,
         settings,
         refreshSettings
       }}

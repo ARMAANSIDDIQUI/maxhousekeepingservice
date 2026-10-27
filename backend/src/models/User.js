@@ -4,6 +4,9 @@ import bcrypt from 'bcryptjs';
 const addressSchema = new mongoose.Schema({
   label: { type: String, default: 'Home', trim: true },
   line1: { type: String, required: true, trim: true },
+  houseOrFlat: { type: String, trim: true },
+  formattedAddress: { type: String, trim: true },
+  placeId: { type: String, trim: true },
   landmark: { type: String, trim: true },
   city: { type: String, required: true, trim: true },
   state: { type: String, default: 'Uttar Pradesh', trim: true },
