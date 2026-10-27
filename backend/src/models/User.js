@@ -35,6 +35,14 @@ const userSchema = new mongoose.Schema({
     attempts: { type: Number, default: 0 }
   },
   addresses: [addressSchema],
+  lastKnownLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    heading: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    accuracy: { type: Number, default: 0 },
+    updatedAt: { type: Date }
+  },
 }, {
   timestamps: true
 });

@@ -8,6 +8,7 @@ import {
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
   updateSupervisorLiveLocation,
+  broadcastSupervisorLiveLocation,
   addSupervisorBookingMessage,
   getSupervisorSchedule,
   getSupervisorsList,
@@ -46,6 +47,7 @@ router.delete('/bookings/:id/photos/:photoId', deleteBookingPhoto);
 
 // Status & Communication & Live GPS
 router.put('/bookings/:id/status', updateSupervisorBookingStatus);
+router.post('/location/broadcast', broadcastSupervisorLiveLocation);
 router.post('/bookings/:id/location', updateSupervisorLiveLocation);
 router.post('/bookings/:id/message', addSupervisorBookingMessage);
 

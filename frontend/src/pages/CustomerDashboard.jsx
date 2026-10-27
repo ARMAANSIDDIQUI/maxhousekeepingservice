@@ -27,7 +27,8 @@ import {
   LuSparkles,
   LuCreditCard,
   LuBanknote,
-  LuCopy
+  LuCopy,
+  LuNavigation
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import confetti from 'canvas-confetti';
@@ -54,6 +55,7 @@ export default function CustomerDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [confirmModalConfig, setConfirmModalConfig] = useState(null);
+  const [trackingModalBooking, setTrackingModalBooking] = useState(null);
 
   // Online Payment State for Unpaid Bookings
   const [payingBookingId, setPayingBookingId] = useState(null);
@@ -1273,13 +1275,16 @@ export default function CustomerDashboard() {
                           <span>WhatsApp</span>
                         </a>
 
-                        {/* Live Tracking Link */}
-                        <Link
-                          to={`/track/${b.bookingCode}`}
-                          className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs shadow-xs"
+                        {/* Track Location Button */}
+                        <button
+                          type="button"
+                          onClick={() => setTrackingModalBooking(b)}
+                          className="px-4 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                          title="Track Supervisor Real-Time Location & Route"
                         >
-                          Live Tracking
-                        </Link>
+                          <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B] animate-pulse" />
+                          <span>Track Location</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2378,6 +2383,48 @@ export default function CustomerDashboard() {
           </Modal>
         )}
 
+
+        {/* Track Live Location Modal */}
+        {trackingModalBooking && (
+          <Modal
+            isOpen={Boolean(trackingModalBooking)}
+            onClose={() => setTrackingModalBooking(null)}
+            title={`Live Tracking · Booking #${trackingModalBooking.bookingCode}`}
+            subtitle="Real-time GPS tracking and arrival route of your assigned supervisor"
+            maxWidth="max-w-2xl"
+          >
+            <div className="space-y-4">
+              <LiveTrackingRadar
+                bookingCode={trackingModalBooking.bookingCode}
+                initialSupervisorLocation={trackingModalBooking.supervisorLiveLocation}
+                customerLocation={trackingModalBooking.address?.coordinates}
+                destinationAddress={`${trackingModalBooking.address?.houseOrFlat ? trackingModalBooking.address.houseOrFlat + ', ' : ''}${trackingModalBooking.address?.line1 || ''}, ${trackingModalBooking.cityName || ''}`}
+                supervisorInfo={{
+                  name: trackingModalBooking.assignedSupervisor?.name || trackingModalBooking.supervisor?.name || 'Field Supervisor',
+                  phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
+                  role: 'Assigned Lead Supervisor'
+                }}
+              />
+              <div className="flex items-center justify-between pt-2">
+                <Link
+                  to={`/track/${trackingModalBooking.bookingCode}`}
+                  target="_blank"
+                  className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
+                >
+                  <span>Open Fullscreen Tracking Window</span>
+                  <LuNavigation className="w-3 h-3" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setTrackingModalBooking(null)}
+                  className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                >
+                  Close Radar
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* Action Confirmation & Prompt Modal */}
         {confirmModalConfig && (

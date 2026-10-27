@@ -943,8 +943,20 @@ export async function getBookingLiveLocation(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
     }
 
-    const liveLoc = booking.supervisorLiveLocation;
-    const isLive = Boolean(liveLoc && liveLoc.isSharing && ['assigned', 'confirmed', 'in_progress'].includes(booking.status));
+    let liveLoc = booking.supervisorLiveLocation;
+    let hasCoords = Boolean(liveLoc && typeof liveLoc.lat === 'number' && typeof liveLoc.lng === 'number' && liveLoc.lat !== 0);
+
+    // If booking doesn't have coordinates yet, fallback to supervisor user's lastKnownLocation
+    if (!hasCoords && booking.supervisor) {
+      const supervisorUser = await User.findById(booking.supervisor).select('lastKnownLocation name phone avatar');
+      if (supervisorUser?.lastKnownLocation?.lat && supervisorUser.lastKnownLocation.lat !== 0) {
+        liveLoc = supervisorUser.lastKnownLocation;
+        hasCoords = true;
+      }
+    }
+
+    // Location sharing persists indefinitely for active bookings even if supervisor closes panel
+    const isLive = Boolean(hasCoords && !['completed', 'cancelled'].includes(booking.status));
 
     res.status(200).json({
       success: true,
@@ -962,7 +974,7 @@ export async function getBookingLiveLocation(req, res, next) {
         heading: liveLoc.heading || 0,
         speed: liveLoc.speed || 0,
         accuracy: liveLoc.accuracy || 0,
-        updatedAt: liveLoc.updatedAt
+        updatedAt: liveLoc.updatedAt || new Date()
       } : null,
       customerLocation: (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number') ? {
         lat: booking.address.coordinates.lat,

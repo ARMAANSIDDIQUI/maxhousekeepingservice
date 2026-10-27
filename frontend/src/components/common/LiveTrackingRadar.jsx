@@ -39,7 +39,73 @@ export default function LiveTrackingRadar({
   const mapInstanceRef = useRef(null);
   const supervisorMarkerRef = useRef(null);
   const customerMarkerRef = useRef(null);
+  const directionsRendererRef = useRef(null);
+  const routePolylineRef = useRef(null);
   const pollTimerRef = useRef(null);
+
+  // Helper to draw or update route line between supervisor location and customer doorstep
+  const updateRouteLine = (start, end) => {
+    if (!start || !end || !window.google?.maps || !mapInstanceRef.current) return;
+    const google = window.google;
+
+    const startPos = { lat: Number(start.lat), lng: Number(start.lng) };
+    const endPos = { lat: Number(end.lat), lng: Number(end.lng) };
+
+    if (google.maps.DirectionsService && google.maps.DirectionsRenderer) {
+      if (!directionsRendererRef.current) {
+        directionsRendererRef.current = new google.maps.DirectionsRenderer({
+          map: mapInstanceRef.current,
+          suppressMarkers: true,
+          polylineOptions: {
+            strokeColor: '#E9A23B',
+            strokeWeight: 5,
+            strokeOpacity: 0.95
+          }
+        });
+      } else {
+        directionsRendererRef.current.setMap(mapInstanceRef.current);
+      }
+
+      const ds = new google.maps.DirectionsService();
+      ds.route(
+        {
+          origin: startPos,
+          destination: endPos,
+          travelMode: google.maps.TravelMode.DRIVING
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK) {
+            directionsRendererRef.current?.setDirections(result);
+            if (routePolylineRef.current) {
+              routePolylineRef.current.setMap(null);
+            }
+          } else {
+            drawFallbackPolyline(startPos, endPos);
+          }
+        }
+      );
+    } else {
+      drawFallbackPolyline(startPos, endPos);
+    }
+  };
+
+  const drawFallbackPolyline = (start, end) => {
+    if (!window.google?.maps || !mapInstanceRef.current) return;
+    const google = window.google;
+
+    if (routePolylineRef.current) {
+      routePolylineRef.current.setMap(null);
+    }
+
+    routePolylineRef.current = new google.maps.Polyline({
+      path: [start, end],
+      geodesic: true,
+      strokeColor: '#E9A23B',
+      strokeOpacity: 0.9,
+      strokeWeight: 4,
+      map: mapInstanceRef.current
+    });
+  };
 
   // Sync prop changes
   useEffect(() => {
@@ -69,7 +135,7 @@ export default function LiveTrackingRadar({
             setResolvedCustomerLoc(data.customerLocation);
           }
           if (data.supervisor) {
-            setResolvedSupervisor(prev => ({ ...prev, ...data.supervisor }));
+            setResolvedSupervisor((prev) => ({ ...prev, ...data.supervisor }));
           }
           if (data.supervisorLocation) {
             setLiveLocation(data.supervisorLocation);
@@ -82,6 +148,9 @@ export default function LiveTrackingRadar({
                 lng: data.supervisorLocation.lng
               };
               supervisorMarkerRef.current.setPosition(newPos);
+              if (resolvedCustomerLoc || customerLocation) {
+                updateRouteLine(newPos, resolvedCustomerLoc || customerLocation);
+              }
             }
           }
         }
@@ -139,7 +208,9 @@ export default function LiveTrackingRadar({
         console.warn('[LiveTrackingRadar] Maps SDK unavailable:', err.message);
       });
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Initialize Map canvas once SDK & container are ready
@@ -150,13 +221,15 @@ export default function LiveTrackingRadar({
       const google = window.google;
       const cust = resolvedCustomerLoc || customerLocation;
 
-      const custPos = cust && typeof cust.lat === 'number'
-        ? cust
-        : { lat: 28.8389, lng: 78.7768 };
+      const custPos =
+        cust && typeof cust.lat === 'number'
+          ? cust
+          : { lat: 28.8389, lng: 78.7768 };
 
-      const supPos = liveLocation && typeof liveLocation.lat === 'number'
-        ? liveLocation
-        : custPos;
+      const supPos =
+        liveLocation && typeof liveLocation.lat === 'number'
+          ? liveLocation
+          : custPos;
 
       const map = new google.maps.Map(mapContainerRef.current, {
         center: supPos,
@@ -202,17 +275,22 @@ export default function LiveTrackingRadar({
         }
       });
 
-      // Adjust bounds to fit both markers
-      if (cust && liveLocation && isSharing) {
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(custPos);
-        bounds.extend(supPos);
-        map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-      }
-
       mapInstanceRef.current = map;
       customerMarkerRef.current = custMarker;
       supervisorMarkerRef.current = supMarker;
+
+      // Draw Route Line between Supervisor and Customer Doorstep
+      if (cust && liveLocation) {
+        updateRouteLine(supPos, custPos);
+      }
+
+      // Adjust bounds to fit both markers
+      if (cust && liveLocation) {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(custPos);
+        bounds.extend(supPos);
+        map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+      }
     } catch (err) {
       console.warn('[LiveTrackingRadar] Map canvas error:', err);
     }

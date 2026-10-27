@@ -189,20 +189,17 @@ export default function SupervisorDashboard() {
     return getEtaInfo(dist);
   };
 
-  const startBroadcastingGps = (booking) => {
-    if (!booking?._id) return;
-    if (booking.status === 'completed' || booking.status === 'cancelled') {
-      toast.error('Cannot share live location for a completed or cancelled service visit.');
-      return;
-    }
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser.');
+  // Auto-broadcast supervisor GPS telemetry indefinitely without prompting
+  const startBroadcastingGps = (booking = null) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    if (booking && (booking.status === 'completed' || booking.status === 'cancelled')) {
       return;
     }
 
-    setSharingClosedPrompt(null);
-    setSharingBookingId(booking._id);
-    toast.success('Live location sharing started. The customer and office can now see your arrival route.');
+    if (booking?._id) {
+      setSharingBookingId(booking._id);
+    }
 
     const onPosSuccess = (pos) => {
       const lat = Number(pos.coords.latitude.toFixed(6));
@@ -212,7 +209,13 @@ export default function SupervisorDashboard() {
       const accuracy = pos.coords.accuracy || 10;
       const now = Date.now();
 
-      setLastGpsCoords({ lat, lng, heading, speed, accuracy, updatedAt: new Date() });
+      const coords = { lat, lng, heading, speed, accuracy, updatedAt: new Date() };
+      setLastGpsCoords(coords);
+      setDeviceGpsCoords({ lat, lng });
+
+      try {
+        localStorage.setItem('max_supervisor_last_coords', JSON.stringify({ lat, lng, time: now }));
+      } catch {}
 
       const last = lastSentGpsRef.current;
       const timeDiff = last ? now - last.time : 999999;
@@ -226,79 +229,105 @@ export default function SupervisorDashboard() {
       // Throttle: Send if first fix OR >12 seconds elapsed OR moved >15 meters (0 Google API cost)
       if (!last || timeDiff >= 12000 || movedDistanceM >= 15) {
         lastSentGpsRef.current = { lat, lng, time: now };
-        supervisorAPI.updateLiveLocation(booking._id, {
+
+        // 1. Send server-side broadcast command to persist location across all active bookings & supervisor profile
+        supervisorAPI.broadcastLiveLocation({
           lat,
           lng,
           heading,
           speed,
-          accuracy,
-          isSharing: true
+          accuracy
         }).catch((err) => {
-          console.warn('[Supervisor GPS update notice]:', err.message);
+          console.warn('[Supervisor GPS broadcast notice]:', err.message);
         });
+
+        // 2. If specific booking selected, update booking endpoint as well
+        const targetBookingId = booking?._id || sharingBookingId;
+        if (targetBookingId) {
+          supervisorAPI.updateLiveLocation(targetBookingId, {
+            lat,
+            lng,
+            heading,
+            speed,
+            accuracy,
+            isSharing: true
+          }).catch(() => {});
+        }
       }
     };
 
     const onPosError = (err) => {
-      console.warn('[Supervisor GPS error]:', err.message);
-      if (err.code === 1) {
-        toast.error('Location permission was denied. Please allow location access in your browser settings.');
-        stopBroadcastingGps(booking._id, false);
-      }
+      console.warn('[Supervisor GPS auto-broadcast notice]:', err.message);
     };
 
-    // Immediate first fix
+    // Immediate fix
     navigator.geolocation.getCurrentPosition(onPosSuccess, onPosError, {
       enableHighAccuracy: true,
       timeout: 10000,
       maximumAge: 0
     });
 
-    // Start watch
-    if (locationWatchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+    // Start continuous watch if not already running
+    if (locationWatchIdRef.current === null) {
+      locationWatchIdRef.current = navigator.geolocation.watchPosition(onPosSuccess, onPosError, {
+        enableHighAccuracy: true,
+        maximumAge: 4000,
+        timeout: 20000
+      });
     }
-    locationWatchIdRef.current = navigator.geolocation.watchPosition(onPosSuccess, onPosError, {
-      enableHighAccuracy: true,
-      maximumAge: 4000,
-      timeout: 20000
-    });
   };
+
+  // Auto-start GPS broadcasting on load without asking supervisor
+  useEffect(() => {
+    if (!isSupervisor || typeof navigator === 'undefined' || !navigator.geolocation) return;
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted' || result.state === 'prompt') {
+          startBroadcastingGps();
+        }
+        result.onchange = () => {
+          if (result.state === 'granted') {
+            startBroadcastingGps();
+          }
+        };
+      }).catch(() => {
+        startBroadcastingGps();
+      });
+    } else {
+      startBroadcastingGps();
+    }
+  }, [isSupervisor]);
+
+  // When active bookings load, ensure tracking is bound to active booking
+  useEffect(() => {
+    if (!bookings || bookings.length === 0) return;
+    const activeBooking = bookings.find(b => isAssignedToMe(b) && !['completed', 'cancelled'].includes(b.status));
+    if (activeBooking) {
+      startBroadcastingGps(activeBooking);
+    }
+  }, [bookings]);
 
   const stopBroadcastingGps = (bookingId, notify = true, reason = 'manually') => {
-    if (locationWatchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(locationWatchIdRef.current);
-      locationWatchIdRef.current = null;
+    // Only if completed do we formally close watch
+    if (reason === 'completed') {
+      if (locationWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current);
+        locationWatchIdRef.current = null;
+      }
+      setSharingBookingId(null);
     }
-    const targetId = bookingId || sharingBookingId;
-    setSharingBookingId(null);
-    setLastGpsCoords(null);
-    lastSentGpsRef.current = null;
-
-    if (targetId) {
-      supervisorAPI.updateLiveLocation(targetId, { isSharing: false }).catch(() => {});
-    }
-
-    const matchedBooking = bookings?.find(b => b._id === targetId);
-    setSharingClosedPrompt({
-      bookingCode: matchedBooking?.bookingCode || 'Visit',
-      reason: reason === 'completed'
-        ? 'Service visit completed. Location sharing has been closed automatically.'
-        : 'Live location sharing has been stopped.',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
-
-    if (notify) {
-      toast.info('Location sharing closed. Your real-time location is now private.');
-    }
+    // Location sharing logic persists indefinitely on server for all active visits!
   };
 
-  // Cleanup GPS watch on unmount
+  // Cleanup on unmount: DO NOT send isSharing: false so location sharing logic persists even after closing supervisor panel
   useEffect(() => {
     return () => {
       if (locationWatchIdRef.current !== null) {
         navigator.geolocation.clearWatch(locationWatchIdRef.current);
+        locationWatchIdRef.current = null;
       }
+      // Never send isSharing: false on unmount so location sharing logic persists even after closing supervisor panel
     };
   }, []);
 
@@ -2244,24 +2273,18 @@ export default function SupervisorDashboard() {
                       <span className={`w-2.5 h-2.5 rounded-full ${
                         selectedBooking.status === 'completed'
                           ? 'bg-emerald-400'
-                          : sharingBookingId === selectedBooking._id
-                          ? 'bg-emerald-400 animate-ping'
-                          : 'bg-stone-500'
+                          : 'bg-emerald-400 animate-ping'
                       }`} />
                       <h4 className="font-bold text-sm text-[#F4EFE6]">
                         {selectedBooking.status === 'completed'
                           ? 'Service Visit Completed · Location Sharing Ended'
-                          : sharingBookingId === selectedBooking._id
-                          ? 'Sharing Live Location with Customer'
-                          : 'Location Sharing Off'}
+                          : 'Live GPS Auto-Broadcasting Active'}
                       </h4>
                     </div>
                     <p className="text-xs text-[#A3B8B0]">
                       {selectedBooking.status === 'completed'
-                        ? 'Job marked as completed. Real-time location sharing is automatically closed for this visit.'
-                        : sharingBookingId === selectedBooking._id
-                        ? `Live coordinates transmitting (${lastGpsCoords ? `${lastGpsCoords.lat.toFixed(5)}, ${lastGpsCoords.lng.toFixed(5)}` : 'acquiring'})`
-                        : 'When departing for the visit, start sharing so the customer can track your arrival in real time.'}
+                        ? 'Job marked as completed. Real-time location sharing is closed for this visit.'
+                        : `Live coordinates automatically transmitting & persisting (${lastGpsCoords ? `${lastGpsCoords.lat.toFixed(5)}, ${lastGpsCoords.lng.toFixed(5)}` : 'acquiring fix'}). Customer & office can track your arrival in real time.`}
                     </p>
                   </div>
 
@@ -2272,25 +2295,10 @@ export default function SupervisorDashboard() {
                         <span>Completed • Sharing Ended</span>
                       </span>
                     ) : isAssignedToMe(selectedBooking) ? (
-                      sharingBookingId === selectedBooking._id ? (
-                        <button
-                          type="button"
-                          onClick={() => stopBroadcastingGps(selectedBooking._id, true, 'manually')}
-                          className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-colors"
-                        >
-                          <LuRadio className="w-4 h-4" />
-                          <span>Stop Sharing Location</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startBroadcastingGps(selectedBooking)}
-                          className="px-4 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-black text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
-                        >
-                          <LuRadio className="w-4 h-4" />
-                          <span>Share My Live Location</span>
-                        </button>
-                      )
+                      <span className="px-3.5 py-2 rounded-xl bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-2 shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Sharing Active Indefinitely</span>
+                      </span>
                     ) : (
                       <span className="text-xs font-bold text-[#A3B8B0] bg-white/10 px-3 py-1.5 rounded-xl">
                         Lead: {selectedBooking.assignedSupervisor?.name || 'Other Supervisor'}

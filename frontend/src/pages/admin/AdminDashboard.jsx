@@ -346,6 +346,7 @@ export default function AdminDashboard() {
   const [chatBooking, setChatBooking] = useState(null);
   const [adminReplyText, setAdminReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const [trackingBookingAdmin, setTrackingBookingAdmin] = useState(null);
 
   const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
@@ -3798,6 +3799,17 @@ export default function AdminDashboard() {
                               <LuEye className="w-3.5 h-3.5" />
                               <span>View Details</span>
                             </button>
+                            {(b.assignedSupervisor?.name || b.supervisor?.name || b.assignedSupervisor || b.supervisor) && (
+                              <button
+                                type="button"
+                                onClick={() => setTrackingBookingAdmin(b)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                title="Track Supervisor Real-Time Location & Route"
+                              >
+                                <LuNavigation className="w-3.5 h-3.5 text-[#25D366] animate-pulse" />
+                                <span>Track Location</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setChatBooking(b)}
@@ -7774,6 +7786,49 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </Modal>
+        )}
+
+        {/* Admin Live Tracking Radar Modal */}
+        {trackingBookingAdmin && (
+          <Modal
+            isOpen={Boolean(trackingBookingAdmin)}
+            onClose={() => setTrackingBookingAdmin(null)}
+            title={`Live Tracking · Booking #${trackingBookingAdmin.bookingCode}`}
+            subtitle="Supervisor live GPS telemetry and transit route towards destination doorstep"
+            maxWidth="max-w-2xl"
+          >
+            <div className="space-y-4">
+              <LiveTrackingRadar
+                bookingCode={trackingBookingAdmin.bookingCode}
+                initialSupervisorLocation={trackingBookingAdmin.supervisorLiveLocation}
+                customerLocation={trackingBookingAdmin.address?.coordinates}
+                destinationAddress={`${trackingBookingAdmin.address?.houseOrFlat ? trackingBookingAdmin.address.houseOrFlat + ', ' : ''}${trackingBookingAdmin.address?.line1 || ''}, ${trackingBookingAdmin.cityName || ''}`}
+                supervisorInfo={{
+                  name: trackingBookingAdmin.assignedSupervisor?.name || trackingBookingAdmin.supervisor?.name || 'Field Supervisor',
+                  phone: trackingBookingAdmin.assignedSupervisor?.phone || trackingBookingAdmin.supervisor?.phone || '',
+                  role: 'Assigned Field Lead'
+                }}
+              />
+              <div className="flex items-center justify-between pt-2">
+                <a
+                  href={`/track/${trackingBookingAdmin.bookingCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
+                >
+                  <span>Open Standalone Tracker</span>
+                  <LuExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setTrackingBookingAdmin(null)}
+                  className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                >
+                  Close Radar
+                </button>
+              </div>
+            </div>
           </Modal>
         )}
 

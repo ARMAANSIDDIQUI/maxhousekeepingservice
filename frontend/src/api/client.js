@@ -1037,8 +1037,8 @@ export const supervisorAPI = {
   },
   deletePhoto: (id, photoId) => apiRequest(`/supervisor/bookings/${id}/photos/${photoId}`, { method: 'DELETE' }),
   updateStatus: (id, status, note) => apiRequest(`/supervisor/bookings/${id}/status`, { method: 'PUT', body: { status, note } }),
-  sendMessage: (id, text) => apiRequest(`/supervisor/bookings/${id}/message`, { method: 'POST', body: { text } }),
-  updateLiveLocation: (id, locationData) => apiRequest(`/supervisor/bookings/${id}/location`, { method: 'POST', body: locationData })
+  updateLiveLocation: (id, locationData) => apiRequest(`/supervisor/bookings/${id}/location`, { method: 'POST', body: locationData }),
+  broadcastLiveLocation: (locationData) => apiRequest('/supervisor/location/broadcast', { method: 'POST', body: locationData })
 };
 
 // Export api Axios instance as default for direct use if desired

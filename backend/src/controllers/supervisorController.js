@@ -956,10 +956,10 @@ export async function updateSupervisorLiveLocation(req, res, next) {
       });
     }
 
-    if (!['assigned', 'confirmed', 'in_progress'].includes(booking.status)) {
+    if (['completed', 'cancelled'].includes(booking.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Live location can only be broadcast for active (assigned, confirmed, or in-progress) bookings.'
+        message: 'Live location cannot be broadcast for completed or cancelled bookings.'
       });
     }
 
@@ -977,15 +977,100 @@ export async function updateSupervisorLiveLocation(req, res, next) {
       speed: Number(speed) || 0,
       accuracy: Number(accuracy) || 0,
       updatedAt: new Date(),
-      isSharing: Boolean(isSharing)
+      isSharing: true
     };
 
     await booking.save();
 
+    // Persist to Supervisor User model
+    if (isSharing && typeof lat === 'number' && typeof lng === 'number') {
+      const locData = {
+        lat,
+        lng,
+        heading: Number(heading) || 0,
+        speed: Number(speed) || 0,
+        accuracy: Number(accuracy) || 0,
+        updatedAt: new Date(),
+        isSharing: true
+      };
+
+      await User.findByIdAndUpdate(req.user._id, {
+        lastKnownLocation: locData
+      }).catch(() => {});
+
+      // Persist across all active bookings for this supervisor
+      await Booking.updateMany(
+        {
+          $or: [{ supervisor: req.user._id }, { 'assignedSupervisor.id': req.user._id }],
+          status: { $nin: ['completed', 'cancelled'] },
+          _id: { $ne: booking._id }
+        },
+        {
+          $set: {
+            supervisorLiveLocation: locData
+          }
+        }
+      ).catch(() => {});
+    }
+
     res.status(200).json({
       success: true,
-      message: isSharing ? 'Live location updated successfully.' : 'Live location sharing paused.',
+      message: 'Live location updated and persisted successfully.',
       liveLocation: booking.supervisorLiveLocation
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Broadcast Supervisor Live Location across all active bookings indefinitely
+ * POST /api/v1/supervisor/location/broadcast
+ */
+export async function broadcastSupervisorLiveLocation(req, res, next) {
+  try {
+    const { lat, lng, heading = 0, speed = 0, accuracy = 0 } = req.body;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid latitude (-90 to 90) and longitude (-180 to 180) are required.'
+      });
+    }
+
+    const locData = {
+      lat,
+      lng,
+      heading: Number(heading) || 0,
+      speed: Number(speed) || 0,
+      accuracy: Number(accuracy) || 0,
+      updatedAt: new Date(),
+      isSharing: true
+    };
+
+    // 1. Update supervisor user lastKnownLocation
+    await User.findByIdAndUpdate(req.user._id, {
+      lastKnownLocation: locData
+    }).catch(() => {});
+
+    // 2. Persist to all active bookings assigned to this supervisor
+    const result = await Booking.updateMany(
+      {
+        $or: [{ supervisor: req.user._id }, { 'assignedSupervisor.id': req.user._id }],
+        status: { $nin: ['completed', 'cancelled'] }
+      },
+      {
+        $set: {
+          supervisorLiveLocation: locData
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Supervisor location broadcasted and persisted indefinitely across all active visits.',
+      updatedBookingsCount: result.modifiedCount || 0,
+      liveLocation: locData
     });
   } catch (err) {
     next(err);
@@ -1001,6 +1086,7 @@ export default {
   deleteBookingPhoto,
   updateSupervisorBookingStatus,
   updateSupervisorLiveLocation,
+  broadcastSupervisorLiveLocation,
   addSupervisorBookingMessage,
   getSupervisorSchedule,
   getSupervisorsList,
