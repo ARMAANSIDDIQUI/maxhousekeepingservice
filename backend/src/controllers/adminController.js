@@ -324,6 +324,17 @@ function processVariantsPayload(payload) {
     payload.cityExtraCharge = 100;
   }
 
+  // Preserve and sync both YouTube and Uploaded Video fields
+  if (payload.youtubeUrl !== undefined) {
+    payload.youtubeUrl = typeof payload.youtubeUrl === 'string' ? payload.youtubeUrl.trim() : '';
+  }
+  if (payload.uploadedVideoUrl !== undefined) {
+    payload.uploadedVideoUrl = typeof payload.uploadedVideoUrl === 'string' ? payload.uploadedVideoUrl.trim() : '';
+  }
+  if (!payload.videoUrl) {
+    payload.videoUrl = payload.uploadedVideoUrl || payload.youtubeUrl || '';
+  }
+
   if (payload.pricingType === 'unit') {
     payload.pricingMode = 'combination';
     const rateMbd = Number(payload.unitRateMoradabad) || Number(payload.price) || 0;

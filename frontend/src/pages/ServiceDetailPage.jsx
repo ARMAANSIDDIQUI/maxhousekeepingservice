@@ -12,7 +12,7 @@ import {
   LuVideo,
   LuPlay
 } from 'react-icons/lu';
-import { FaInstagram } from 'react-icons/fa6';
+import { FaInstagram, FaYoutube } from 'react-icons/fa6';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
@@ -20,18 +20,33 @@ import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
 import SEO from '../components/common/SEO';
 
+function isYouTubeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const str = url.toLowerCase();
+  return str.includes('youtube.com') || str.includes('youtu.be');
+}
+
 function getYouTubeEmbedUrl(url) {
-  if (!url) return '';
-  if (url.includes('youtube.com/watch?v=' || url.includes('m.youtube.com/watch?v='))) {
-    const videoId = url.split('v=')[1]?.split('&')[0];
-    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (trimmed.includes('youtu.be/')) {
+    const id = trimmed.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
   }
-  if (url.includes('youtu.be/')) {
-    const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  if (trimmed.includes('watch?v=')) {
+    const id = trimmed.split('watch?v=')[1]?.split('&')[0]?.split('?')[0];
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
   }
-  if (url.includes('youtube.com/embed/')) {
-    return url;
+  if (trimmed.includes('youtube.com/shorts/')) {
+    const id = trimmed.split('youtube.com/shorts/')[1]?.split('?')[0]?.split('&')[0];
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+  }
+  if (trimmed.includes('youtube.com/live/')) {
+    const id = trimmed.split('youtube.com/live/')[1]?.split('?')[0]?.split('&')[0];
+    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+  }
+  if (trimmed.includes('youtube.com/embed/')) {
+    return trimmed;
   }
   return '';
 }
@@ -202,6 +217,10 @@ export default function ServiceDetailPage() {
     addItem(service, selections, 1);
     navigate('/book');
   };
+
+  const youtubeUrlResolved = service.youtubeUrl || (isYouTubeUrl(service.videoUrl) ? service.videoUrl : '');
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(youtubeUrlResolved);
+  const uploadedVideoUrlResolved = service.uploadedVideoUrl || (!isYouTubeUrl(service.videoUrl) ? service.videoUrl : '');
 
   return (
     <div className="bg-[#F4EFE6] min-h-screen py-10">
@@ -396,43 +415,61 @@ export default function ServiceDetailPage() {
           </div>
         </div>
 
-        {/* Service Walkthrough Video (Urban Company Style) */}
-        {service.videoUrl && (
+        {/* Uploaded Field Video Walkthrough */}
+        {uploadedVideoUrlResolved && (
           <div className="p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B]/40 shadow-xl mb-14">
             <div className="text-center max-w-xl mx-auto mb-6">
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E9A23B] flex items-center justify-center gap-1.5">
                 <LuVideo className="w-4 h-4" />
-                <span>SERVICE IN ACTION • VIDEO WALKTHROUGH</span>
+                <span>SERVICE IN ACTION • FIELD HD WALKTHROUGH</span>
               </span>
               <h3 className="font-display font-black text-2xl sm:text-3xl text-[#F4EFE6] mt-1.5">
-                Watch Our Expert Process
+                Watch Our Expert Cleaning Process
               </h3>
               <p className="text-xs text-[#A3B8B0] mt-1">
-                See how our verified crew details, cleans, and sanitises step-by-step with professional-grade equipment.
+                See how our verified crew details, cleans, and sanitises step-by-step with professional-grade industrial equipment.
               </p>
             </div>
 
             <div className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden border-2 border-[#2C4A3E] shadow-2xl bg-black">
-              {getYouTubeEmbedUrl(service.videoUrl) ? (
-                <iframe
-                  src={getYouTubeEmbedUrl(service.videoUrl)}
-                  title={`${service.title} Video Demonstration`}
-                  className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <video
-                  controls
-                  playsInline
-                  preload="metadata"
-                  poster={service.media?.hero?.url || service.imageUrl}
-                  className="w-full h-full object-cover"
-                >
-                  <source src={service.videoUrl} />
-                  Your browser does not support HTML5 video streaming.
-                </video>
-              )}
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                poster={service.media?.hero?.url || service.imageUrl}
+                className="w-full h-full object-cover"
+              >
+                <source src={uploadedVideoUrlResolved} />
+                Your browser does not support HTML5 video streaming.
+              </video>
+            </div>
+          </div>
+        )}
+
+        {/* YouTube Showcase Stream */}
+        {youtubeEmbedUrl && (
+          <div className="p-6 sm:p-8 rounded-3xl bg-[#0F1E19] text-[#F4EFE6] border-2 border-red-500/40 shadow-xl mb-14">
+            <div className="text-center max-w-xl mx-auto mb-6">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-red-400 flex items-center justify-center gap-1.5">
+                <FaYoutube className="w-4 h-4 text-red-500 animate-pulse" />
+                <span>OFFICIAL STREAM • YOUTUBE SHOWCASE STREAM</span>
+              </span>
+              <h3 className="font-display font-black text-2xl sm:text-3xl text-[#F4EFE6] mt-1.5">
+                YouTube Showcase Stream
+              </h3>
+              <p className="text-xs text-[#A3B8B0] mt-1">
+                Watch our official YouTube demonstration stream and detailed video breakdown for {service.title}.
+              </p>
+            </div>
+
+            <div className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden border-2 border-red-900/50 shadow-2xl bg-black">
+              <iframe
+                src={youtubeEmbedUrl}
+                title={`${service.title} YouTube Showcase Stream`}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
             </div>
           </div>
         )}

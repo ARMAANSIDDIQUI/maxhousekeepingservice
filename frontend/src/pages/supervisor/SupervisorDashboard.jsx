@@ -111,9 +111,19 @@ export default function SupervisorDashboard() {
     toast.success(`Duty status: ${status === 'active' ? 'Active on Duty' : status === 'onsite' ? 'On Site Inspection' : status === 'break' ? 'On Break' : 'Off Duty'}`);
   };
 
-  // Admin Fleet Switcher
+  // Admin Fleet Switcher - default to current user's assigned bookings
   const [supervisorsList, setSupervisorsList] = useState([]);
-  const [selectedSupervisorFilter, setSelectedSupervisorFilter] = useState('all');
+  const [selectedSupervisorFilter, setSelectedSupervisorFilter] = useState('me');
+
+  // Helper to verify if a booking is assigned to the currently logged in user
+  const isAssignedToMe = (b) => {
+    if (!b || !user) return false;
+    const currentUserId = String(user._id || user.id || '').trim();
+    if (!currentUserId) return false;
+    const supId = b.supervisor ? String(b.supervisor._id || b.supervisor).trim() : '';
+    const assignedId = b.assignedSupervisor?.id ? String(b.assignedSupervisor.id._id || b.assignedSupervisor.id).trim() : '';
+    return supId === currentUserId || assignedId === currentUserId;
+  };
 
   useEffect(() => {
     if (isAdmin) {
@@ -243,6 +253,10 @@ export default function SupervisorDashboard() {
       toast.error('Please enter the 4-digit verification code.');
       return;
     }
+    if (!isAssignedToMe(quickOtpBooking)) {
+      toast.error('Access restricted: Only the assigned supervisor can verify this customer visit OTP.');
+      return;
+    }
     setVerifyingQuickOtp(true);
     try {
       const res = await supervisorAPI.verifyOtp(quickOtpBooking._id, quickOtpInput.trim());
@@ -340,6 +354,10 @@ export default function SupervisorDashboard() {
   // 1. Verify OTP with Enterprise Urban Company Standards
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    if (!isAssignedToMe(selectedBooking)) {
+      toast.error('Access restricted: Only the assigned supervisor can verify this customer visit OTP.');
+      return;
+    }
     if (!otpInput.trim()) {
       toast.error('Please enter the 4-digit verification code.');
       return;
@@ -364,6 +382,11 @@ export default function SupervisorDashboard() {
 
   // 2. Upload Photo (Before or After) with strict validation
   const handlePhotoUpload = async (e, type) => {
+    if (!isAssignedToMe(selectedBooking)) {
+      toast.error('Access restricted: Only the assigned supervisor can upload inspection photos.');
+      if (e?.target) e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -405,6 +428,10 @@ export default function SupervisorDashboard() {
 
   // 3. Delete Photo
   const handleDeletePhoto = (photoId) => {
+    if (!isAssignedToMe(selectedBooking)) {
+      toast.error('Access restricted: Only the assigned supervisor can delete inspection photos.');
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Inspection Photo',
@@ -450,6 +477,10 @@ export default function SupervisorDashboard() {
   };
 
   const handleUpdateStatus = (newStatus) => {
+    if (!isAssignedToMe(selectedBooking)) {
+      toast.error('Access restricted: Only the assigned supervisor can update this booking status.');
+      return;
+    }
     if (newStatus === 'completed' && !selectedBooking.otpVerified) {
       setConfirmModal({
         isOpen: true,
@@ -471,6 +502,10 @@ export default function SupervisorDashboard() {
   const [completingId, setCompletingId] = useState(null);
 
   const executeMarkCompleted = async (b) => {
+    if (!isAssignedToMe(b)) {
+      toast.error('Access restricted: Only the assigned supervisor can complete this service visit.');
+      return;
+    }
     setCompletingId(b._id);
     try {
       const res = await supervisorAPI.updateStatus(b._id, 'completed', `Service marked as completed by supervisor ${user?.name || ''}`);
@@ -600,6 +635,7 @@ export default function SupervisorDashboard() {
                   onChange={(e) => setSelectedSupervisorFilter(e.target.value)}
                   className="bg-transparent text-xs font-bold text-[#F4EFE6] focus:outline-none cursor-pointer"
                 >
+                  <option value="me" className="bg-[#10231D] text-[#F4EFE6]">My Assigned Visits ({user?.name || 'Me'})</option>
                   <option value="all" className="bg-[#10231D] text-[#F4EFE6]">All Fleet Dispatches</option>
                   {supervisorsList.map(s => (
                     <option key={s._id} value={s._id} className="bg-[#10231D] text-[#F4EFE6]">
@@ -652,7 +688,7 @@ export default function SupervisorDashboard() {
           const liveSlot = getCurrentSlotWindow(currentTime);
           const isToday = scheduleDate === formatToday();
           const liveSlotData = scheduleData?.schedule?.find(s => s.timeWindow === liveSlot);
-          const activeBooking = liveSlotData?.bookings?.[0];
+          const activeBooking = liveSlotData?.bookings?.find(b => isAssignedToMe(b));
 
           return (
             <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#10231D] via-[#162D25] to-[#1C3A30] text-[#F4EFE6] border border-[#2C4A3E] shadow-lg">
@@ -1245,7 +1281,11 @@ export default function SupervisorDashboard() {
                                   <LuNavigation className="w-3.5 h-3.5 text-blue-600" />
                                 </a>
 
-                                {!b.otpVerified ? (
+                                {!isAssignedToMe(b) ? (
+                                  <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 text-[10px] font-bold border border-stone-200">
+                                    Lead: {b.assignedSupervisor?.name || b.supervisor?.name || 'Other Supervisor'}
+                                  </span>
+                                ) : !b.otpVerified ? (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1276,14 +1316,17 @@ export default function SupervisorDashboard() {
                                   </span>
                                 )}
 
-
                                 <button
                                   type="button"
                                   onClick={() => handleOpenBooking(b)}
-                                  className="px-3 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs ${
+                                    isAssignedToMe(b)
+                                      ? 'bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6]'
+                                      : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300'
+                                  }`}
                                 >
-                                  <span>Manage</span>
-                                  <LuChevronRight className="w-3.5 h-3.5 text-[#E9A23B]" />
+                                  <span>{isAssignedToMe(b) ? 'Manage' : 'View'}</span>
+                                  {isAssignedToMe(b) ? <LuChevronRight className="w-3.5 h-3.5 text-[#E9A23B]" /> : <LuEye className="w-3.5 h-3.5 text-stone-600" />}
                                 </button>
                               </div>
                             </div>
@@ -1504,7 +1547,12 @@ export default function SupervisorDashboard() {
 
                   {/* Action Toolbar on Card */}
                   <div className="mt-4 pt-3 border-t border-[#E2D9C8] flex flex-wrap items-center gap-2">
-                    {b.status !== 'completed' ? (
+                    {!isAssignedToMe(b) ? (
+                      <div className="py-2 px-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-700 text-xs font-bold flex items-center gap-1.5 shrink-0">
+                        <LuShieldCheck className="w-3.5 h-3.5 text-stone-500" />
+                        <span>Lead: {b.assignedSupervisor?.name || b.supervisor?.name || 'Other Supervisor'}</span>
+                      </div>
+                    ) : b.status !== 'completed' ? (
                       !b.otpVerified ? (
                         <button
                           type="button"
@@ -1538,10 +1586,14 @@ export default function SupervisorDashboard() {
                     <button
                       type="button"
                       onClick={() => handleOpenBooking(b)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
+                        isAssignedToMe(b)
+                          ? 'bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6]'
+                          : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300'
+                      }`}
                     >
-                      <span>Manage Visit</span>
-                      <LuChevronRight className="w-4 h-4 text-[#E9A23B]" />
+                      <span>{isAssignedToMe(b) ? 'Manage Visit' : 'View Details'}</span>
+                      {isAssignedToMe(b) ? <LuChevronRight className="w-4 h-4 text-[#E9A23B]" /> : <LuEye className="w-4 h-4 text-stone-600" />}
                     </button>
                   </div>
                 </div>
@@ -1640,6 +1692,25 @@ export default function SupervisorDashboard() {
                       </p>
                     )}
                   </div>
+                ) : !isAssignedToMe(selectedBooking) ? (
+                  <div className="p-6 rounded-2xl bg-amber-50 border-2 border-amber-300 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-amber-500 text-[#10231D] flex items-center justify-center mx-auto shadow-sm">
+                      <LuShieldCheck className="w-6 h-6 stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-lg text-amber-950">
+                        Assigned Lead Only: Verification Locked
+                      </h4>
+                      <p className="text-xs text-amber-900 max-w-md mx-auto mt-1">
+                        You are not assigned to this job. Only the assigned supervisor (<strong>{selectedBooking.assignedSupervisor?.name || selectedBooking.supervisor?.name || 'Assigned Lead'}</strong>) can verify the customer's on-site OTP and advance service status.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-950 text-[11px] font-mono font-bold uppercase tracking-wider">
+                        View Only Access
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="p-6 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-4">
                     <div className="text-center max-w-md mx-auto">
@@ -1684,32 +1755,34 @@ export default function SupervisorDashboard() {
                 )}
 
                 {/* Quick Status Advancement */}
-                <div className="p-4 rounded-xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-center justify-between gap-3">
-                  <div>
-                    <h5 className="font-bold text-xs text-[#10231D]">Update Service Visit Status</h5>
-                    <p className="text-[11px] text-[#6B8077]">
-                      Current: <span className="font-bold uppercase text-[#E9A23B]">{selectedBooking.status}</span>
-                    </p>
+                {isAssignedToMe(selectedBooking) && (
+                  <div className="p-4 rounded-xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                      <h5 className="font-bold text-xs text-[#10231D]">Update Service Visit Status</h5>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Current: <span className="font-bold uppercase text-[#E9A23B]">{selectedBooking.status}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus('in_progress')}
+                        disabled={updatingStatus || selectedBooking.status === 'in_progress'}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
+                      >
+                        Mark In-Progress
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus('completed')}
+                        disabled={updatingStatus || selectedBooking.status === 'completed'}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
+                      >
+                        Mark Completed
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus('in_progress')}
-                      disabled={updatingStatus || selectedBooking.status === 'in_progress'}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
-                    >
-                      Mark In-Progress
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus('completed')}
-                      disabled={updatingStatus || selectedBooking.status === 'completed'}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-40 transition-colors"
-                    >
-                      Mark Completed
-                    </button>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -1724,17 +1797,23 @@ export default function SupervisorDashboard() {
                     </p>
                   </div>
 
-                  <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10231D] text-[#E9A23B] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer shadow-xs shrink-0">
-                    <LuUpload className="w-3.5 h-3.5" />
-                    <span>{uploadingPhoto ? 'Uploading...' : 'Add Before Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={(e) => handlePhotoUpload(e, 'before')}
-                      disabled={uploadingPhoto}
-                      className="hidden"
-                    />
-                  </label>
+                  {isAssignedToMe(selectedBooking) ? (
+                    <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10231D] text-[#E9A23B] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer shadow-xs shrink-0">
+                      <LuUpload className="w-3.5 h-3.5" />
+                      <span>{uploadingPhoto ? 'Uploading...' : 'Add Before Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => handlePhotoUpload(e, 'before')}
+                        disabled={uploadingPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  ) : (
+                    <span className="px-3 py-1.5 rounded-xl bg-stone-100 text-stone-600 text-[11px] font-bold border border-stone-200">
+                      View Only (Assigned Lead Only)
+                    </span>
+                  )}
                 </div>
 
                 {/* Photo Gallery Grid */}
@@ -1751,19 +1830,21 @@ export default function SupervisorDashboard() {
                           alt={`Before service photo ${idx + 1}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePhoto(p._id);
-                            }}
-                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                            title="Delete photo"
-                          >
-                            <LuTrash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isAssignedToMe(selectedBooking) && (
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePhoto(p._id);
+                              }}
+                              className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                              title="Delete photo"
+                            >
+                              <LuTrash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                         <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-mono text-white">
                           {new Date(p.uploadedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -1793,17 +1874,23 @@ export default function SupervisorDashboard() {
                     </p>
                   </div>
 
-                  <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 text-white text-xs font-bold hover:bg-emerald-900 transition-colors cursor-pointer shadow-xs shrink-0">
-                    <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
-                    <span>{uploadingPhoto ? 'Uploading...' : 'Add After Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={(e) => handlePhotoUpload(e, 'after')}
-                      disabled={uploadingPhoto}
-                      className="hidden"
-                    />
-                  </label>
+                  {isAssignedToMe(selectedBooking) ? (
+                    <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-800 text-white text-xs font-bold hover:bg-emerald-900 transition-colors cursor-pointer shadow-xs shrink-0">
+                      <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{uploadingPhoto ? 'Uploading...' : 'Add After Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => handlePhotoUpload(e, 'after')}
+                        disabled={uploadingPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  ) : (
+                    <span className="px-3 py-1.5 rounded-xl bg-stone-100 text-stone-600 text-[11px] font-bold border border-stone-200">
+                      View Only (Assigned Lead Only)
+                    </span>
+                  )}
                 </div>
 
                 {/* Photo Gallery Grid */}
@@ -1820,19 +1907,21 @@ export default function SupervisorDashboard() {
                           alt={`After service photo ${idx + 1}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePhoto(p._id);
-                            }}
-                            className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                            title="Delete photo"
-                          >
-                            <LuTrash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isAssignedToMe(selectedBooking) && (
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePhoto(p._id);
+                              }}
+                              className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                              title="Delete photo"
+                            >
+                              <LuTrash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                         <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-mono text-white">
                           {new Date(p.uploadedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </span>

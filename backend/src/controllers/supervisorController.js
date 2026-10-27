@@ -18,6 +18,17 @@ function escapeRegex(str) {
 }
 
 /**
+ * Helper to verify if the given user is strictly the assigned supervisor for a booking
+ */
+export function isAssignedSupervisor(booking, userId) {
+  if (!booking || !userId) return false;
+  const uid = userId.toString();
+  const supId = booking.supervisor ? (booking.supervisor._id || booking.supervisor).toString() : null;
+  const assignedId = booking.assignedSupervisor?.id ? (booking.assignedSupervisor.id._id || booking.assignedSupervisor.id).toString() : null;
+  return supId === uid || assignedId === uid;
+}
+
+/**
  * Get Supervisor Stats
  * GET /api/v1/supervisor/stats
  */
@@ -33,11 +44,24 @@ export async function getSupervisorStats(req, res, next) {
         ]
       });
     } else if (req.user.role === 'admin') {
-      if (req.query.supervisorId && req.query.supervisorId !== 'all') {
+      if (req.query.supervisorId && req.query.supervisorId !== 'all' && req.query.supervisorId !== 'me') {
         andConditions.push({
           $or: [
             { supervisor: req.query.supervisorId },
             { 'assignedSupervisor.id': req.query.supervisorId }
+          ]
+        });
+      } else if (req.query.supervisorId === 'all') {
+        // Fleet overview: only count bookings that have an assigned supervisor
+        andConditions.push({
+          supervisor: { $ne: null, $exists: true }
+        });
+      } else {
+        // By default, show stats for admin's own assigned visits
+        andConditions.push({
+          $or: [
+            { supervisor: req.user._id },
+            { 'assignedSupervisor.id': req.user._id }
           ]
         });
       }
@@ -131,13 +155,27 @@ export async function getSupervisorSchedule(req, res, next) {
           { 'assignedSupervisor.id': req.user._id }
         ]
       });
-    } else if (req.user.role === 'admin' && req.query.supervisorId && req.query.supervisorId !== 'all') {
-      andConditions.push({
-        $or: [
-          { supervisor: req.query.supervisorId },
-          { 'assignedSupervisor.id': req.query.supervisorId }
-        ]
-      });
+    } else if (req.user.role === 'admin') {
+      if (req.query.supervisorId && req.query.supervisorId !== 'all' && req.query.supervisorId !== 'me') {
+        andConditions.push({
+          $or: [
+            { supervisor: req.query.supervisorId },
+            { 'assignedSupervisor.id': req.query.supervisorId }
+          ]
+        });
+      } else if (req.query.supervisorId === 'all') {
+        andConditions.push({
+          supervisor: { $ne: null, $exists: true }
+        });
+      } else {
+        // Default to admin's own assigned jobs
+        andConditions.push({
+          $or: [
+            { supervisor: req.user._id },
+            { 'assignedSupervisor.id': req.user._id }
+          ]
+        });
+      }
     }
 
     const scheduleFilter = { $and: andConditions };
@@ -218,13 +256,28 @@ export async function getSupervisorBookings(req, res, next) {
             { 'assignedSupervisor.id': req.user._id }
           ]
         });
-      } else if (req.user.role === 'admin' && supervisorId && supervisorId !== 'all') {
-        andConditions.push({
-          $or: [
-            { supervisor: supervisorId },
-            { 'assignedSupervisor.id': supervisorId }
-          ]
-        });
+      } else if (req.user.role === 'admin') {
+        if (supervisorId && supervisorId !== 'all' && supervisorId !== 'me') {
+          andConditions.push({
+            $or: [
+              { supervisor: supervisorId },
+              { 'assignedSupervisor.id': supervisorId }
+            ]
+          });
+        } else if (supervisorId === 'all') {
+          // Explicit fleet overview: only show bookings that are actually assigned to a supervisor
+          andConditions.push({
+            supervisor: { $ne: null, $exists: true }
+          });
+        } else {
+          // Default: bookings assigned to current user
+          andConditions.push({
+            $or: [
+              { supervisor: req.user._id },
+              { 'assignedSupervisor.id': req.user._id }
+            ]
+          });
+        }
       }
     }
 
@@ -341,8 +394,11 @@ export async function verifyBookingOtp(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (req.user.role !== 'admin' && (!booking.supervisor || booking.supervisor.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ success: false, message: 'Unauthorized for this booking.' });
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Only the assigned supervisor can verify the customer visit OTP.'
+      });
     }
 
     const enteredOtp = otp.trim();
@@ -415,8 +471,11 @@ export async function uploadBookingPhoto(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (req.user.role !== 'admin' && (!booking.supervisor || booking.supervisor.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ success: false, message: 'Unauthorized for this booking.' });
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Only the assigned supervisor can upload inspection photos.'
+      });
     }
 
     let photoUrl = '';
@@ -502,8 +561,11 @@ export async function deleteBookingPhoto(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (req.user.role !== 'admin' && (!booking.supervisor || booking.supervisor.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ success: false, message: 'Unauthorized.' });
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Only the assigned supervisor can delete inspection photos.'
+      });
     }
 
     let foundPublicId = null;
@@ -560,8 +622,11 @@ export async function updateSupervisorBookingStatus(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (req.user.role !== 'admin' && (!booking.supervisor || booking.supervisor.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ success: false, message: 'Unauthorized for this booking.' });
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Only the assigned supervisor can update this booking status.'
+      });
     }
 
     if (status && !['in_progress', 'completed'].includes(status)) {
@@ -613,8 +678,11 @@ export async function addSupervisorBookingMessage(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
-    if (req.user.role !== 'admin' && (!booking.supervisor || booking.supervisor.toString() !== req.user._id.toString())) {
-      return res.status(403).json({ success: false, message: 'Unauthorized for this booking.' });
+    if (!isAssignedSupervisor(booking, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Only the assigned supervisor can send messages for this booking.'
+      });
     }
 
     const message = {

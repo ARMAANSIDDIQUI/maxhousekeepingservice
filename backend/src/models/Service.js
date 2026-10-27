@@ -68,6 +68,8 @@ const serviceSchema = new mongoose.Schema({
   videoUrl: { type: String, trim: true },
   videoPublicId: { type: String, trim: true },
   videoDuration: { type: Number },
+  youtubeUrl: { type: String, trim: true },
+  uploadedVideoUrl: { type: String, trim: true },
 
   // Dual Pricing Controls (Shown Price vs Offered Price)
   pricingMode: { type: String, enum: ['fixed', 'tiered', 'combination'], default: 'combination' },

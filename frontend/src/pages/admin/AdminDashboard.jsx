@@ -179,6 +179,8 @@ export default function AdminDashboard() {
     moradabadOnly: false,
     cityAvailability: ['moradabad'],
     videoUrl: '',
+    youtubeUrl: '',
+    uploadedVideoUrl: '',
     duration: '1.5 hrs',
     icon: 'Sparkles',
     shortDescription: '',
@@ -219,6 +221,8 @@ export default function AdminDashboard() {
     moradabadOnly: false,
     cityAvailability: ['moradabad'],
     videoUrl: '',
+    youtubeUrl: '',
+    uploadedVideoUrl: '',
     categories: [],
     icon: 'Sparkles',
     duration: '',
@@ -367,10 +371,12 @@ export default function AdminDashboard() {
       minUnitQuantity: 1,
       hasCitySpecificRates: false,
       cityRates: [],
-      cityExtraCharge: 0,
+      cityExtraCharge: 100,
       moradabadOnly: false,
       cityAvailability: ['moradabad'],
       videoUrl: '',
+      youtubeUrl: '',
+      uploadedVideoUrl: '',
       duration: '1.5 hrs',
       icon: 'Sparkles',
       shortDescription: '',
@@ -1662,82 +1668,172 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-[#10231D]">
-                  Demonstration Video (Cloudinary Upload / YouTube URL):
-                </label>
-                <span className="text-[10px] font-mono text-[#6B8077] bg-white px-2 py-0.5 rounded-md border border-[#E2D9C8]">
-                  Max 50MB • MP4 / WebM / MOV
-                </span>
-              </div>
+            {/* Dual Video Showcase: YouTube Stream & Uploaded HD Video */}
+            <div className="space-y-4 pt-2 border-t border-[#E2D9C8]">
+              {/* 1. YouTube Showcase Stream */}
+              <div className="space-y-2 p-3.5 rounded-2xl bg-white border border-[#E2D9C8]">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-red-600 inline-block animate-pulse" />
+                    <span>YouTube Showcase Stream (Watch / Live / Shorts URL):</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md font-bold">
+                    YouTube Stream
+                  </span>
+                </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 items-center">
-                <div className="relative flex-1 w-full">
+                <div className="relative">
                   <input
                     type="url"
-                    placeholder="https://youtu.be/... or Cloudinary video link"
-                    value={form.videoUrl || ''}
-                    onChange={(e) => setter(prev => ({ ...prev, videoUrl: e.target.value }))}
-                    className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-mono"
+                    placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                    value={form.youtubeUrl || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setter(prev => ({
+                        ...prev,
+                        youtubeUrl: val,
+                        videoUrl: prev.uploadedVideoUrl || val
+                      }));
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-[#F8F5EE] border border-[#E2D9C8] text-xs text-[#10231D] font-mono focus:bg-white focus:outline-none"
                   />
-                  {form.videoUrl && (
+                  {form.youtubeUrl && (
                     <button
                       type="button"
-                      onClick={() => setter(prev => ({ ...prev, videoUrl: '' }))}
+                      onClick={() => setter(prev => ({
+                        ...prev,
+                        youtubeUrl: '',
+                        videoUrl: prev.uploadedVideoUrl || ''
+                      }))}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#C2512D] hover:text-red-700 font-bold cursor-pointer"
-                      title="Clear video"
+                      title="Clear YouTube Link"
                     >
                       Clear
                     </button>
                   )}
                 </div>
 
-                <label className={`shrink-0 w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                  uploadingServiceVideo
-                    ? 'bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none'
-                    : 'bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] shadow-sm'
-                }`}>
-                  <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
-                  <span>{uploadingServiceVideo ? 'Uploading (50MB max)...' : 'Upload Video (<50MB)'}</span>
-                  <input
-                    type="file"
-                    accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/ogg"
-                    onChange={(e) => handleServiceVideoUpload(e, setter)}
-                    disabled={uploadingServiceVideo}
-                    className="hidden"
-                  />
-                </label>
+                {form.youtubeUrl && (
+                  <div className="p-2.5 rounded-xl bg-red-50/60 border border-red-200/80 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <LuVideo className="w-4 h-4 text-red-600 shrink-0" />
+                      <div className="truncate">
+                        <p className="font-bold text-red-950 truncate">YouTube Showcase Connected</p>
+                        <p className="text-[10px] text-red-700 font-mono truncate">{form.youtubeUrl}</p>
+                      </div>
+                    </div>
+                    <a
+                      href={form.youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold flex items-center gap-1 shrink-0 shadow-2xs"
+                    >
+                      <LuEye className="w-3 h-3" />
+                      <span>Preview YouTube</span>
+                    </a>
+                  </div>
+                )}
+                <p className="text-[10px] text-[#6B8077]">
+                  Embeds a branded, responsive YouTube Showcase stream on the customer service page.
+                </p>
               </div>
 
-              {form.videoUrl && (
-                <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0">
-                      <LuVideo className="w-4 h-4" />
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-[#10231D] truncate">
-                        {form.videoUrl.includes('cloudinary') ? 'Cloudinary Hosted HD Video' : form.videoUrl.includes('youtu') ? 'YouTube Showcase Stream' : 'Video Source'}
-                      </p>
-                      <p className="text-[10px] text-[#6B8077] font-mono truncate">{form.videoUrl}</p>
-                    </div>
-                  </div>
-                  <a
-                    href={form.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-[11px] font-bold flex items-center gap-1 shrink-0"
-                  >
-                    <LuEye className="w-3 h-3 text-[#E9A23B]" />
-                    <span>Watch Preview</span>
-                  </a>
+              {/* 2. Uploaded Demonstration Video */}
+              <div className="space-y-2 p-3.5 rounded-2xl bg-white border border-[#E2D9C8]">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                    <LuVideo className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Uploaded Demonstration Video (Cloudinary HD Walkthrough):</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-[#6B8077] bg-[#ECE5D8] px-2 py-0.5 rounded-md border border-[#E2D9C8]">
+                    Max 50MB • MP4 / WebM / MOV
+                  </span>
                 </div>
-              )}
 
-              <p className="text-[10px] text-[#6B8077]">
-                Urban Company / Pronto standard: Video appears as an HD walkthrough on the customer service detail page.
-              </p>
+                <div className="flex flex-col sm:flex-row gap-2 items-center">
+                  <div className="relative flex-1 w-full">
+                    <input
+                      type="url"
+                      placeholder="Cloudinary video URL or upload direct video file below..."
+                      value={form.uploadedVideoUrl || form.videoUrl || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setter(prev => ({
+                          ...prev,
+                          uploadedVideoUrl: val,
+                          videoUrl: val || prev.youtubeUrl || ''
+                        }));
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-[#F8F5EE] border border-[#E2D9C8] text-xs text-[#10231D] font-mono focus:bg-white focus:outline-none"
+                    />
+                    {(form.uploadedVideoUrl || form.videoUrl) && (
+                      <button
+                        type="button"
+                        onClick={() => setter(prev => ({
+                          ...prev,
+                          uploadedVideoUrl: '',
+                          videoUrl: prev.youtubeUrl || ''
+                        }))}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#C2512D] hover:text-red-700 font-bold cursor-pointer"
+                        title="Clear Uploaded Video"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <label className={`shrink-0 w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    uploadingServiceVideo
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none'
+                      : 'bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] shadow-sm'
+                  }`}>
+                    <LuUpload className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>{uploadingServiceVideo ? 'Uploading (50MB max)...' : 'Upload Video (<50MB)'}</span>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/ogg"
+                      onChange={(e) => handleServiceVideoUpload(e, setter)}
+                      disabled={uploadingServiceVideo}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {(form.uploadedVideoUrl || (form.videoUrl && !form.videoUrl.includes('youtu'))) && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0">
+                        <LuVideo className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="truncate">
+                        <p className="font-bold text-emerald-950 truncate">Cloudinary HD Video Active</p>
+                        <p className="text-[10px] text-emerald-700 font-mono truncate">
+                          {form.uploadedVideoUrl || form.videoUrl}
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={form.uploadedVideoUrl || form.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-[11px] font-bold flex items-center gap-1 shrink-0"
+                    >
+                      <LuEye className="w-3 h-3 text-[#E9A23B]" />
+                      <span>Watch HD Video</span>
+                    </a>
+                  </div>
+                )}
+                <p className="text-[10px] text-[#6B8077]">
+                  Urban Company / Pronto standard: Hosted HD field walkthrough video player.
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-start gap-2 text-[11px] text-[#3D524A]">
+                <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B] shrink-0 mt-0.5" />
+                <span>
+                  <strong>Dual Video Support:</strong> You can add both a YouTube Showcase Stream and an Uploaded HD Video. When both are present, both players are displayed separately on the customer service page.
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1993,6 +2089,8 @@ export default function AdminDashboard() {
       moradabadOnly: Boolean(service.moradabadOnly || (allAvailableCities.length === 1 && allAvailableCities[0] === 'moradabad')),
       cityAvailability: allAvailableCities,
       videoUrl: service.videoUrl || '',
+      youtubeUrl: service.youtubeUrl || (service.videoUrl?.includes('youtu') ? service.videoUrl : ''),
+      uploadedVideoUrl: service.uploadedVideoUrl || (!service.videoUrl?.includes('youtu') ? service.videoUrl : ''),
       price: service.price,
       mrp: service.mrp,
       duration: service.duration || '1.5 hrs',
@@ -2075,7 +2173,9 @@ export default function AdminDashboard() {
         cityExtraCharge: serviceForm.cityExtraCharge !== undefined && serviceForm.cityExtraCharge !== null ? Number(serviceForm.cityExtraCharge) : 100,
         moradabadOnly: Boolean(serviceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
-        videoUrl: serviceForm.videoUrl || '',
+        videoUrl: serviceForm.uploadedVideoUrl || serviceForm.youtubeUrl || serviceForm.videoUrl || '',
+        youtubeUrl: serviceForm.youtubeUrl || '',
+        uploadedVideoUrl: serviceForm.uploadedVideoUrl || '',
         price: isUnit ? mbdRate : Number(serviceForm.price),
         mrp: isUnit ? (Number(serviceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(serviceForm.mrp),
         duration: serviceForm.duration,
@@ -2193,7 +2293,9 @@ export default function AdminDashboard() {
         cityExtraCharge: newServiceForm.cityExtraCharge !== undefined && newServiceForm.cityExtraCharge !== null ? Number(newServiceForm.cityExtraCharge) : 100,
         moradabadOnly: Boolean(newServiceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
-        videoUrl: newServiceForm.videoUrl || '',
+        videoUrl: newServiceForm.uploadedVideoUrl || newServiceForm.youtubeUrl || newServiceForm.videoUrl || '',
+        youtubeUrl: newServiceForm.youtubeUrl || '',
+        uploadedVideoUrl: newServiceForm.uploadedVideoUrl || '',
         price: isUnit ? mbdRate : Number(newServiceForm.price),
         mrp: isUnit ? (Number(newServiceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(newServiceForm.mrp),
         duration: newServiceForm.duration || '1.5 hrs',
@@ -3208,7 +3310,7 @@ export default function AdminDashboard() {
       const res = await adminAPI.uploadVideo(file, 'max-housekeeping/services/videos');
       if (res && (res.url || res.data?.url)) {
         const videoUrl = res.url || res.data?.url;
-        setter(prev => ({ ...prev, videoUrl }));
+        setter(prev => ({ ...prev, uploadedVideoUrl: videoUrl, videoUrl }));
         toast.success('Demonstration video uploaded to Cloudinary successfully!');
       } else {
         toast.error('Upload succeeded, but video URL was missing.');
