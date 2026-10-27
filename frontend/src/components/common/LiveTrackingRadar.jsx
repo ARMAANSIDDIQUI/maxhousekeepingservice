@@ -43,7 +43,7 @@ export default function LiveTrackingRadar({
   const routePolylineRef = useRef(null);
   const pollTimerRef = useRef(null);
 
-  // Helper to draw or update route line between supervisor location and customer doorstep
+  // Helper to draw or update real driving route line following actual roads
   const updateRouteLine = (start, end) => {
     if (!start || !end || !window.google?.maps || !mapInstanceRef.current) return;
     const google = window.google;
@@ -51,57 +51,102 @@ export default function LiveTrackingRadar({
     const startPos = { lat: Number(start.lat), lng: Number(start.lng) };
     const endPos = { lat: Number(end.lat), lng: Number(end.lng) };
 
-    if (google.maps.DirectionsService && google.maps.DirectionsRenderer) {
-      if (!directionsRendererRef.current) {
-        directionsRendererRef.current = new google.maps.DirectionsRenderer({
-          map: mapInstanceRef.current,
-          suppressMarkers: true,
-          polylineOptions: {
-            strokeColor: '#E9A23B',
-            strokeWeight: 5,
-            strokeOpacity: 0.95
-          }
-        });
-      } else {
-        directionsRendererRef.current.setMap(mapInstanceRef.current);
-      }
+    // Fetch and render real turn-by-turn road route immediately
+    fetchRoadDrivingRoute(startPos, endPos);
 
-      const ds = new google.maps.DirectionsService();
-      ds.route(
-        {
-          origin: startPos,
-          destination: endPos,
-          travelMode: google.maps.TravelMode.DRIVING
-        },
-        (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK) {
-            directionsRendererRef.current?.setDirections(result);
-            if (routePolylineRef.current) {
-              routePolylineRef.current.setMap(null);
+    // Also attempt Google Directions if active and supported
+    if (google.maps.DirectionsService && google.maps.DirectionsRenderer) {
+      try {
+        const ds = new google.maps.DirectionsService();
+        ds.route(
+          {
+            origin: startPos,
+            destination: endPos,
+            travelMode: google.maps.TravelMode.DRIVING
+          },
+          (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK) {
+              if (!directionsRendererRef.current) {
+                directionsRendererRef.current = new google.maps.DirectionsRenderer({
+                  map: mapInstanceRef.current,
+                  suppressMarkers: true,
+                  polylineOptions: {
+                    strokeColor: '#E9A23B',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.95
+                  }
+                });
+              } else {
+                directionsRendererRef.current.setMap(mapInstanceRef.current);
+              }
+              directionsRendererRef.current.setDirections(result);
+              if (routePolylineRef.current) {
+                routePolylineRef.current.setMap(null);
+              }
             }
-          } else {
-            drawFallbackPolyline(startPos, endPos);
           }
-        }
-      );
-    } else {
-      drawFallbackPolyline(startPos, endPos);
+        );
+      } catch (err) {
+        // Fallback already rendered by fetchRoadDrivingRoute
+      }
     }
   };
 
-  const drawFallbackPolyline = (start, end) => {
+  const fetchRoadDrivingRoute = async (startPos, endPos) => {
     if (!window.google?.maps || !mapInstanceRef.current) return;
     const google = window.google;
 
+    try {
+      // Real turn-by-turn street route following road networks (OSRM)
+      const url = `https://router.project-osrm.org/route/v1/driving/${startPos.lng},${startPos.lat};${endPos.lng},${endPos.lat}?overview=full&geometries=geojson`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates?.length) {
+          const roadPoints = data.routes[0].geometry.coordinates.map((coord) => ({
+            lat: coord[1],
+            lng: coord[0]
+          }));
+
+          if (routePolylineRef.current) {
+            routePolylineRef.current.setMap(null);
+          }
+
+          routePolylineRef.current = new google.maps.Polyline({
+            path: roadPoints,
+            geodesic: true,
+            strokeColor: '#E9A23B',
+            strokeOpacity: 0.95,
+            strokeWeight: 5,
+            map: mapInstanceRef.current
+          });
+
+          // Adjust map viewport to show entire road journey
+          const bounds = new google.maps.LatLngBounds();
+          roadPoints.forEach((pt) => bounds.extend(pt));
+          mapInstanceRef.current.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
+
+          // Update real road distance if provided
+          if (data.routes[0].distance) {
+            setDistanceKm(Number((data.routes[0].distance / 1000).toFixed(1)));
+          }
+
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[LiveTrackingRadar] Real road route notice:', err.message);
+    }
+
+    // Direct fallback only if both routing engines fail
     if (routePolylineRef.current) {
       routePolylineRef.current.setMap(null);
     }
-
     routePolylineRef.current = new google.maps.Polyline({
-      path: [start, end],
+      path: [startPos, endPos],
       geodesic: true,
       strokeColor: '#E9A23B',
-      strokeOpacity: 0.9,
+      strokeOpacity: 0.8,
       strokeWeight: 4,
       map: mapInstanceRef.current
     });
