@@ -906,186 +906,237 @@ export default function AdminDashboard() {
         {/* CONDITIONAL BODY: NORMAL SERVICE FORM */}
         {!isUnit ? (
           <div className="space-y-4">
-            {/* Base Prices */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Header: Pricing Mode Toggle */}
+            <div className="p-3 rounded-xl bg-[#ECE5D8]/70 border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Base Shown Price (MRP Crossed Out):
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={form.mrp}
-                  onChange={(e) => setter(prev => ({ ...prev, mrp: e.target.value }))}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-bold text-[#10231D] tnum"
-                  required
-                />
+                <span className="text-xs font-black text-[#10231D] uppercase tracking-wide block">
+                  Base Pricing (Shown MRP & Payable Rate)
+                </span>
+                <span className="text-[11px] text-[#6B8077]">
+                  {form.hasCitySpecificRates
+                    ? 'City-wise pricing enabled: Enter separate Shown Price (MRP) & Offered Price (Payable) for each city.'
+                    : 'Single rate enabled: Base Shown Price and Offered Price apply uniformly to all cities.'}
+                </span>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Base Offered Price (Payable):
-                </label>
+              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-[#E2D9C8] shrink-0 shadow-2xs">
                 <input
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setter(prev => ({ ...prev, price: e.target.value }))}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum"
-                  required
+                  type="checkbox"
+                  checked={Boolean(form.hasCitySpecificRates)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setter(prev => {
+                      const updates = { ...prev, hasCitySpecificRates: checked };
+                      if (checked && (!Array.isArray(prev.cityRates) || prev.cityRates.length === 0)) {
+                        const initRates = cities
+                          .filter(c => c.status === 'active' || !c.status)
+                          .map(c => ({
+                            cityId: c._id,
+                            cityName: c.name,
+                            citySlug: (c.slug || c.name.toLowerCase()).trim(),
+                            rate: Number(prev.price) || 0,
+                            mrp: Number(prev.mrp) || Number(prev.price) || 0
+                          }));
+                        updates.cityRates = initRates;
+                      }
+                      return updates;
+                    });
+                  }}
+                  className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
                 />
-              </div>
+                <span className="text-xs font-bold text-[#10231D]">
+                  Set separate Base Prices for each city?
+                </span>
+              </label>
             </div>
 
-            {/* City-Wise Pricing Configuration for Normal Service */}
-            <div className="pt-2 border-t border-[#E2D9C8] space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <label className="block text-xs font-black text-[#10231D] uppercase tracking-wide">
-                  Pricing & Rates Overrides:
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-[#ECE5D8] px-3 py-1.5 rounded-xl border border-[#E2D9C8]">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.hasCitySpecificRates)}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setter(prev => ({
-                        ...prev,
-                        hasCitySpecificRates: checked
-                      }));
-                    }}
-                    className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
-                  />
+            {/* Separate Base Prices by City OR Uniform Base Prices */}
+            {form.hasCitySpecificRates ? (
+              /* SEPARATE CITY-BY-CITY BASE PRICES */
+              <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
+                <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#10231D]">
-                    Different rates for different cities?
+                    Base Shown Price (MRP) & Base Offered Price (Payable) per City:
                   </span>
-                </label>
-              </div>
+                  <span className="text-[10px] text-[#6B8077]">
+                    Moradabad is the central hub. Other cities have individual base rates.
+                  </span>
+                </div>
 
-              {/* City-by-City Rates Grid when hasCitySpecificRates is enabled */}
-              {form.hasCitySpecificRates ? (
-                <div className="p-3.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-[#10231D] block">
-                        City-Wise Custom Rates & Pricing {form.variants?.length > 0 ? '(Base / Default Variant)' : ''}
-                      </span>
-                      <span className="text-[10px] text-[#6B8077]">
-                        {form.variants?.length > 0
-                          ? `This service has ${form.variants.length} variants. Set exact city-wise rates for each individual variant in the "Service Variants & Tiered Rates" cards below!`
-                          : `Enter specific rate and MRP for each city. Unset cities use the base price (₹${form.price || 0}).`}
-                      </span>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cities.filter(c => c.status === 'active' || !c.status).map(city => {
+                    const citySlug = (city.slug || city.name.toLowerCase()).trim();
+                    const isMbd = citySlug === 'moradabad';
+                    const currentCityRate = Array.isArray(form.cityRates)
+                      ? form.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug)
+                      : undefined;
+                    const displayPrice = currentCityRate?.rate !== undefined
+                      ? currentCityRate.rate
+                      : (form.price || 0);
+                    const displayMrp = currentCityRate?.mrp !== undefined
+                      ? currentCityRate.mrp
+                      : (form.mrp || 0);
+                    const discount = displayMrp > displayPrice ? Math.round(((displayMrp - displayPrice) / displayMrp) * 100) : 0;
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                    {cities.filter(c => c.status === 'active' || !c.status).map(city => {
-                      const citySlug = (city.slug || city.name.toLowerCase()).trim();
-                      const currentCityRate = Array.isArray(form.cityRates)
-                        ? form.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug)
-                        : undefined;
-                      const displayPrice = currentCityRate?.rate !== undefined
-                        ? currentCityRate.rate
-                        : (citySlug === 'moradabad' ? (form.price || 0) : (form.price || 0));
-                      const displayMrp = currentCityRate?.mrp !== undefined
-                        ? currentCityRate.mrp
-                        : (citySlug === 'moradabad' ? (form.mrp || 0) : (form.mrp || 0));
-
-                      return (
-                        <div key={city._id || citySlug} className="p-2.5 rounded-lg bg-white border border-[#E2D9C8] space-y-1.5">
-                          <div className="flex items-center justify-between">
+                    return (
+                      <div
+                        key={city._id || citySlug}
+                        className={`p-3 rounded-xl border space-y-2 transition-all ${
+                          isMbd
+                            ? 'bg-white border-[#10231D] shadow-xs ring-1 ring-[#10231D]/20'
+                            : 'bg-white border-[#E2D9C8] shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-[#10231D]">{city.name}</span>
-                            <span className="text-[10px] font-mono text-[#6B8077] uppercase">{city.state || 'UP'}</span>
+                            {isMbd && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#10231D] text-[#E9A23B]">
+                                Central Hub
+                              </span>
+                            )}
                           </div>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <div>
-                              <label className="block text-[9px] font-bold text-[#10231D]">Price (₹)</label>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1.5 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={displayPrice}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setter(prev => {
-                                      const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
-                                      const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
-                                      const prevMrp = existingRates[idx]?.mrp || displayMrp;
-                                      const entry = {
-                                        cityId: city._id,
-                                        cityName: city.name,
-                                        citySlug: citySlug,
-                                        rate: val,
-                                        mrp: prevMrp
-                                      };
-                                      if (idx >= 0) {
-                                        existingRates[idx] = entry;
-                                      } else {
-                                        existingRates.push(entry);
-                                      }
-                                      const updates = { ...prev, cityRates: existingRates };
-                                      if (citySlug === 'moradabad') {
-                                        updates.price = val;
-                                      }
-                                      return updates;
-                                    });
-                                  }}
-                                  className="w-full pl-5 pr-1.5 py-1 rounded bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-black text-[#10231D] tnum"
-                                  placeholder="Rate"
-                                />
-                              </div>
+                          {discount > 0 && (
+                            <span className="text-[10px] font-bold text-[#C2512D] bg-[#F9ECE8] px-1.5 py-0.5 rounded">
+                              {discount}% OFF
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {/* Base Offered Price (Payable) */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#10231D] mb-0.5">
+                              Base Offered Price (Payable):
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-[#6B8077] font-bold text-xs">₹</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={displayPrice}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setter(prev => {
+                                    const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
+                                    const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                    const prevMrp = existingRates[idx]?.mrp !== undefined ? existingRates[idx].mrp : displayMrp;
+                                    const entry = {
+                                      cityId: city._id,
+                                      cityName: city.name,
+                                      citySlug: citySlug,
+                                      rate: val,
+                                      mrp: prevMrp
+                                    };
+                                    if (idx >= 0) {
+                                      existingRates[idx] = entry;
+                                    } else {
+                                      existingRates.push(entry);
+                                    }
+                                    const updates = { ...prev, cityRates: existingRates };
+                                    if (isMbd) {
+                                      updates.price = val;
+                                    }
+                                    return updates;
+                                  });
+                                }}
+                                className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-black text-[#10231D] tnum focus:border-[#E9A23B] outline-none"
+                                placeholder="Payable"
+                              />
                             </div>
-                            <div>
-                              <label className="block text-[9px] font-bold text-[#6B8077]">MRP (₹)</label>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1.5 text-[#6B8077] font-bold text-[11px]">₹</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={displayMrp}
-                                  onChange={(e) => {
-                                    const val = Number(e.target.value) || 0;
-                                    setter(prev => {
-                                      const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
-                                      const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
-                                      const prevRate = existingRates[idx]?.rate || displayPrice;
-                                      const entry = {
-                                        cityId: city._id,
-                                        cityName: city.name,
-                                        citySlug: citySlug,
-                                        rate: prevRate,
-                                        mrp: val
-                                      };
-                                      if (idx >= 0) {
-                                        existingRates[idx] = entry;
-                                      } else {
-                                        existingRates.push(entry);
-                                      }
-                                      const updates = { ...prev, cityRates: existingRates };
-                                      if (citySlug === 'moradabad') {
-                                        updates.mrp = val;
-                                      }
-                                      return updates;
-                                    });
-                                  }}
-                                  className="w-full pl-5 pr-1.5 py-1 rounded bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-bold text-[#6B8077] line-through tnum"
-                                  placeholder="MRP"
-                                />
-                              </div>
+                          </div>
+
+                          {/* Base Shown Price (MRP Crossed Out) */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#6B8077] mb-0.5">
+                              Base Shown Price (MRP Crossed Out):
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-[#6B8077] font-bold text-xs">₹</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={displayMrp}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setter(prev => {
+                                    const existingRates = Array.isArray(prev.cityRates) ? [...prev.cityRates] : [];
+                                    const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                    const prevRate = existingRates[idx]?.rate !== undefined ? existingRates[idx].rate : displayPrice;
+                                    const entry = {
+                                      cityId: city._id,
+                                      cityName: city.name,
+                                      citySlug: citySlug,
+                                      rate: prevRate,
+                                      mrp: val
+                                    };
+                                    if (idx >= 0) {
+                                      existingRates[idx] = entry;
+                                    } else {
+                                      existingRates.push(entry);
+                                    }
+                                    const updates = { ...prev, cityRates: existingRates };
+                                    if (isMbd) {
+                                      updates.mrp = val;
+                                    }
+                                    return updates;
+                                  });
+                                }}
+                                className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-xs font-bold text-[#6B8077] line-through tnum focus:border-[#E9A23B] outline-none"
+                                placeholder="MRP"
+                              />
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* UNIFORM BASE PRICES ACROSS ALL CITIES */
+              <div className="p-3.5 rounded-xl bg-white border border-[#E2D9C8] space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Base Shown Price (MRP Crossed Out):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-[#6B8077] font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={form.mrp}
+                        onChange={(e) => setter(prev => ({ ...prev, mrp: e.target.value }))}
+                        className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm font-bold text-[#6B8077] line-through tnum focus:border-[#E9A23B] outline-none"
+                        placeholder="MRP (Crossed Out)"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#10231D] mb-1">
+                      Base Offered Price (Payable):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-[#6B8077] font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={form.price}
+                        onChange={(e) => setter(prev => ({ ...prev, price: e.target.value }))}
+                        className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm font-black text-[#10231D] tnum focus:border-[#E9A23B] outline-none"
+                        placeholder="Payable Price"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-[#ECE5D8]/50 border border-[#E2D9C8] text-[11px] text-[#6B8077]">
-                  All serviceable cities currently use the uniform base price of <strong>₹{form.price || 0}</strong> (and uniform variant prices below). Check "Different rates for different cities?" above to customize prices per city for the base service and for every variant.
-                </div>
-              )}
-            </div>
+                <p className="text-[11px] text-[#6B8077]">
+                  These base prices apply uniformly across all active cities. Check "Set separate Base Prices for each city?" above if you want custom rates for Rampur, Sambhal, Amroha, etc.
+                </p>
+              </div>
+            )}
 
             {/* Dynamic Service Variants & Tiered Rates */}
             <div className="pt-2">
@@ -1386,7 +1437,7 @@ export default function AdminDashboard() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-1.5">
                                       <div>
-                                        <label className="block text-[9px] font-bold text-[#10231D]">Price (₹)</label>
+                                        <label className="block text-[9px] font-bold text-[#10231D]">Offered (Payable) ₹</label>
                                         <div className="relative">
                                           <span className="absolute left-1.5 top-1 text-[#6B8077] font-bold text-[10px]">₹</span>
                                           <input
@@ -1435,7 +1486,7 @@ export default function AdminDashboard() {
                                         </div>
                                       </div>
                                       <div>
-                                        <label className="block text-[9px] font-bold text-[#6B8077]">MRP (₹)</label>
+                                        <label className="block text-[9px] font-bold text-[#6B8077]">Shown (MRP) ₹</label>
                                         <div className="relative">
                                           <span className="absolute left-1.5 top-1 text-[#6B8077] font-bold text-[10px]">₹</span>
                                           <input
