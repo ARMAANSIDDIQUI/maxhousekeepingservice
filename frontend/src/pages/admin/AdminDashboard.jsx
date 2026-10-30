@@ -3833,6 +3833,10 @@ export default function AdminDashboard() {
 
   const handleAdminUpdateSupervisorLocation = async (booking) => {
     if (!booking) return;
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      toast.error('Cannot update live location: Service visit is already completed or cancelled. Tracking has ceased.');
+      return;
+    }
     const defaultCoords = booking.supervisorLiveLocation?.lat
       ? `${booking.supervisorLiveLocation.lat}, ${booking.supervisorLiveLocation.lng}`
       : '28.8410, 78.7785';
@@ -8264,6 +8268,7 @@ export default function AdminDashboard() {
                     <div className="pt-2 border-t border-[#E2D9C8] rounded-xl overflow-hidden">
                       <LiveTrackingRadar
                         bookingCode={viewBookingDetails.bookingCode}
+                        bookingStatus={viewBookingDetails.status}
                         initialSupervisorLocation={viewBookingDetails.supervisorLiveLocation}
                         customerLocation={viewBookingDetails.address?.coordinates}
                         destinationAddress={`${viewBookingDetails.address?.houseOrFlat ? viewBookingDetails.address.houseOrFlat + ', ' : ''}${viewBookingDetails.address?.line1 || ''}, ${viewBookingDetails.cityName}`}
@@ -9046,6 +9051,7 @@ export default function AdminDashboard() {
               <div className="space-y-4">
                 <LiveTrackingRadar
                   bookingCode={trackingBookingAdmin.bookingCode}
+                  bookingStatus={trackingBookingAdmin.status}
                   isSupervisorAssigned={hasAssignedSup}
                   initialSupervisorLocation={hasAssignedSup ? trackingBookingAdmin.supervisorLiveLocation : null}
                   customerLocation={trackingBookingAdmin.address?.coordinates}
@@ -9072,15 +9078,17 @@ export default function AdminDashboard() {
                     <LuExternalLink className="w-3.5 h-3.5" />
                   </a>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAdminUpdateSupervisorLocation(trackingBookingAdmin)}
-                      className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                      title="Update/Calibrate supervisor coordinates"
-                    >
-                      <LuMapPin className="w-3.5 h-3.5" />
-                      <span>Update Location (Admin)</span>
-                    </button>
+                    {!['completed', 'cancelled'].includes(trackingBookingAdmin.status) && (
+                      <button
+                        type="button"
+                        onClick={() => handleAdminUpdateSupervisorLocation(trackingBookingAdmin)}
+                        className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        title="Update/Calibrate supervisor coordinates"
+                      >
+                        <LuMapPin className="w-3.5 h-3.5" />
+                        <span>Update Location (Admin)</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setTrackingBookingAdmin(null)}

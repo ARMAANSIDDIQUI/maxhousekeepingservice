@@ -252,17 +252,20 @@ export default function SupervisorDashboard() {
           console.warn('[Supervisor GPS broadcast notice]:', err.message);
         });
 
-        // 2. If specific booking selected, update booking endpoint as well
+        // 2. If specific booking selected, update booking endpoint as well (Active non-completed visits only)
         const targetBookingId = booking?._id || sharingBookingId;
         if (targetBookingId) {
-          supervisorAPI.updateLiveLocation(targetBookingId, {
-            lat,
-            lng,
-            heading,
-            speed,
-            accuracy,
-            isSharing: true
-          }).catch(() => {});
+          const targetBooking = bookings?.find(b => String(b._id) === String(targetBookingId));
+          if (!targetBooking || !['completed', 'cancelled'].includes(targetBooking.status)) {
+            supervisorAPI.updateLiveLocation(targetBookingId, {
+              lat,
+              lng,
+              heading,
+              speed,
+              accuracy,
+              isSharing: true
+            }).catch(() => {});
+          }
         }
       }
     };
@@ -333,15 +336,26 @@ export default function SupervisorDashboard() {
   }, [bookings]);
 
   const stopBroadcastingGps = (bookingId, notify = true, reason = 'manually') => {
-    // Only if completed do we formally close watch
+    // Only if completed do we formally cease live tracking for that booking
     if (reason === 'completed') {
-      if (locationWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(locationWatchIdRef.current);
-        locationWatchIdRef.current = null;
+      if (bookingId) {
+        supervisorAPI.updateLiveLocation(bookingId, { isSharing: false }).catch(() => {});
       }
       setSharingBookingId(null);
+
+      // If no other active non-completed visits exist for this supervisor, halt GPS watch
+      const hasOtherActive = bookings?.some(b => isAssignedToMe(b) && b._id !== bookingId && !['completed', 'cancelled'].includes(b.status));
+      if (!hasOtherActive) {
+        if (locationWatchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(locationWatchIdRef.current);
+          locationWatchIdRef.current = null;
+        }
+        if (heartbeatTimerRef.current !== null) {
+          clearInterval(heartbeatTimerRef.current);
+          heartbeatTimerRef.current = null;
+        }
+      }
     }
-    // Location sharing logic persists indefinitely on server for all active visits!
   };
 
   // Cleanup on unmount: DO NOT send isSharing: false so location sharing logic persists even after closing supervisor panel
@@ -2319,6 +2333,7 @@ export default function SupervisorDashboard() {
                 <div className="rounded-2xl overflow-hidden border border-[#E2D9C8] shadow-sm">
                   <LiveTrackingRadar
                     bookingCode={selectedBooking.bookingCode}
+                    bookingStatus={selectedBooking.status}
                     initialSupervisorLocation={selectedBooking.supervisorLiveLocation}
                     customerLocation={selectedBooking.address?.coordinates}
                     destinationAddress={`${selectedBooking.address?.houseOrFlat ? selectedBooking.address.houseOrFlat + ', ' : ''}${selectedBooking.address?.line1 || ''}, ${selectedBooking.cityName}`}

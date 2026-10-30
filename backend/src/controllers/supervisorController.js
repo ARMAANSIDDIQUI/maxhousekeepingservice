@@ -651,6 +651,8 @@ export async function updateSupervisorBookingStatus(req, res, next) {
           booking.supervisorLiveLocation = {};
         }
         booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.speed = 0;
+        booking.supervisorLiveLocation.heading = 0;
         booking.supervisorLiveLocation.updatedAt = new Date();
       }
     }
@@ -957,9 +959,32 @@ export async function updateSupervisorLiveLocation(req, res, next) {
     }
 
     if (['completed', 'cancelled'].includes(booking.status)) {
+      if (booking.supervisorLiveLocation?.isSharing) {
+        booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.speed = 0;
+        booking.supervisorLiveLocation.heading = 0;
+        booking.supervisorLiveLocation.updatedAt = new Date();
+        await booking.save().catch(() => {});
+      }
       return res.status(400).json({
         success: false,
-        message: 'Live location cannot be broadcast for completed or cancelled bookings.'
+        message: 'Live location cannot be broadcast for completed or cancelled bookings. Location tracking has ceased.'
+      });
+    }
+
+    if (isSharing === false) {
+      if (!booking.supervisorLiveLocation) {
+        booking.supervisorLiveLocation = {};
+      }
+      booking.supervisorLiveLocation.isSharing = false;
+      booking.supervisorLiveLocation.speed = 0;
+      booking.supervisorLiveLocation.heading = 0;
+      booking.supervisorLiveLocation.updatedAt = new Date();
+      await booking.save();
+      return res.status(200).json({
+        success: true,
+        message: 'Live location sharing turned off for this booking.',
+        liveLocation: booking.supervisorLiveLocation
       });
     }
 
@@ -985,7 +1010,7 @@ export async function updateSupervisorLiveLocation(req, res, next) {
       speed: Number(speed) || 0,
       accuracy: Number(accuracy) || 0,
       updatedAt: new Date(),
-      isSharing: true
+      isSharing: isSharing !== false
     };
 
     await booking.save();

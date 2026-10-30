@@ -41,6 +41,7 @@ function isGenuineSupervisor(sup) {
 
 export default function LiveTrackingRadar({
   bookingCode,
+  bookingStatus = null,
   initialSupervisorLocation = null,
   customerLocation = null,
   destinationAddress = '',
@@ -48,6 +49,7 @@ export default function LiveTrackingRadar({
   isSupervisorAssigned: initialAssignedProp = undefined,
   pollIntervalMs = 3000
 }) {
+  const [status, setStatus] = useState(bookingStatus);
   const initialHasSupervisor =
     typeof initialAssignedProp === 'boolean'
       ? initialAssignedProp
@@ -56,10 +58,12 @@ export default function LiveTrackingRadar({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [hasSupervisor, setHasSupervisor] = useState(initialHasSupervisor);
   const [liveLocation, setLiveLocation] = useState(
-    initialHasSupervisor && initialSupervisorLocation?.lat ? initialSupervisorLocation : null
+    initialHasSupervisor && initialSupervisorLocation?.lat && !['completed', 'cancelled'].includes(bookingStatus)
+      ? initialSupervisorLocation
+      : null
   );
   const [isSharing, setIsSharing] = useState(
-    Boolean(initialHasSupervisor && (initialSupervisorLocation?.isSharing !== false))
+    Boolean(initialHasSupervisor && (initialSupervisorLocation?.isSharing !== false) && !['completed', 'cancelled'].includes(bookingStatus))
   );
   const [lastUpdated, setLastUpdated] = useState(
     initialSupervisorLocation?.updatedAt ? new Date(initialSupervisorLocation.updatedAt) : new Date()
@@ -73,6 +77,16 @@ export default function LiveTrackingRadar({
   const [streetViewNotice, setStreetViewNotice] = useState('');
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [updateNotice, setUpdateNotice] = useState('');
+
+  const isCompleted = status === 'completed';
+  const isCancelled = status === 'cancelled';
+  const isFinished = isCompleted || isCancelled;
+
+  useEffect(() => {
+    if (bookingStatus && bookingStatus !== status) {
+      setStatus(bookingStatus);
+    }
+  }, [bookingStatus]);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -239,6 +253,40 @@ export default function LiveTrackingRadar({
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          const effectiveStatus = data.status || status || bookingStatus;
+          if (data.status) {
+            setStatus(data.status);
+          }
+
+          // STRICT CESSATION: If completed or cancelled, all live location tracking MUST be ceased strictly
+          if (['completed', 'cancelled'].includes(effectiveStatus)) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
+            setIsSharing(false);
+            setLiveLocation(null);
+            setDistanceKm(null);
+            if (supervisorMarkerRef.current) {
+              supervisorMarkerRef.current.setVisible(false);
+            }
+            if (routePolylineRef.current) {
+              routePolylineRef.current.setMap(null);
+              routePolylineRef.current = null;
+            }
+            if (directionsRendererRef.current) {
+              directionsRendererRef.current.setMap(null);
+              directionsRendererRef.current = null;
+            }
+            if (data.customerLocation) {
+              setResolvedCustomerLoc(data.customerLocation);
+            }
+            if (data.supervisor) {
+              setResolvedSupervisor(prev => ({ ...(prev || {}), ...data.supervisor }));
+            }
+            return;
+          }
+
           const assigned =
             typeof data.isSupervisorAssigned === 'boolean'
               ? data.isSupervisorAssigned
@@ -296,11 +344,33 @@ export default function LiveTrackingRadar({
   useEffect(() => {
     if (!bookingCode) return;
 
+    if (isFinished) {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+      setIsSharing(false);
+      setLiveLocation(null);
+      setDistanceKm(null);
+      if (supervisorMarkerRef.current) {
+        supervisorMarkerRef.current.setVisible(false);
+      }
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+        routePolylineRef.current = null;
+      }
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+      return;
+    }
+
     fetchLiveLocation();
     pollTimerRef.current = setInterval(fetchLiveLocation, pollIntervalMs);
 
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && !isFinished) {
         fetchLiveLocation();
       }
     };
@@ -311,7 +381,7 @@ export default function LiveTrackingRadar({
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [bookingCode, pollIntervalMs]);
+  }, [bookingCode, pollIntervalMs, isFinished]);
 
   // Calculate distance between supervisor and customer doorstep (Zero Google API costs)
   useEffect(() => {
@@ -434,13 +504,13 @@ export default function LiveTrackingRadar({
     }
   }, [mapLoaded, resolvedCustomerLoc, customerLocation, liveLocation, hasSupervisor]);
 
-  // Keep supervisor marker visibility synced with assignment state
+  // Keep supervisor marker visibility synced with assignment and completed state
   useEffect(() => {
     if (supervisorMarkerRef.current) {
-      const showMarker = Boolean(hasSupervisor && liveLocation && typeof liveLocation.lat === 'number');
+      const showMarker = Boolean(hasSupervisor && liveLocation && typeof liveLocation.lat === 'number' && !isFinished);
       supervisorMarkerRef.current.setVisible(showMarker);
     }
-  }, [hasSupervisor, liveLocation]);
+  }, [hasSupervisor, liveLocation, isFinished]);
 
   const handleRecenterSupervisor = () => {
     if (mapInstanceRef.current && hasSupervisor && liveLocation?.lat) {
@@ -474,6 +544,11 @@ export default function LiveTrackingRadar({
   };
 
   const handleTriggerLocationUpdate = async () => {
+    if (isFinished) {
+      setUpdateNotice('Tracking ceased: Service visit has completed.');
+      setTimeout(() => setUpdateNotice(''), 3500);
+      return;
+    }
     if (updatingLocation) return;
     setUpdatingLocation(true);
     setUpdateNotice('Querying latest satellite / device GPS fix...');
@@ -585,51 +660,81 @@ export default function LiveTrackingRadar({
 
   return (
     <div className="bg-[#10231D] text-[#F4EFE6] rounded-3xl border-2 border-[#2D453B] overflow-hidden shadow-2xl">
-      {/* Smart Header: Checks if Supervisor is Assigned First */}
+      {/* Smart Header: Checks if Visit is Completed/Cancelled, or Supervisor is Assigned */}
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2D453B]/70 bg-[#0C1B16]">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <span
-              className={`w-3.5 h-3.5 rounded-full block ${
-                !hasSupervisor
-                  ? 'bg-[#E9A23B]'
-                  : 'bg-[#25D366]'
-              }`}
-            />
-            {hasSupervisor && (
-              <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
-            )}
-          </div>
+          {isCompleted ? (
+            <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center shrink-0">
+              <LuCircleCheck className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+          ) : isCancelled ? (
+            <div className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/50 flex items-center justify-center shrink-0">
+              <span className="w-2 h-2 rounded-full bg-red-400 block" />
+            </div>
+          ) : (
+            <div className="relative">
+              <span
+                className={`w-3.5 h-3.5 rounded-full block ${
+                  !hasSupervisor
+                    ? 'bg-[#E9A23B]'
+                    : 'bg-[#25D366]'
+                }`}
+              />
+              {hasSupervisor && (
+                <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
+              )}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#E9A23B]">
-                {!hasSupervisor
-                  ? 'SUPERVISOR NOT YET ASSIGNED'
-                  : 'LIVE LOCATION & ROUTE'}
+              <span className={`font-mono text-xs font-bold uppercase tracking-wider ${
+                isCompleted ? 'text-emerald-400' : isCancelled ? 'text-red-400' : 'text-[#E9A23B]'
+              }`}>
+                {isCompleted
+                  ? 'SERVICE VISIT COMPLETED'
+                  : isCancelled
+                    ? 'BOOKING CANCELLED'
+                    : !hasSupervisor
+                      ? 'SUPERVISOR NOT YET ASSIGNED'
+                      : 'LIVE LOCATION & ROUTE'}
               </span>
               <span
                 className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
-                  !hasSupervisor
-                    ? 'bg-amber-950/90 text-[#E9A23B] border border-[#E9A23B]/40'
-                    : 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                  isCompleted
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                    : isCancelled
+                      ? 'bg-red-950 text-red-300 border border-red-700'
+                      : !hasSupervisor
+                        ? 'bg-amber-950/90 text-[#E9A23B] border border-[#E9A23B]/40'
+                        : 'bg-emerald-950 text-emerald-300 border border-emerald-700'
                 }`}
               >
-                {!hasSupervisor ? 'Not Assigned Yet' : 'Sharing On'}
+                {isCompleted
+                  ? 'Tracking Ceased'
+                  : isCancelled
+                    ? 'Tracking Inactive'
+                    : !hasSupervisor
+                      ? 'Not Assigned Yet'
+                      : 'Sharing On'}
               </span>
             </div>
             <p className="text-xs text-[#A3B8B0] mt-0.5">
-              {!hasSupervisor
-                ? `Field supervisor not yet assigned to your visit · Ref: #${bookingCode}`
-                : etaInfo
-                  ? `${etaInfo.statusText} · Ref: #${bookingCode}`
-                  : `Supervisor en route to your address · Ref: #${bookingCode}`}
+              {isCompleted
+                ? `Service visit concluded · Live GPS tracking has strictly ceased · Ref: #${bookingCode}`
+                : isCancelled
+                  ? `Booking has been cancelled · Live tracking closed · Ref: #${bookingCode}`
+                  : !hasSupervisor
+                    ? `Field supervisor not yet assigned to your visit · Ref: #${bookingCode}`
+                    : etaInfo
+                      ? `${etaInfo.statusText} · Ref: #${bookingCode}`
+                      : `Supervisor en route to your address · Ref: #${bookingCode}`}
             </p>
           </div>
         </div>
 
-        {/* Uber/Rapido Distance & ETA Pill (Always when Supervisor is Assigned & Distance is calculated) */}
+        {/* Uber/Rapido Distance & ETA Pill (Active visits only) */}
         <div className="flex items-center gap-2.5">
-          {hasSupervisor && distanceKm !== null && etaInfo && (
+          {!isFinished && hasSupervisor && distanceKm !== null && etaInfo && (
             <div className="px-4 py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-3.5 shadow-sm">
               <div>
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">Distance</span>
@@ -716,18 +821,20 @@ export default function LiveTrackingRadar({
 
         {/* Floating Map Navigation Controls */}
         <div className="absolute top-3 right-14 flex flex-col gap-1.5 z-10">
-          <button
-            type="button"
-            onClick={handleTriggerLocationUpdate}
-            disabled={updatingLocation}
-            className="px-2.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
-            title="Update live location & sync GPS"
-          >
-            <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation ? 'animate-spin' : ''}`} />
-            <span>Update Location</span>
-          </button>
+          {!isFinished && (
+            <button
+              type="button"
+              onClick={handleTriggerLocationUpdate}
+              disabled={updatingLocation}
+              className="px-2.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
+              title="Update live location & sync GPS"
+            >
+              <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation ? 'animate-spin' : ''}`} />
+              <span>Update Location</span>
+            </button>
+          )}
 
-          {hasSupervisor && (
+          {!isFinished && hasSupervisor && (
             <button
               type="button"
               onClick={handleRecenterSupervisor}
@@ -747,7 +854,7 @@ export default function LiveTrackingRadar({
             <LuMapPin className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden sm:inline">Doorstep</span>
           </button>
-          {hasSupervisor && (
+          {!isFinished && hasSupervisor && (
             <button
               type="button"
               onClick={handleFitRoute}
@@ -769,8 +876,27 @@ export default function LiveTrackingRadar({
           </div>
         )}
 
+        {/* Completed Service Notice Banner on Map */}
+        {isCompleted && (
+          <div className="absolute top-3 left-3 right-16 sm:max-w-md z-10 pointer-events-none">
+            <div className="backdrop-blur-md bg-[#10231D]/95 border border-emerald-500/60 text-[#F4EFE6] px-4 py-3 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                <LuCircleCheck className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="font-bold text-xs text-emerald-400 uppercase tracking-wide">
+                  Service Visit Completed
+                </p>
+                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed">
+                  Real-time vehicle and crew tracking has strictly ceased as work has concluded. Thank you for choosing Max HouseKeeping.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Smart Banner on Map when Supervisor is NOT Yet Assigned */}
-        {!hasSupervisor && (
+        {!hasSupervisor && !isFinished && (
           <div className="absolute top-3 left-3 right-16 sm:max-w-md z-10 pointer-events-none">
             <div className="backdrop-blur-md bg-[#10231D]/95 border border-[#E9A23B]/60 text-[#F4EFE6] px-4 py-3 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto">
               <div className="w-8 h-8 rounded-xl bg-[#E9A23B]/20 border border-[#E9A23B]/40 flex items-center justify-center shrink-0 mt-0.5">
@@ -789,7 +915,7 @@ export default function LiveTrackingRadar({
         )}
 
         {/* Floating Uber/Rapido Live Arrival Pill on Map */}
-        {hasSupervisor && etaInfo && (
+        {!isFinished && hasSupervisor && etaInfo && (
           <div className="absolute top-3 left-3 right-16 sm:right-auto z-10 pointer-events-none">
             <div className={`backdrop-blur-md px-4 py-2.5 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
               etaInfo.isArrived
@@ -817,12 +943,14 @@ export default function LiveTrackingRadar({
         )}
 
         {/* Live overlay update time */}
-        <div className="absolute bottom-3 right-14 pointer-events-none">
-          <div className="bg-[#10231D]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
-            <LuCompass className="w-3 h-3 text-[#E9A23B]" />
-            <span>Updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+        {!isFinished && (
+          <div className="absolute bottom-3 right-14 pointer-events-none">
+            <div className="bg-[#10231D]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
+              <LuCompass className="w-3 h-3 text-[#E9A23B]" />
+              <span>Updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Footer Info: Smart Check for Supervisor Assignment vs Pending */}
@@ -838,8 +966,12 @@ export default function LiveTrackingRadar({
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="font-bold text-[#F4EFE6]">{currentSupervisor?.name || 'Assigned Supervisor'}</p>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#E9A23B]/20 text-[#E9A23B] font-bold">
-                  Lead
+                <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                  isCompleted
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
+                    : 'bg-[#E9A23B]/20 text-[#E9A23B]'
+                }`}>
+                  {isCompleted ? 'Lead (Completed)' : 'Lead'}
                 </span>
               </div>
               {currentSupervisor?.phone && (
@@ -852,7 +984,7 @@ export default function LiveTrackingRadar({
                     <span>Call: +91 {currentSupervisor.phone}</span>
                   </a>
                   <a
-                    href={`https://wa.me/91${currentSupervisor.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${currentSupervisor.name || ''}, tracking booking #${bookingCode}.`)}`}
+                    href={`https://wa.me/91${currentSupervisor.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${currentSupervisor.name || ''}, regarding booking #${bookingCode}.`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] text-[#25D366] hover:underline flex items-center gap-1 transition-colors"

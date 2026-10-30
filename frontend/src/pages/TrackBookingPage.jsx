@@ -305,6 +305,7 @@ export default function TrackBookingPage() {
             {booking.status !== 'cancelled' && (
               <LiveTrackingRadar
                 bookingCode={booking.bookingCode}
+                bookingStatus={booking.status}
                 isSupervisorAssigned={Boolean(booking.supervisor || booking.assignedSupervisor?.name || booking.assignedSupervisor?.id)}
                 initialSupervisorLocation={booking.supervisorLiveLocation}
                 customerLocation={booking.address?.coordinates}

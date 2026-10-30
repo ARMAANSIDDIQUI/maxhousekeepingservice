@@ -2382,6 +2382,7 @@ export default function CustomerDashboard() {
               <div className="space-y-4">
                 <LiveTrackingRadar
                   bookingCode={trackingModalBooking.bookingCode}
+                  bookingStatus={trackingModalBooking.status}
                   isSupervisorAssigned={hasAssignedSup}
                   initialSupervisorLocation={hasAssignedSup ? trackingModalBooking.supervisorLiveLocation : null}
                   customerLocation={trackingModalBooking.address?.coordinates}

@@ -898,6 +898,8 @@ export async function cancelBooking(req, res, next) {
       booking.supervisorLiveLocation = {};
     }
     booking.supervisorLiveLocation.isSharing = false;
+    booking.supervisorLiveLocation.speed = 0;
+    booking.supervisorLiveLocation.heading = 0;
     booking.supervisorLiveLocation.updatedAt = new Date();
     booking.statusHistory.push({
       status: 'cancelled',
@@ -999,6 +1001,50 @@ export async function getBookingLiveLocation(req, res, next) {
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
+    }
+
+    // STRICT CESSATION: If booking is completed or cancelled, all live location tracking MUST be ceased strictly
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      if (booking.supervisorLiveLocation?.isSharing) {
+        booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.speed = 0;
+        booking.supervisorLiveLocation.heading = 0;
+        booking.supervisorLiveLocation.updatedAt = new Date();
+        await booking.save().catch(() => {});
+      }
+
+      let supervisorUser = null;
+      if (booking.supervisor) {
+        supervisorUser = await User.findById(booking.supervisor).select('name phone avatar avatarUrl');
+      }
+
+      const assignedName = (booking.assignedSupervisor?.name || supervisorUser?.name || '').trim();
+      const assignedPhone = (booking.assignedSupervisor?.phone || supervisorUser?.phone || '').trim();
+      const assignedAvatar = booking.assignedSupervisor?.avatarUrl || booking.assignedSupervisor?.avatar || supervisorUser?.avatarUrl || supervisorUser?.avatar || '';
+
+      const isSupervisorAssigned = Boolean(
+        booking.supervisor ||
+        booking.assignedSupervisor?.id ||
+        assignedName
+      );
+
+      return res.status(200).json({
+        success: true,
+        bookingCode: booking.bookingCode,
+        status: booking.status,
+        isSupervisorAssigned,
+        isSharing: false,
+        supervisor: isSupervisorAssigned ? {
+          name: assignedName || 'Assigned Supervisor',
+          phone: assignedPhone,
+          avatar: assignedAvatar,
+          avatarUrl: assignedAvatar
+        } : null,
+        supervisorLocation: null,
+        customerLocation: booking.address?.coordinates || null,
+        destinationAddress: `${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.address?.cityText || booking.cityName || ''}`.trim(),
+        message: 'Service visit has been completed. All real-time location tracking for this booking has strictly ceased.'
+      });
     }
 
     let supervisorUser = null;

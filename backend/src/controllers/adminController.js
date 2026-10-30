@@ -130,6 +130,8 @@ export async function updateBooking(req, res, next) {
           booking.supervisorLiveLocation = {};
         }
         booking.supervisorLiveLocation.isSharing = false;
+        booking.supervisorLiveLocation.speed = 0;
+        booking.supervisorLiveLocation.heading = 0;
         booking.supervisorLiveLocation.updatedAt = new Date();
       }
       booking.statusHistory.push({
@@ -1622,6 +1624,13 @@ export async function assignSupervisorToBooking(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
     }
 
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot assign supervisor: Booking is already completed or cancelled.'
+      });
+    }
+
     if (!supervisorId) {
       return res.status(400).json({ success: false, message: 'Please select a supervisor.' });
     }
@@ -2082,6 +2091,13 @@ export async function updateBookingSupervisorLocation(req, res, next) {
     }
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    if (['completed', 'cancelled'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot update live location: Booking has already been marked as completed or cancelled. Tracking has strictly ceased.'
+      });
     }
 
     const locData = {
