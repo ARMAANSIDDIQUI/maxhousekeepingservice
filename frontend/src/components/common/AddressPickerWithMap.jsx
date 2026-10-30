@@ -74,7 +74,15 @@ export default function AddressPickerWithMap({
   const sessionTokenRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const reverseGeocodeRef = useRef(null);
+  const disabledRef = useRef(disabled);
   const lastEmittedLine1Ref = useRef(value.line1 || value.formattedAddress || '');
+
+  useEffect(() => {
+    disabledRef.current = disabled;
+    if (markerInstanceRef.current && typeof markerInstanceRef.current.setDraggable === 'function') {
+      markerInstanceRef.current.setDraggable(!disabled);
+    }
+  }, [disabled]);
 
   // Load saved serviceable cities from MongoDB backend
   useEffect(() => {
@@ -307,7 +315,8 @@ export default function AddressPickerWithMap({
         streetViewControl: true,
         fullscreenControl: true,
         zoomControl: true,
-        gestureHandling: 'cooperative'
+        clickableIcons: true,
+        gestureHandling: 'greedy'
       });
 
       const panorama = map.getStreetView();
@@ -324,24 +333,29 @@ export default function AddressPickerWithMap({
       const marker = new google.maps.Marker({
         position: initialPos,
         map: map,
-        draggable: !disabled,
-        title: 'Drag marker to your exact house or gate',
+        draggable: !disabledRef.current,
+        title: 'Tap anywhere on the map or drag pin to your exact house or gate',
         animation: google.maps.Animation.DROP
       });
 
       marker.addListener('dragend', () => {
+        if (disabledRef.current) return;
         const newPos = marker.getPosition();
         if (newPos && reverseGeocodeRef.current) {
-          reverseGeocodeRef.current({ lat: newPos.lat(), lng: newPos.lng() }, true);
+          reverseGeocodeRef.current({ lat: newPos.lat(), lng: newPos.lng() }, true, null);
         }
       });
 
       map.addListener('click', (e) => {
-        if (disabled) return;
+        if (disabledRef.current || !e?.latLng) return;
+        if (typeof e.stop === 'function') {
+          e.stop(); // Prevent Google Maps default POI popup from intercepting tap-to-pin
+        }
         const newCoords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
         marker.setPosition(newCoords);
+        setCoordinates(newCoords);
         if (reverseGeocodeRef.current) {
-          reverseGeocodeRef.current(newCoords, true);
+          reverseGeocodeRef.current(newCoords, true, e.placeId || null);
         }
       });
 
@@ -847,18 +861,24 @@ export default function AddressPickerWithMap({
   };
 
   // Multi-source Reverse Geocoding that ALWAYS autofills the Search Street / Area / Landmark bar, City, Pincode & Landmark
-  const reverseGeocodeAndAutofill = useCallback(async (newCoords, updateSearchBar = true) => {
+  const reverseGeocodeAndAutofill = useCallback(async (newCoords, updateSearchBar = true, tappedPlaceId = null) => {
     const { lat, lng } = newCoords;
     setCoordinates(newCoords);
 
     if (mapInstanceRef.current) {
       mapInstanceRef.current.panTo(newCoords);
-      mapInstanceRef.current.setZoom(17);
+      const currentZoom = mapInstanceRef.current.getZoom?.() || 16;
+      if (currentZoom < 16) {
+        mapInstanceRef.current.setZoom(16);
+      }
     }
     if (markerInstanceRef.current) {
       markerInstanceRef.current.setPosition(newCoords);
       triggerPinDropAnimation();
     }
+
+    // Immediately emit new pin coordinates so parent state is updated on tap even before reverse geocoding completes
+    emitChange({ coordinates: newCoords });
 
     let resolvedAddress = '';
     let resolvedLandmark = '';
@@ -866,7 +886,38 @@ export default function AddressPickerWithMap({
     let resolvedState = '';
     let resolvedPincode = '';
 
-    // 1. Try our Backend Reverse Geocoding API first (combines MongoDB UP Cities + Nominatim + Photon)
+    // 0. If the user tapped directly on a Google Maps POI icon/landmark (tappedPlaceId), resolve its exact name & address first
+    if (tappedPlaceId && window.google?.maps?.places?.Place) {
+      try {
+        const placeObj = new window.google.maps.places.Place({ id: tappedPlaceId });
+        await placeObj.fetchFields({
+          fields: ['displayName', 'formattedAddress', 'addressComponents']
+        });
+        const poiName = placeObj.displayName || '';
+        const poiAddr = placeObj.formattedAddress || '';
+        if (poiName) resolvedLandmark = poiName;
+        if (poiAddr) {
+          resolvedAddress = poiName && !poiAddr.toLowerCase().includes(poiName.toLowerCase())
+            ? `${poiName}, ${poiAddr}`
+            : poiAddr;
+        }
+        if (Array.isArray(placeObj.addressComponents)) {
+          const fakeGeoResult = [{
+            address_components: placeObj.addressComponents.map((c) => ({
+              long_name: c.longText || c.shortText || '',
+              short_name: c.shortText || c.longText || '',
+              types: c.types || []
+            }))
+          }];
+          const comps = extractFromGeocodeResults(fakeGeoResult);
+          if (comps.city) resolvedCity = comps.city;
+          if (comps.state) resolvedState = comps.state;
+          if (comps.pincode) resolvedPincode = comps.pincode;
+        }
+      } catch (_) {}
+    }
+
+    // 1. Try our Backend Reverse Geocoding API (combines MongoDB UP Cities + Nominatim + Photon)
     try {
       const backendRes = await fetch(
         `${API_BASE_URL}/locations/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
@@ -1442,7 +1493,7 @@ export default function AddressPickerWithMap({
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#10231D] flex items-center gap-1.5">
               <LuCompass className="w-4 h-4 text-[#E9A23B]" />
-              <span>Map Location (Optional — Drag pin if needed)</span>
+              <span>Map Location (Tap anywhere on map or drag pin to change location)</span>
             </span>
           </div>
 
