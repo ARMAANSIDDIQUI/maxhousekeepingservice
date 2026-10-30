@@ -11,6 +11,7 @@ import Testimonial from '../models/Testimonial.js';
 import { ContactMessage } from '../models/Supporting.js';
 import { deleteCloudinaryAsset } from '../config/cloudinary.js';
 import { sendBookingStatusUpdateEmail } from '../services/emailService.js';
+import { validateDateMonthDays, formatDateDMY } from '../utils/dateValidation.js';
 
 /**
  * Get Admin Dashboard Overview Statistics
@@ -163,6 +164,18 @@ export async function updateBooking(req, res, next) {
           if (['pending', 'assigned'].includes(booking.status) || !booking.status) {
             booking.status = 'confirmed';
           }
+          booking.supervisorLiveLocation = {
+            ...(booking.supervisorLiveLocation || {}),
+            ...(sup.lastKnownLocation?.lat ? {
+              lat: sup.lastKnownLocation.lat,
+              lng: sup.lastKnownLocation.lng,
+              heading: sup.lastKnownLocation.heading || 0,
+              speed: sup.lastKnownLocation.speed || 0,
+              accuracy: sup.lastKnownLocation.accuracy || 15
+            } : {}),
+            isSharing: true,
+            updatedAt: new Date()
+          };
           booking.statusHistory.push({
             status: booking.status,
             timestamp: new Date(),
@@ -177,6 +190,12 @@ export async function updateBooking(req, res, next) {
     }
 
     if (assignedSlot) {
+      if (assignedSlot.date) {
+        const check = validateDateMonthDays(assignedSlot.date);
+        if (!check.valid) {
+          return res.status(400).json({ success: false, message: check.error });
+        }
+      }
       booking.assignedSlot = {
         date: assignedSlot.date || booking.slot?.date,
         timeWindow: assignedSlot.timeWindow || assignedSlot.window || booking.slot?.window,
@@ -659,6 +678,18 @@ export async function getAdminCoupons(req, res, next) {
 
 export async function createCoupon(req, res, next) {
   try {
+    if (req.body.expiryDate) {
+      const check = validateDateMonthDays(req.body.expiryDate);
+      if (!check.valid) {
+        return res.status(400).json({ success: false, message: check.error });
+      }
+    }
+    if (req.body.validUntil) {
+      const check = validateDateMonthDays(req.body.validUntil);
+      if (!check.valid) {
+        return res.status(400).json({ success: false, message: check.error });
+      }
+    }
     let coupon = await Coupon.create(req.body);
     coupon = await Coupon.findById(coupon._id)
       .populate('applicableServices', 'title slug price')
@@ -671,6 +702,18 @@ export async function createCoupon(req, res, next) {
 
 export async function updateCoupon(req, res, next) {
   try {
+    if (req.body.expiryDate) {
+      const check = validateDateMonthDays(req.body.expiryDate);
+      if (!check.valid) {
+        return res.status(400).json({ success: false, message: check.error });
+      }
+    }
+    if (req.body.validUntil) {
+      const check = validateDateMonthDays(req.body.validUntil);
+      if (!check.valid) {
+        return res.status(400).json({ success: false, message: check.error });
+      }
+    }
     const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .populate('applicableServices', 'title slug price')
       .populate('applicableCategories', 'name slug');
@@ -1646,6 +1689,12 @@ export async function assignSupervisorToBooking(req, res, next) {
     };
 
     if (assignedSlot) {
+      if (assignedSlot.date) {
+        const check = validateDateMonthDays(assignedSlot.date);
+        if (!check.valid) {
+          return res.status(400).json({ success: false, message: check.error });
+        }
+      }
       booking.assignedSlot = {
         date: assignedSlot.date || booking.slot?.date,
         timeWindow: assignedSlot.timeWindow || assignedSlot.window || booking.slot?.window,
@@ -1666,6 +1715,22 @@ export async function assignSupervisorToBooking(req, res, next) {
     if (['pending', 'assigned'].includes(booking.status) || !booking.status) {
       booking.status = 'confirmed';
     }
+
+    // Ensure live location sharing is ON by default for assigned supervisor
+    const supervisorCoords = supervisor.lastKnownLocation?.lat ? {
+      lat: supervisor.lastKnownLocation.lat,
+      lng: supervisor.lastKnownLocation.lng,
+      heading: supervisor.lastKnownLocation.heading || 0,
+      speed: supervisor.lastKnownLocation.speed || 0,
+      accuracy: supervisor.lastKnownLocation.accuracy || 15
+    } : null;
+
+    booking.supervisorLiveLocation = {
+      ...(booking.supervisorLiveLocation || {}),
+      ...(supervisorCoords || {}),
+      isSharing: true,
+      updatedAt: new Date()
+    };
 
     const assignmentNote = note || `Assigned to supervisor ${supervisor.name} for slot: ${booking.slot.date} (${booking.slot.window}). Status automatically confirmed.`;
     booking.statusHistory.push({

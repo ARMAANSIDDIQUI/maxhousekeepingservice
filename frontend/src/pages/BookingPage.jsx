@@ -31,6 +31,7 @@ import { apiRequest } from '../api';
 import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
+import { formatDateDMY, validateDateMonthDays } from '../utils/date';
 
 // Central Dynamic Helper: Check if a service is available in the target city
 export function isServiceAvailableInCity(service, citySlug) {
@@ -447,17 +448,25 @@ export default function BookingPage() {
         ...prev,
         date: 'Please select a date.'
       }));
-    } else if (val < today) {
-      setFieldErrors(prev => ({
-        ...prev,
-        date: 'Booking date cannot be in the past.'
-      }));
     } else {
-      setFieldErrors(prev => {
-        const next = { ...prev };
-        delete next.date;
-        return next;
-      });
+      const check = validateDateMonthDays(val);
+      if (!check.valid) {
+        setFieldErrors(prev => ({
+          ...prev,
+          date: check.error
+        }));
+      } else if (val < today) {
+        setFieldErrors(prev => ({
+          ...prev,
+          date: 'Booking date cannot be in the past.'
+        }));
+      } else {
+        setFieldErrors(prev => {
+          const next = { ...prev };
+          delete next.date;
+          return next;
+        });
+      }
     }
   };
 
@@ -886,9 +895,20 @@ export default function BookingPage() {
 
     // 6. Validate Booking Date & Time Window
     const today = new Date().toISOString().split('T')[0];
-    if (!slot.date || slot.date < today) {
+    if (!slot.date) {
       toast.error('Please select an upcoming date for your cleaning service.');
       setFieldErrors(prev => ({ ...prev, date: 'Please select an upcoming date.' }));
+      return;
+    }
+    const checkDate = validateDateMonthDays(slot.date);
+    if (!checkDate.valid) {
+      toast.error(checkDate.error);
+      setFieldErrors(prev => ({ ...prev, date: checkDate.error }));
+      return;
+    }
+    if (slot.date < today) {
+      toast.error('Booking date cannot be in the past.');
+      setFieldErrors(prev => ({ ...prev, date: 'Booking date cannot be in the past.' }));
       return;
     }
 
@@ -1678,6 +1698,11 @@ export default function BookingPage() {
                     <label className="block text-xs font-bold text-[#10231D]">
                       Select Date: <span className="text-[#C2512D]">*</span>
                     </label>
+                    {slot.date && (
+                      <span className="text-[11px] font-bold text-[#10231D] bg-[#ECE5D8] px-2 py-0.5 rounded-md border border-[#D2C8B8]">
+                        Format: <span className="font-mono text-[#C2512D]">{formatDateDMY(slot.date)}</span> (DD/MM/YYYY)
+                      </span>
+                    )}
                   </div>
                   <input
                     type="date"

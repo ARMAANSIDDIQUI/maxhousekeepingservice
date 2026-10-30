@@ -163,9 +163,25 @@ export async function getDrivingRoute(req, res, next) {
       }
     }
 
-    return res.status(503).json({
-      success: false,
-      message: 'Road network route temporarily calculating. Please retry.'
+    // Resilient fallback: estimate route coordinates, distance and transit time
+    const dLat = (eLat - sLat) * (Math.PI / 180);
+    const dLng = (eLng - sLng) * (Math.PI / 180);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(sLat * (Math.PI / 180)) * Math.cos(eLat * (Math.PI / 180)) * Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const directKm = Number((6371 * c).toFixed(1));
+    const drivingKm = Number((directKm * 1.25).toFixed(1));
+    const mins = Math.max(2, Math.round((drivingKm / 22) * 60));
+
+    return res.status(200).json({
+      success: true,
+      coordinates: [
+        { lat: sLat, lng: sLng },
+        { lat: (sLat + eLat) / 2, lng: (sLng + eLng) / 2 },
+        { lat: eLat, lng: eLng }
+      ],
+      distanceKm: drivingKm,
+      durationMinutes: mins,
+      fallback: true
     });
   } catch (err) {
     next(err);

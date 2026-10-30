@@ -57,7 +57,7 @@ export default function LiveTrackingRadar({
     initialHasSupervisor && initialSupervisorLocation?.lat ? initialSupervisorLocation : null
   );
   const [isSharing, setIsSharing] = useState(
-    Boolean(initialHasSupervisor && initialSupervisorLocation?.lat && (initialSupervisorLocation?.isSharing ?? true))
+    Boolean(initialHasSupervisor && (initialSupervisorLocation?.isSharing !== false))
   );
   const [lastUpdated, setLastUpdated] = useState(
     initialSupervisorLocation?.updatedAt ? new Date(initialSupervisorLocation.updatedAt) : new Date()
@@ -199,8 +199,9 @@ export default function LiveTrackingRadar({
       }
     }
 
-    // Notice: We strictly DO NOT draw a 2-point straight displacement vector.
-    // If road network data is temporarily unreachable, markers stay at their exact locations.
+    // Fallback: If road engines are unreachable, render direct route path so supervisor, admin and user ALWAYS see route, distance and ETA
+    const fallbackDist = calculateDistanceKm(startPos.lat, startPos.lng, endPos.lat, endPos.lng);
+    renderRoadPolyline([startPos, endPos], fallbackDist);
   };
 
   // Sync prop changes
@@ -240,9 +241,9 @@ export default function LiveTrackingRadar({
               : isGenuineSupervisor(data.supervisor);
 
           setHasSupervisor(assigned);
-          setIsSharing(Boolean(assigned && data.isSharing));
+          setIsSharing(Boolean(assigned && (data.isSharing ?? true)));
 
-          if (data.customerLocation && !resolvedCustomerLoc) {
+          if (data.customerLocation) {
             setResolvedCustomerLoc(data.customerLocation);
           }
 
@@ -311,18 +312,19 @@ export default function LiveTrackingRadar({
   // Calculate distance between supervisor and customer doorstep (Zero Google API costs)
   useEffect(() => {
     const cust = resolvedCustomerLoc || customerLocation;
-    if (hasSupervisor && cust?.lat && liveLocation?.lat) {
+    const sup = liveLocation || initialSupervisorLocation;
+    if (hasSupervisor && cust?.lat && sup?.lat) {
       const dist = calculateDistanceKm(
         cust.lat,
         cust.lng,
-        liveLocation.lat,
-        liveLocation.lng
+        sup.lat,
+        sup.lng
       );
       setDistanceKm(dist);
     } else if (!hasSupervisor) {
       setDistanceKm(null);
     }
-  }, [hasSupervisor, resolvedCustomerLoc, customerLocation, liveLocation]);
+  }, [hasSupervisor, resolvedCustomerLoc, customerLocation, liveLocation, initialSupervisorLocation]);
 
   const etaInfo = hasSupervisor ? getEtaInfo(distanceKm) : null;
 
@@ -542,12 +544,10 @@ export default function LiveTrackingRadar({
               className={`w-3.5 h-3.5 rounded-full block ${
                 !hasSupervisor
                   ? 'bg-[#E9A23B]'
-                  : isSharing
-                    ? 'bg-[#25D366]'
-                    : 'bg-[#6B8077]'
+                  : 'bg-[#25D366]'
               }`}
             />
-            {hasSupervisor && isSharing && (
+            {hasSupervisor && (
               <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
             )}
           </div>
@@ -556,37 +556,31 @@ export default function LiveTrackingRadar({
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#E9A23B]">
                 {!hasSupervisor
                   ? 'SUPERVISOR NOT YET ASSIGNED'
-                  : isSharing
-                    ? 'LIVE LOCATION MAP'
-                    : 'SUPERVISOR ASSIGNED'}
+                  : 'LIVE LOCATION & ROUTE'}
               </span>
               <span
                 className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
                   !hasSupervisor
                     ? 'bg-amber-950/90 text-[#E9A23B] border border-[#E9A23B]/40'
-                    : isSharing
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
-                      : 'bg-[#2D453B] text-[#A3B8B0]'
+                    : 'bg-emerald-950 text-emerald-300 border border-emerald-700'
                 }`}
               >
-                {!hasSupervisor ? 'Not Assigned Yet' : isSharing ? 'Sharing On' : 'Sharing Off'}
+                {!hasSupervisor ? 'Not Assigned Yet' : 'Sharing On'}
               </span>
             </div>
             <p className="text-xs text-[#A3B8B0] mt-0.5">
               {!hasSupervisor
                 ? `Field supervisor not yet assigned to your visit · Ref: #${bookingCode}`
-                : isSharing
-                  ? etaInfo
-                    ? `${etaInfo.statusText} · Ref: #${bookingCode}`
-                    : `Supervisor en route to your address · Ref: #${bookingCode}`
-                  : `Supervisor assigned to your visit · Ref: #${bookingCode}`}
+                : etaInfo
+                  ? `${etaInfo.statusText} · Ref: #${bookingCode}`
+                  : `Supervisor en route to your address · Ref: #${bookingCode}`}
             </p>
           </div>
         </div>
 
-        {/* Uber/Rapido Distance & ETA Pill (Only when Supervisor is Assigned & Sharing) */}
+        {/* Uber/Rapido Distance & ETA Pill (Always when Supervisor is Assigned & Distance is calculated) */}
         <div className="flex items-center gap-2.5">
-          {hasSupervisor && distanceKm !== null && isSharing && etaInfo && (
+          {hasSupervisor && distanceKm !== null && etaInfo && (
             <div className="px-4 py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-3.5 shadow-sm">
               <div>
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">Distance</span>
@@ -725,8 +719,8 @@ export default function LiveTrackingRadar({
           </div>
         )}
 
-        {/* Floating Uber/Rapido Live Arrival Pill on Map (Only when Supervisor is Assigned & Sharing) */}
-        {hasSupervisor && isSharing && etaInfo && (
+        {/* Floating Uber/Rapido Live Arrival Pill on Map */}
+        {hasSupervisor && etaInfo && (
           <div className="absolute top-3 left-3 right-16 sm:right-auto z-10 pointer-events-none">
             <div className={`backdrop-blur-md px-4 py-2.5 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
               etaInfo.isArrived

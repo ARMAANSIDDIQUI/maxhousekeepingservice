@@ -46,7 +46,7 @@ import {
   LuNavigation,
   LuExternalLink
 } from 'react-icons/lu';
-import { formatDateDMY } from '../../utils/date';
+import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../../utils/date';
 import {
   apiRequest,
   adminAPI
@@ -2757,6 +2757,13 @@ export default function AdminDashboard() {
       toast.error('Coupon code is required.');
       return;
     }
+    if (couponForm.expiryDate) {
+      const check = validateDateMonthDays(couponForm.expiryDate);
+      if (!check.valid) {
+        toast.error(check.error);
+        return;
+      }
+    }
     setSavingCoupon(true);
     try {
       const payload = {
@@ -3868,6 +3875,13 @@ export default function AdminDashboard() {
       toast.error('Please select a supervisor to assign.');
       return;
     }
+    if (assignDate) {
+      const check = validateDateMonthDays(assignDate);
+      if (!check.valid) {
+        toast.error(check.error);
+        return;
+      }
+    }
     setAssigningSupervisor(true);
     try {
       const payload = {
@@ -4346,7 +4360,7 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-[#10231D]">{b.cityName}</span>: {b.address?.line1}
                         </td>
                         <td className="py-3 px-3 font-mono text-[#3D524A]">
-                          <p>{b.assignedSlot?.date || b.slot?.date} ({b.assignedSlot?.timeWindow?.split(' ')[0] || b.slot?.window?.split(' ')[0] || 'Scheduled'})</p>
+                          <p>{formatDateDMY(b.assignedSlot?.date || b.slot?.date)} ({b.assignedSlot?.timeWindow?.split(' ')[0] || b.slot?.window?.split(' ')[0] || 'Scheduled'})</p>
                           <div className="mt-1">
                             {b.assignedSupervisor?.name || b.supervisor?.name ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -5363,10 +5377,7 @@ export default function AdminDashboard() {
                     {filteredMessagesList.map((msg) => (
                       <tr key={msg._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3 font-mono text-[#6B8077]">
-                          {new Date(msg.createdAt).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short'
-                          })}
+                          {formatDateDMY(msg.createdAt)}
                         </td>
                         <td className="py-3 px-3 font-bold text-[#10231D]">
                           <button
@@ -5831,11 +5842,7 @@ export default function AdminDashboard() {
                           {u.addresses?.length || 0} locations
                         </td>
                         <td className="py-3 px-3 font-mono text-[#6B8077]">
-                          {new Date(u.createdAt).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
+                          {formatDateDMY(u.createdAt)}
                         </td>
                         <td className="py-3 px-3 text-right">
                           <button
@@ -5930,11 +5937,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-3 font-mono text-[#6B8077]">
                           {(c.validUntil || c.expiryDate)
-                            ? new Date(c.validUntil || c.expiryDate).toLocaleDateString('en-IN', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric'
-                              })
+                            ? formatDateDMY(c.validUntil || c.expiryDate)
                             : 'Never'}
                         </td>
                         <td className="py-3 px-3">
@@ -7955,10 +7958,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <p className="text-[11px] text-[#A3B8B0]">
-                    Booked on: {new Date(viewBookingDetails.createdAt).toLocaleString('en-IN', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short'
-                    })}
+                    Booked on: {formatDateTimeDMY(viewBookingDetails.createdAt)}
                   </p>
                 </div>
 
@@ -8063,7 +8063,7 @@ export default function AdminDashboard() {
                     <div className="pt-2 mt-2 border-t border-[#E2D9C8] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                       <div className="flex items-center gap-2">
                         <LuClock className="w-3.5 h-3.5 text-[#E9A23B]" />
-                        <span>{viewBookingDetails.slot?.date}</span>
+                        <span>{formatDateDMY(viewBookingDetails.slot?.date)}</span>
                         <span className="text-[#6B8077]">({viewBookingDetails.slot?.window})</span>
                       </div>
                       <a
@@ -8140,7 +8140,7 @@ export default function AdminDashboard() {
                         )}
                         {viewBookingDetails.assignedSlot?.timeWindow && (
                           <p className="text-[10px] font-mono text-[#3D524A] mt-1 pt-1 border-t border-[#E2D9C8]/60">
-                            Slot: {viewBookingDetails.assignedSlot?.date || viewBookingDetails.slot?.date} • {viewBookingDetails.assignedSlot?.timeWindow}
+                            Slot: {formatDateDMY(viewBookingDetails.assignedSlot?.date || viewBookingDetails.slot?.date)} • {viewBookingDetails.assignedSlot?.timeWindow}
                           </p>
                         )}
                       </div>
@@ -8467,10 +8467,7 @@ export default function AdminDashboard() {
             isOpen={Boolean(viewInquiryDetails)}
             onClose={() => setViewInquiryDetails(null)}
             title="Customer Contact Inquiry"
-            subtitle={`Submitted on ${new Date(viewInquiryDetails.createdAt).toLocaleString('en-IN', {
-              dateStyle: 'medium',
-              timeStyle: 'short'
-            })}`}
+            subtitle={`Submitted on ${formatDateTimeDMY(viewInquiryDetails.createdAt)}`}
             maxWidth="max-w-xl"
           >
             <div className="space-y-4 text-xs text-[#10231D]">

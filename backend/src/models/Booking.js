@@ -125,7 +125,7 @@ const bookingSchema = new mongoose.Schema({
     speed: { type: Number, default: 0 },
     accuracy: { type: Number, default: 0 },
     updatedAt: { type: Date },
-    isSharing: { type: Boolean, default: false }
+    isSharing: { type: Boolean, default: true }
   },
   serviceOtp: {
     type: String,

@@ -41,7 +41,7 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import UserAvatar from '../components/common/UserAvatar';
 import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
 import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
-import { formatDateDMY } from '../utils/date';
+import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../utils/date';
 
 export default function CustomerDashboard() {
   const { user, updateProfile, changePassword, addAddress, updateAddress, deleteAddress, setDefaultAddress, isLoading: isAuthLoading } = useAuth();
@@ -479,6 +479,21 @@ export default function CustomerDashboard() {
     const cleanPincode = editForm.pincode.replace(/\D/g, '');
     if (cleanPincode.length !== 6) {
       toast.error('Please enter a valid 6-digit pincode.');
+      return;
+    }
+
+    if (!editForm.date) {
+      toast.error('Please select a scheduled date.');
+      return;
+    }
+    const checkDate = validateDateMonthDays(editForm.date);
+    if (!checkDate.valid) {
+      toast.error(checkDate.error);
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    if (editForm.date < today) {
+      toast.error('Scheduled date cannot be in the past.');
       return;
     }
 
@@ -2034,11 +2049,19 @@ export default function CustomerDashboard() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Scheduled Date:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      Scheduled Date:
+                    </label>
+                    {editForm.date && (
+                      <span className="text-[10px] font-mono text-[#3D524A] bg-[#ECE5D8] px-1.5 py-0.5 rounded border border-[#D2C8B8]">
+                        {formatDateDMY(editForm.date)} (DD/MM/YYYY)
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={editForm.date}
                     onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                     className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"

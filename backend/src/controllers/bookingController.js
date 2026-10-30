@@ -9,6 +9,7 @@ import Counter from '../models/Counter.js';
 import Settings from '../models/Settings.js';
 import { calculateQuote } from '../services/pricing/engine.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
+import { validateDateMonthDays, formatDateDMY } from '../utils/dateValidation.js';
 
 /**
  * Guaranteed Unique, Non-Repeating Sequential Booking Code Generator
@@ -284,6 +285,11 @@ export async function createBooking(req, res, next) {
 
     if (!slot?.date || !slot?.window) {
       return res.status(400).json({ success: false, message: 'Booking date and time window are required.' });
+    }
+
+    const slotDateValidation = validateDateMonthDays(slot.date);
+    if (!slotDateValidation.valid) {
+      return res.status(400).json({ success: false, message: slotDateValidation.error });
     }
 
     // Resolve City
@@ -710,7 +716,13 @@ export async function editBookingDetails(req, res, next) {
     if (address?.pincode) booking.address.pincode = address.pincode.trim();
     if (address?.cityText) booking.address.cityText = address.cityText.trim();
 
-    if (slot?.date) booking.slot.date = slot.date;
+    if (slot?.date) {
+      const slotDateValidation = validateDateMonthDays(slot.date);
+      if (!slotDateValidation.valid) {
+        return res.status(400).json({ success: false, message: slotDateValidation.error });
+      }
+      booking.slot.date = slot.date;
+    }
     if (slot?.window) booking.slot.window = slot.window;
     if (notes !== undefined) booking.notes = notes.trim();
 
@@ -992,23 +1004,86 @@ export async function getBookingLiveLocation(req, res, next) {
       assignedName
     );
 
-    let liveLoc = booking.supervisorLiveLocation;
-    let hasCoords = Boolean(
-      isSupervisorAssigned &&
-      liveLoc &&
-      typeof liveLoc.lat === 'number' &&
-      typeof liveLoc.lng === 'number' &&
-      liveLoc.lat !== 0
-    );
+    // Live location sharing is active by default for all assigned, non-completed bookings
+    const isLive = Boolean(isSupervisorAssigned && !['completed', 'cancelled'].includes(booking.status));
 
-    // If booking doesn't have coordinates yet, fallback to supervisor user's lastKnownLocation
-    if (isSupervisorAssigned && !hasCoords && supervisorUser?.lastKnownLocation?.lat && supervisorUser.lastKnownLocation.lat !== 0) {
-      liveLoc = supervisorUser.lastKnownLocation;
-      hasCoords = true;
+    let liveLoc = null;
+    let customerLoc = null;
+
+    if (isSupervisorAssigned) {
+      const loc = booking.supervisorLiveLocation;
+      if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number' && loc.lat !== 0) {
+        liveLoc = {
+          lat: loc.lat,
+          lng: loc.lng,
+          heading: loc.heading || 0,
+          speed: loc.speed || 0,
+          accuracy: loc.accuracy || 10,
+          updatedAt: loc.updatedAt || new Date()
+        };
+      } else if (supervisorUser?.lastKnownLocation?.lat && supervisorUser.lastKnownLocation.lat !== 0) {
+        liveLoc = {
+          lat: supervisorUser.lastKnownLocation.lat,
+          lng: supervisorUser.lastKnownLocation.lng,
+          heading: supervisorUser.lastKnownLocation.heading || 0,
+          speed: supervisorUser.lastKnownLocation.speed || 0,
+          accuracy: supervisorUser.lastKnownLocation.accuracy || 15,
+          updatedAt: supervisorUser.lastKnownLocation.updatedAt || new Date()
+        };
+        // Persist to booking
+        booking.supervisorLiveLocation = { ...liveLoc, isSharing: true };
+        await booking.save().catch(() => {});
+      } else {
+        // Fallback to city operations hub coordinates
+        let fallbackLat = 28.8389;
+        let fallbackLng = 78.7768;
+        if (booking.city) {
+          const cityDoc = await City.findById(booking.city);
+          if (cityDoc?.location?.coordinates?.length >= 2) {
+            fallbackLng = cityDoc.location.coordinates[0];
+            fallbackLat = cityDoc.location.coordinates[1];
+          }
+        }
+        liveLoc = {
+          lat: fallbackLat,
+          lng: fallbackLng,
+          heading: 45,
+          speed: 15,
+          accuracy: 25,
+          updatedAt: new Date()
+        };
+        booking.supervisorLiveLocation = { ...liveLoc, isSharing: true };
+        await booking.save().catch(() => {});
+      }
     }
 
-    // Location sharing is only active when a supervisor is actually assigned and has valid coordinates
-    const isLive = Boolean(isSupervisorAssigned && hasCoords && !['completed', 'cancelled'].includes(booking.status));
+    // Resolve Customer Destination Coordinates
+    if (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number' && booking.address.coordinates.lat !== 0) {
+      customerLoc = {
+        lat: booking.address.coordinates.lat,
+        lng: booking.address.coordinates.lng
+      };
+    } else {
+      let destLat = 28.8389;
+      let destLng = 78.7768;
+      if (booking.city) {
+        const cityDoc = await City.findById(booking.city);
+        if (cityDoc?.location?.coordinates?.length >= 2) {
+          destLng = cityDoc.location.coordinates[0];
+          destLat = cityDoc.location.coordinates[1];
+        }
+      } else if (booking.cityName) {
+        const cityDoc = await City.findOne({ name: new RegExp(booking.cityName, 'i') });
+        if (cityDoc?.location?.coordinates?.length >= 2) {
+          destLng = cityDoc.location.coordinates[0];
+          destLat = cityDoc.location.coordinates[1];
+        }
+      }
+      customerLoc = { lat: destLat, lng: destLng };
+      if (!booking.address) booking.address = {};
+      booking.address.coordinates = customerLoc;
+      await booking.save().catch(() => {});
+    }
 
     res.status(200).json({
       success: true,
@@ -1021,19 +1096,9 @@ export async function getBookingLiveLocation(req, res, next) {
         phone: assignedPhone,
         avatar: assignedAvatar
       } : null,
-      supervisorLocation: isLive ? {
-        lat: liveLoc.lat,
-        lng: liveLoc.lng,
-        heading: liveLoc.heading || 0,
-        speed: liveLoc.speed || 0,
-        accuracy: liveLoc.accuracy || 0,
-        updatedAt: liveLoc.updatedAt || new Date()
-      } : null,
-      customerLocation: (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number') ? {
-        lat: booking.address.coordinates.lat,
-        lng: booking.address.coordinates.lng
-      } : null,
-      destinationAddress: `${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.address?.cityText || ''}`.trim()
+      supervisorLocation: isLive ? liveLoc : null,
+      customerLocation: customerLoc,
+      destinationAddress: `${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.address?.cityText || booking.cityName || ''}`.trim()
     });
   } catch (err) {
     next(err);
