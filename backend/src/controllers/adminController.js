@@ -1345,8 +1345,12 @@ export async function getAdminSupervisors(req, res, next) {
 
     const supervisorsWithStats = supervisors.map(s => {
       const stats = countMap.get(String(s._id)) || { totalAssigned: 0, completed: 0, inProgress: 0 };
+      const defaultAvatar = User.generateDefaultAvatar ? User.generateDefaultAvatar(s.name) : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(s.name || 'MH')}&backgroundColor=10231D&textColor=F4EFE6&radius=50`;
+      const resolvedAvatar = s.avatar || s.avatarUrl || defaultAvatar;
       return {
         ...s.toObject(),
+        avatar: resolvedAvatar,
+        avatarUrl: resolvedAvatar,
         status: s.isActive ? 'active' : 'suspended',
         totalAssigned: stats.totalAssigned,
         completed: stats.completed,
@@ -1402,7 +1406,8 @@ export async function createSupervisor(req, res, next) {
       }
     }
 
-    const avatarUrl = User.generateDefaultAvatar ? User.generateDefaultAvatar(name) : '';
+    const defaultAvatar = User.generateDefaultAvatar ? User.generateDefaultAvatar(name) : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'MH')}&backgroundColor=10231D&textColor=F4EFE6&radius=50`;
+    const resolvedAvatar = (req.body.avatarUrl || req.body.avatar || defaultAvatar).trim();
 
     const supervisor = new User({
       name: name.trim(),
@@ -1411,7 +1416,8 @@ export async function createSupervisor(req, res, next) {
       passwordHash: password, // Mongoose pre-save hook will hash this securely
       role: 'supervisor',
       authProvider: 'local',
-      avatarUrl,
+      avatarUrl: resolvedAvatar,
+      avatar: resolvedAvatar,
       emailVerified: true,
       isActive: true
     });
@@ -1421,6 +1427,8 @@ export async function createSupervisor(req, res, next) {
     const safeSupervisor = supervisor.toObject();
     delete safeSupervisor.passwordHash;
     delete safeSupervisor.otpSecret;
+    safeSupervisor.avatar = safeSupervisor.avatar || safeSupervisor.avatarUrl || defaultAvatar;
+    safeSupervisor.avatarUrl = safeSupervisor.avatar;
     safeSupervisor.status = safeSupervisor.isActive ? 'active' : 'suspended';
 
     res.status(201).json({
@@ -1460,11 +1468,20 @@ export async function updateSupervisor(req, res, next) {
       supervisor.passwordHash = password.trim(); // Will be hashed by pre-save hook
     }
 
+    if (req.body.avatarUrl !== undefined || req.body.avatar !== undefined) {
+      const av = String(req.body.avatarUrl || req.body.avatar || '').trim();
+      supervisor.avatarUrl = av || (User.generateDefaultAvatar ? User.generateDefaultAvatar(supervisor.name) : '');
+      supervisor.avatar = supervisor.avatarUrl;
+    }
+
     await supervisor.save();
 
     const safeSupervisor = supervisor.toObject();
     delete safeSupervisor.passwordHash;
     delete safeSupervisor.otpSecret;
+    const fallbackAvatar = User.generateDefaultAvatar ? User.generateDefaultAvatar(supervisor.name) : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(supervisor.name || 'MH')}&backgroundColor=10231D&textColor=F4EFE6&radius=50`;
+    safeSupervisor.avatar = supervisor.avatar || supervisor.avatarUrl || fallbackAvatar;
+    safeSupervisor.avatarUrl = safeSupervisor.avatar;
     safeSupervisor.status = safeSupervisor.isActive ? 'active' : 'suspended';
 
     res.status(200).json({

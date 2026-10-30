@@ -3710,7 +3710,10 @@ export default function AdminDashboard() {
       password: '',
       phone: '',
       city: cities[0]?.slug || 'moradabad',
-      status: 'active'
+      status: 'active',
+      role: 'supervisor',
+      avatarUrl: '',
+      avatar: ''
     });
     setSupervisorModalOpen(true);
   };
@@ -3724,7 +3727,9 @@ export default function AdminDashboard() {
       phone: sup.phone || '',
       city: sup.city || 'moradabad',
       status: sup.status || 'active',
-      role: sup.role || 'supervisor'
+      role: sup.role || 'supervisor',
+      avatarUrl: sup.avatarUrl || sup.avatar || '',
+      avatar: sup.avatar || sup.avatarUrl || ''
     });
     setSupervisorModalOpen(true);
   };
@@ -4599,9 +4604,11 @@ export default function AdminDashboard() {
                         <tr key={sup._id} className="hover:bg-[#F4EFE6]/50">
                           <td className="py-3 px-3 font-bold text-[#10231D]">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center font-bold text-xs shrink-0">
-                                {sup.name?.charAt(0)?.toUpperCase() || 'S'}
-                              </div>
+                              <img
+                                src={sup.avatarUrl || sup.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent((sup.name || 'MH').slice(0, 2))}&backgroundColor=10231D&textColor=F4EFE6&radius=50`}
+                                alt={sup.name}
+                                className="w-8 h-8 rounded-full border border-[#E2D9C8] bg-white object-cover shrink-0"
+                              />
                               <div>
                                 <p className="font-bold text-xs text-[#10231D]">{sup.name}</p>
                                 <span className="text-[10px] font-mono text-[#6B8077]">ID: {sup._id?.slice(-6)}</span>
@@ -8634,6 +8641,26 @@ export default function AdminDashboard() {
             maxWidth="max-w-lg"
           >
             <form onSubmit={handleSaveSupervisor} className="space-y-4 text-xs text-[#10231D]">
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
+                <img
+                  src={
+                    supervisorForm.avatarUrl ||
+                    supervisorForm.avatar ||
+                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent((supervisorForm.name || 'MH').slice(0, 2))}&backgroundColor=10231D&textColor=F4EFE6&radius=50`
+                  }
+                  alt={supervisorForm.name || 'Supervisor'}
+                  className="w-12 h-12 rounded-full border-2 border-[#E2D9C8] bg-white object-cover shadow-xs shrink-0"
+                />
+                <div>
+                  <p className="font-bold text-xs text-[#10231D]">
+                    {supervisorForm.name || 'Field Supervisor Profile'}
+                  </p>
+                  <p className="text-[10px] text-[#6B8077]">
+                    Default profile DP automatically matched to user profile avatar
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
                   Full Name: <span className="text-[#C2512D]">*</span>
