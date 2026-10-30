@@ -8,7 +8,9 @@ import {
   LuExternalLink,
   LuPhone,
   LuUser,
-  LuCircleCheck
+  LuCircleCheck,
+  LuLayers,
+  LuEye
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import { loadGoogleMapsScript } from '../../utils/googleMapsLoader';
@@ -65,6 +67,8 @@ export default function LiveTrackingRadar({
     initialHasSupervisor && isGenuineSupervisor(supervisorInfo) ? supervisorInfo : null
   );
   const [distanceKm, setDistanceKm] = useState(null);
+  const [mapViewMode, setMapViewMode] = useState('roadmap'); // 'roadmap' | 'hybrid' | 'streetview'
+  const [streetViewNotice, setStreetViewNotice] = useState('');
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -357,17 +361,23 @@ export default function LiveTrackingRadar({
       const map = new google.maps.Map(mapContainerRef.current, {
         center: hasSupCoords ? supPos : custPos,
         zoom: 15,
+        mapTypeId: 'roadmap',
         mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-        zoomControl: true,
-        styles: [
-          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-          { featureType: 'landscape', stylers: [{ lightness: 18 }] },
-          { featureType: 'road', stylers: [{ lightness: 22 }] }
-        ]
+        streetViewControl: true,
+        fullscreenControl: true,
+        zoomControl: true
       });
+
+      const panorama = map.getStreetView();
+      if (panorama) {
+        panorama.addListener('visible_changed', () => {
+          if (panorama.getVisible()) {
+            setMapViewMode('streetview');
+          } else {
+            setMapViewMode((prev) => (prev === 'streetview' ? (map.getMapTypeId() || 'roadmap') : prev));
+          }
+        });
+      }
 
       // Customer Doorstep Marker (Gold Pin)
       const custMarker = new google.maps.Marker({
@@ -428,6 +438,8 @@ export default function LiveTrackingRadar({
 
   const handleRecenterSupervisor = () => {
     if (mapInstanceRef.current && hasSupervisor && liveLocation?.lat) {
+      const pano = mapInstanceRef.current.getStreetView?.();
+      if (pano?.getVisible()) pano.setVisible(false);
       mapInstanceRef.current.panTo({ lat: liveLocation.lat, lng: liveLocation.lng });
       mapInstanceRef.current.setZoom(16);
     }
@@ -436,6 +448,8 @@ export default function LiveTrackingRadar({
   const handleRecenterDestination = () => {
     const cust = resolvedCustomerLoc || customerLocation;
     if (mapInstanceRef.current && cust?.lat) {
+      const pano = mapInstanceRef.current.getStreetView?.();
+      if (pano?.getVisible()) pano.setVisible(false);
       mapInstanceRef.current.panTo({ lat: cust.lat, lng: cust.lng });
       mapInstanceRef.current.setZoom(16);
     }
@@ -444,10 +458,70 @@ export default function LiveTrackingRadar({
   const handleFitRoute = () => {
     const cust = resolvedCustomerLoc || customerLocation;
     if (mapInstanceRef.current && hasSupervisor && cust?.lat && liveLocation?.lat && window.google?.maps) {
+      const pano = mapInstanceRef.current.getStreetView?.();
+      if (pano?.getVisible()) pano.setVisible(false);
       const bounds = new window.google.maps.LatLngBounds();
       bounds.extend(cust);
       bounds.extend(liveLocation);
       mapInstanceRef.current.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
+    }
+  };
+
+  const handleSelectMapType = (type) => {
+    setStreetViewNotice('');
+    if (!mapInstanceRef.current) return;
+    const pano = mapInstanceRef.current.getStreetView?.();
+    if (pano?.getVisible()) {
+      pano.setVisible(false);
+    }
+    mapInstanceRef.current.setMapTypeId(type);
+    setMapViewMode(type);
+  };
+
+  const handleToggleStreetView = () => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+    const google = window.google;
+    const pano = mapInstanceRef.current.getStreetView?.();
+
+    if (pano?.getVisible()) {
+      pano.setVisible(false);
+      const currentType = mapInstanceRef.current.getMapTypeId() || 'roadmap';
+      setMapViewMode(currentType);
+      setStreetViewNotice('');
+      return;
+    }
+
+    const cust = resolvedCustomerLoc || customerLocation;
+    const targetPoint =
+      (hasSupervisor && liveLocation && typeof liveLocation.lat === 'number'
+        ? { lat: Number(liveLocation.lat), lng: Number(liveLocation.lng) }
+        : null) ||
+      (cust && typeof cust.lat === 'number'
+        ? { lat: Number(cust.lat), lng: Number(cust.lng) }
+        : { lat: 28.8389, lng: 78.7768 });
+
+    if (google.maps.StreetViewService && pano) {
+      const svService = new google.maps.StreetViewService();
+      svService.getPanorama(
+        { location: targetPoint, radius: 250 },
+        (data, status) => {
+          if (status === google.maps.StreetViewStatus.OK && data?.location?.latLng) {
+            pano.setPosition(data.location.latLng);
+            pano.setPov({ heading: liveLocation?.heading || 0, pitch: 0 });
+            pano.setVisible(true);
+            setMapViewMode('streetview');
+            setStreetViewNotice('');
+          } else {
+            // If 360° panorama isn't captured on this exact residential lane, switch to high-detail 3D Satellite View & show notice
+            mapInstanceRef.current.setMapTypeId('hybrid');
+            mapInstanceRef.current.panTo(targetPoint);
+            mapInstanceRef.current.setZoom(19);
+            setMapViewMode('hybrid');
+            setStreetViewNotice('360° Street View imagery is not available on this exact lane — switched to close-up Satellite View.');
+            setTimeout(() => setStreetViewNotice(''), 5500);
+          }
+        }
+      );
     }
   };
 
@@ -545,8 +619,60 @@ export default function LiveTrackingRadar({
           style={{ minHeight: '300px' }}
         />
 
+        {/* Floating Map View Mode Switcher: Original Map / Satellite / Street View */}
+        <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1 p-1 rounded-xl bg-[#10231D]/95 backdrop-blur-md border border-[#2D453B] shadow-lg">
+          <button
+            type="button"
+            onClick={() => handleSelectMapType('roadmap')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              mapViewMode === 'roadmap'
+                ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
+                : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+            }`}
+            title="Original Google Map View"
+          >
+            <LuLayers className="w-3.5 h-3.5" />
+            <span>Map</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelectMapType('hybrid')}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              mapViewMode === 'hybrid'
+                ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
+                : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+            }`}
+            title="Satellite View with Labels"
+          >
+            <LuCompass className="w-3.5 h-3.5" />
+            <span>Sat View</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleStreetView}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              mapViewMode === 'streetview'
+                ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
+                : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+            }`}
+            title="Toggle 360° Street View"
+          >
+            <LuEye className="w-3.5 h-3.5" />
+            <span>{mapViewMode === 'streetview' ? 'Exit Street View' : 'Street View'}</span>
+          </button>
+        </div>
+
+        {/* Street View Fallback Notice */}
+        {streetViewNotice && (
+          <div className="absolute bottom-14 left-3 right-3 sm:right-auto sm:max-w-md z-10 pointer-events-none">
+            <div className="bg-[#10231D]/95 backdrop-blur-md text-[#F4EFE6] border border-[#E9A23B]/60 px-3.5 py-2 rounded-xl text-[11px] font-medium shadow-lg">
+              {streetViewNotice}
+            </div>
+          </div>
+        )}
+
         {/* Floating Map Navigation Controls */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-10">
+        <div className="absolute top-3 right-14 flex flex-col gap-1.5 z-10">
           {hasSupervisor && (
             <button
               type="button"
@@ -628,7 +754,7 @@ export default function LiveTrackingRadar({
         )}
 
         {/* Live overlay update time */}
-        <div className="absolute bottom-3 right-3 pointer-events-none">
+        <div className="absolute bottom-3 right-14 pointer-events-none">
           <div className="bg-[#10231D]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
             <LuCompass className="w-3 h-3 text-[#E9A23B]" />
             <span>Updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>

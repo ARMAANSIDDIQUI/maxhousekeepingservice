@@ -14,85 +14,17 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c * 10) / 10;
 }
 
-// Common phonetic / spelling variations in Indian & Uttar Pradesh addresses
-const PHONETIC_REPLACEMENTS = [
-  [/\bmolsiry\b/gi, 'Molsari'],
-  [/\bmolsiri\b/gi, 'Molsari'],
-  [/\bmaulsiry\b/gi, 'Maulsari'],
-  [/\bmoulsari\b/gi, 'Molsari'],
-  [/\bmaszid\b/gi, 'Masjid'],
-  [/\bmashjid\b/gi, 'Masjid'],
-  [/\bchoraha\b/gi, 'Chauraha'],
-  [/\bchouraha\b/gi, 'Chauraha'],
-  [/\bchawk\b/gi, 'Chowk'],
-  [/\bcoloni\b/gi, 'Colony'],
-  [/\bmuradabad\b/gi, 'Moradabad'],
-  [/\bgajrola\b/gi, 'Gajraula'],
-  [/\bchandosi\b/gi, 'Chandausi']
-];
-
 /**
- * Generates phonetic and local-context query variants so landmarks like
- * "molsiry masjid" match "Molsari Masjid" / "Maulsari Masjid" reliably.
+ * Returns the exact raw query without altering or hardcoding place names.
  */
-export function expandIndianQueryVariants(rawQuery, activeCity = '') {
+export function expandIndianQueryVariants(rawQuery) {
   const clean = String(rawQuery || '').trim();
-  if (!clean) return [];
-
-  const variants = new Set([clean]);
-
-  // Apply phonetic normalizations
-  let normalized = clean;
-  for (const [pattern, replacement] of PHONETIC_REPLACEMENTS) {
-    normalized = normalized.replace(pattern, replacement);
-  }
-  if (normalized !== clean) {
-    variants.add(normalized);
-  }
-
-  // Specific vowel/transliteration swaps common in Hindi/Urdu -> English
-  if (/molsir[iy]/i.test(clean)) {
-    variants.add(clean.replace(/molsir[iy]/gi, 'Molsari'));
-    variants.add(clean.replace(/molsir[iy]/gi, 'Maulsari'));
-  } else if (/molsari/i.test(clean)) {
-    variants.add(clean.replace(/molsari/gi, 'Maulsari'));
-  }
-
-  // If query mentions masjid/mosque, ensure both are tried if needed
-  const baseList = Array.from(variants);
-  const cityClean = String(activeCity || '').trim();
-
-  if (cityClean && !clean.toLowerCase().includes(cityClean.toLowerCase())) {
-    variants.add(`${ baseList[0] }, ${ cityClean }, Uttar Pradesh`);
-    if (baseList[1]) {
-      variants.add(`${ baseList[1] }, ${ cityClean }, Uttar Pradesh`);
-    }
-  } else if (!/uttar pradesh|\bup\b/i.test(clean)) {
-    variants.add(`${ baseList[0] }, Uttar Pradesh`);
-  }
-
-  return Array.from(variants);
+  return clean ? [clean] : [];
 }
 
-// Curated high-priority landmarks & localities in our MongoDB cities (Moradabad, Rampur, Amroha, etc.)
-export const UP_CITY_LANDMARKS = [
-  { name: 'Molsari Masjid (Maulsari Masjid)', area: 'Mughal Pura / Lal Bagh', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8398, lng: 78.7822, keywords: ['molsiry masjid', 'molsari masjid', 'maulsari masjid', 'molsiri masjid', 'masjid moradabad'] },
-  { name: 'Jama Masjid Moradabad', area: 'Jama Masjid Chowk', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8344, lng: 78.7905, keywords: ['jama masjid', 'shahi jama masjid', 'masjid'] },
-  { name: 'Civil Lines', area: 'Civil Lines', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8465, lng: 78.7652, keywords: ['civil lines', 'collectorate', 'pili kothi'] },
-  { name: 'MDA Colony / New Moradabad', area: 'Kanth Road / Delhi Road', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8624, lng: 78.7289, keywords: ['mda colony', 'new moradabad', 'ram ganga vihar', 'ashiyana'] },
-  { name: 'Ram Ganga Vihar Phase 1 & 2', area: 'Kanth Road', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8672, lng: 78.7544, keywords: ['ram ganga vihar', 'tdi city', 'wave mall'] },
-  { name: 'Budh Bazaar / Station Road', area: 'Budh Bazaar', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8351, lng: 78.7718, keywords: ['budh bazaar', 'station road', 'railway station', 'imperial tiraha'] },
-  { name: 'Majhola / Line Par', area: 'Delhi Road, Majhola', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244103', lat: 28.8211, lng: 78.7421, keywords: ['majhola', 'line par', 'kashiram nagar', 'pakbara'] },
-  { name: 'Kanth Road / Harthala', area: 'Kanth Road', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8795, lng: 78.7465, keywords: ['kanth road', 'harthala', 'vivekanand hospital', 'mit'] },
-  { name: 'Karula / Sambhal Road', area: 'Karula', city: 'Moradabad', state: 'Uttar Pradesh', pincode: '244001', lat: 28.8124, lng: 78.7798, keywords: ['karula', 'sambhal road', 'katghar', 'galshaheed'] },
-  { name: 'Raza Library / Civil Lines', area: 'Hamid Manzil', city: 'Rampur', state: 'Uttar Pradesh', pincode: '244901', lat: 28.8035, lng: 79.0265, keywords: ['rampur', 'raza library', 'jama masjid rampur', 'civil lines rampur'] },
-  { name: 'Vasudev Tirth / Joya Road', area: 'Amroha Town', city: 'Amroha', state: 'Uttar Pradesh', pincode: '244221', lat: 28.9044, lng: 78.4673, keywords: ['amroha', 'joya road', 'shah vilayat'] },
-  { name: 'Chopla / NH-9 Industrial Area', area: 'Gajraula', city: 'Gajraula', state: 'Uttar Pradesh', pincode: '244235', lat: 28.8456, lng: 78.2393, keywords: ['gajraula', 'chopla', 'jubliant'] }
-];
-
 /**
- * Scores and sorts an address candidate by:
- * 1. MongoDB Saved Cities priority (using City.rankingScore from MongoDB)
+ * Scores and sorts a live address candidate against saved MongoDB cities:
+ * 1. MongoDB Saved Cities priority (fetched from City collection, weighted by City.rankingScore)
  * 2. Uttar Pradesh state priority (UP state name or UP pincode 20xxxx-28xxxx)
  * 3. India country priority
  * 4. Distance to active reference coordinates
@@ -102,7 +34,7 @@ export function computeAddressPriorityScore(item, mongoCities = [], activeCityNa
   let score = 0;
   let matchedMongoCity = null;
 
-  // Check if item matches any saved MongoDB city
+  // Check if item matches any saved MongoDB city fetched from the database
   for (const city of mongoCities) {
     const cName = String(city.name || '').toLowerCase();
     if (!cName) continue;
@@ -121,6 +53,11 @@ export function computeAddressPriorityScore(item, mongoCities = [], activeCityNa
       matchedMongoCity = city;
       break;
     }
+  }
+
+  // Native Google Places prediction boost
+  if (item.source === 'google_autocomplete' || item.source === 'google_textsearch') {
+    score += 3000;
   }
 
   // Tier 1: Saved MongoDB City boost (5000 + city.rankingScore)
@@ -167,7 +104,9 @@ export function computeAddressPriorityScore(item, mongoCities = [], activeCityNa
 }
 
 /**
- * Multi-source autocomplete & landmark search with MongoDB City + UP + India priority
+ * Live autocomplete search that fetches saved cities from MongoDB FIRST,
+ * then queries Google Places Autocomplete / TextSearch / Nominatim / Photon
+ * with the user's exact query and prioritizes results matching MongoDB cities.
  */
 export async function searchAndPrioritizeAddresses({ query, lat, lng, city: activeCityName }) {
   const rawQuery = String(query || '').trim();
@@ -175,64 +114,38 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
     return [];
   }
 
-  // 1. Load saved cities from MongoDB sorted by rankingScore
+  // 1. Fetch saved cities from MongoDB FIRST, sorted by rankingScore
   const mongoCities = await City.find({ status: { $ne: 'inactive' } })
     .sort({ rankingScore: -1, sortOrder: 1, name: 1 })
     .lean();
 
-  // Determine reference coordinates (from query params, active MongoDB city, or Moradabad default)
-  const activeCityDoc = mongoCities.find(
-    (c) => activeCityName && c.name.toLowerCase() === String(activeCityName).toLowerCase()
-  ) || mongoCities[0];
+  const activeCityDoc =
+    mongoCities.find(
+      (c) => activeCityName && String(c.name || '').toLowerCase() === String(activeCityName).toLowerCase()
+    ) || mongoCities[0];
 
-  const refLat = typeof lat === 'number' && !isNaN(lat)
-    ? lat
-    : (activeCityDoc?.location?.coordinates?.[1] ?? 28.8386);
-  const refLng = typeof lng === 'number' && !isNaN(lng)
-    ? lng
-    : (activeCityDoc?.location?.coordinates?.[0] ?? 78.7733);
+  const refLat =
+    typeof lat === 'number' && !isNaN(lat)
+      ? lat
+      : (activeCityDoc?.location?.coordinates?.[1] ?? 28.8386);
+  const refLng =
+    typeof lng === 'number' && !isNaN(lng)
+      ? lng
+      : (activeCityDoc?.location?.coordinates?.[0] ?? 78.7733);
 
-  const qLower = rawQuery.toLowerCase();
   const candidates = [];
 
-  // 2. Match curated local UP landmarks & mosques (e.g. Molsari Masjid / Molsiry Masjid)
-  for (const lm of UP_CITY_LANDMARKS) {
-    const hay = `${lm.name} ${lm.area} ${lm.city} ${lm.keywords.join(' ')}`.toLowerCase();
-    const tokens = qLower.split(/\s+/).filter(Boolean);
-    const allMatch = tokens.every((t) => {
-      if (hay.includes(t)) return true;
-      // Handle molsiry / molsiri / maulsari fuzzy match
-      if (/^m[ao]u?ls[ia]?r[iy]$/i.test(t) && hay.includes('molsari')) return true;
-      if (/^mas[jz]id$/i.test(t) && hay.includes('masjid')) return true;
-      return false;
-    });
-
-    if (allMatch) {
-      candidates.push({
-        place_id: `up_lm_${lm.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-        description: `${lm.name}, ${lm.area}, ${lm.city}, ${lm.state} ${lm.pincode}, India`,
-        mainText: lm.name,
-        secondaryText: `${lm.area}, ${lm.city}, ${lm.state}`,
-        city: lm.city,
-        state: lm.state,
-        pincode: lm.pincode,
-        lat: lm.lat,
-        lng: lm.lng,
-        source: 'local_verified'
-      });
-    }
-  }
-
-  // 3. Match saved MongoDB cities directly if query matches city name, tag, or pincode
+  // 2. Match saved MongoDB cities directly if user types a city name or pincode from MongoDB
+  const qLower = rawQuery.toLowerCase();
   for (const c of mongoCities) {
-    const cityHay = `${c.name} ${c.state || 'Uttar Pradesh'} ${(c.pincodes || []).join(' ')} ${(c.tags || []).join(' ')}`.toLowerCase();
+    const cityHay = `${c.name} ${c.state || 'Uttar Pradesh'} ${(c.pincodes || []).join(' ')}`.toLowerCase();
     if (cityHay.includes(qLower)) {
-      const [cLng, cLat] = c.location?.coordinates?.length === 2 ? c.location.coordinates : [78.7733, 28.8386];
+      const [cLng, cLat] = c.location?.coordinates?.length === 2 ? c.location.coordinates : [refLng, refLat];
       candidates.push({
         place_id: `mongo_city_${c.slug || c._id}`,
         description: `${c.name}, ${c.state || 'Uttar Pradesh'}${c.pincodes?.[0] ? ' ' + c.pincodes[0] : ''}, India`,
         mainText: c.name,
-        secondaryText: `${c.state || 'Uttar Pradesh'} • Active Service City`,
+        secondaryText: `${c.state || 'Uttar Pradesh'} • Serviceable City`,
         city: c.name,
         state: c.state || 'Uttar Pradesh',
         pincode: c.pincodes?.[0] || '',
@@ -243,9 +156,7 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
     }
   }
 
-  const queryVariants = expandIndianQueryVariants(rawQuery, activeCityDoc?.name || activeCityName || 'Moradabad');
-
-  // 4. Optional Backend Google Maps Places Text Search (if API key configured)
+  // 3. Resolve Google Maps API Key (env or MongoDB Settings)
   let googleApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
   if (!googleApiKey) {
     try {
@@ -258,9 +169,31 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
 
   const fetchPromises = [];
 
+  // 4. Google Places Autocomplete & TextSearch using the user's exact rawQuery
   if (googleApiKey && googleApiKey !== 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
-    const gQuery = encodeURIComponent(queryVariants[0]);
-    const gUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${gQuery}&location=${refLat},${refLng}&radius=35000&region=in&key=${googleApiKey}`;
+    const autoUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(rawQuery)}&location=${refLat},${refLng}&radius=45000&key=${googleApiKey}`;
+    fetchPromises.push(
+      fetch(autoUrl, { signal: AbortSignal.timeout(3500) })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (Array.isArray(data?.predictions)) {
+            for (const pred of data.predictions) {
+              const pMatch = (pred.description || '').match(/\b([1-9][0-9]{5})\b/);
+              candidates.push({
+                place_id: pred.place_id,
+                description: pred.description,
+                mainText: pred.structured_formatting?.main_text || (pred.description || '').split(',')[0],
+                secondaryText: pred.structured_formatting?.secondary_text || (pred.description || '').split(',').slice(1).join(',').trim(),
+                pincode: pMatch ? pMatch[1] : '',
+                source: 'google_autocomplete'
+              });
+            }
+          }
+        })
+        .catch(() => {})
+    );
+
+    const gUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(rawQuery)}&location=${refLat},${refLng}&radius=45000&region=in&key=${googleApiKey}`;
     fetchPromises.push(
       fetch(gUrl, { signal: AbortSignal.timeout(3500) })
         .then((r) => (r.ok ? r.json() : null))
@@ -272,7 +205,7 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
                 place_id: item.place_id || `gtext_${Math.random()}`,
                 description: item.formatted_address ? `${item.name}, ${item.formatted_address}` : item.name,
                 mainText: item.name,
-                secondaryText: item.formatted_address || 'Uttar Pradesh, India',
+                secondaryText: item.formatted_address || '',
                 pincode: pMatch ? pMatch[1] : '',
                 lat: item.geometry?.location?.lat,
                 lng: item.geometry?.location?.lng,
@@ -285,95 +218,87 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
     );
   }
 
-  // 5. OpenStreetMap Nominatim (India filter + UP viewbox priority)
-  for (const variant of queryVariants.slice(0, 2)) {
-    const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=in&limit=6&viewbox=77.0,29.6,80.5,27.5&bounded=0&q=${encodeURIComponent(variant)}`;
-    fetchPromises.push(
-      fetch(nomUrl, {
-        headers: { 'User-Agent': 'MaxHousekeepingApp/1.0 (https://maxhousekeeping.in)' },
-        signal: AbortSignal.timeout(3500)
+  // 5. OpenStreetMap Nominatim (using exact rawQuery)
+  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=in&limit=6&q=${encodeURIComponent(rawQuery)}`;
+  fetchPromises.push(
+    fetch(nomUrl, {
+      headers: { 'User-Agent': 'MaxHousekeepingApp/1.0 (https://maxhousekeeping.in)' },
+      signal: AbortSignal.timeout(3500)
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rows) => {
+        if (Array.isArray(rows)) {
+          for (const r of rows) {
+            const addr = r.address || {};
+            const mainText = r.name || addr.amenity || addr.Road || addr.suburb || (r.display_name || '').split(',')[0];
+            const city = addr.city || addr.town || addr.county || addr.state_district || '';
+            const state = addr.state || '';
+            const pincode = addr.postcode || '';
+            candidates.push({
+              place_id: `nom_${r.place_id}`,
+              description: r.display_name,
+              mainText,
+              secondaryText: [addr.suburb || addr.neighbourhood, city, state, pincode].filter(Boolean).join(', '),
+              city,
+              state,
+              pincode,
+              lat: parseFloat(r.lat),
+              lng: parseFloat(r.lon),
+              source: 'nominatim'
+            });
+          }
+        }
       })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((rows) => {
-          if (Array.isArray(rows)) {
-            for (const r of rows) {
-              const addr = r.address || {};
-              const mainText = r.name || addr.amenity || addr.Road || addr.suburb || (r.display_name || '').split(',')[0];
-              const city = addr.city || addr.town || addr.county || addr.state_district || '';
-              const state = addr.state || '';
-              const pincode = addr.postcode || '';
-              candidates.push({
-                place_id: `nom_${r.place_id}`,
-                description: r.display_name,
-                mainText,
-                secondaryText: [addr.suburb || addr.neighbourhood, city, state, pincode].filter(Boolean).join(', '),
-                city,
-                state,
-                pincode,
-                lat: parseFloat(r.lat),
-                lng: parseFloat(r.lon),
-                source: 'nominatim'
-              });
-            }
-          }
-        })
-        .catch(() => {})
-    );
-  }
+      .catch(() => {})
+  );
 
-  // 6. Photon Komoot Geocoder (biased to active UP city coordinates)
-  for (const variant of queryVariants.slice(0, 2)) {
-    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(variant)}&lat=${refLat}&lon=${refLng}&limit=6`;
-    fetchPromises.push(
-      fetch(photonUrl, { signal: AbortSignal.timeout(3500) })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (Array.isArray(data?.features)) {
-            for (const f of data.features) {
-              const p = f.properties || {};
-              const country = (p.country || '').toLowerCase();
-              if (country && country !== 'india' && p.countrycode !== 'IN') continue;
-              const [fLng, fLat] = f.geometry?.coordinates || [];
-              const mainText = p.name || p.street || p.locality || p.city || 'Location';
-              const city = p.city || p.county || p.district || '';
-              const state = p.state || '';
-              const pincode = p.postcode || '';
-              const secondaryParts = [p.street, p.locality || p.district, city, state, pincode].filter(
-                (x, idx, arr) => x && x !== mainText && arr.indexOf(x) === idx
-              );
-              candidates.push({
-                place_id: `photon_${p.osm_id || Math.random()}`,
-                description: [mainText, ...secondaryParts, 'India'].filter(Boolean).join(', '),
-                mainText,
-                secondaryText: secondaryParts.join(', ') || 'Uttar Pradesh, India',
-                city,
-                state,
-                pincode,
-                lat: fLat,
-                lng: fLng,
-                source: 'photon'
-              });
-            }
+  // 6. Photon Komoot Geocoder (biased to active MongoDB city coordinates)
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(rawQuery)}&lat=${refLat}&lon=${refLng}&limit=6`;
+  fetchPromises.push(
+    fetch(photonUrl, { signal: AbortSignal.timeout(3500) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.features)) {
+          for (const f of data.features) {
+            const p = f.properties || {};
+            const [fLng, fLat] = f.geometry?.coordinates || [];
+            const mainText = p.name || p.street || p.locality || p.city || 'Location';
+            const city = p.city || p.county || p.district || '';
+            const state = p.state || '';
+            const pincode = p.postcode || '';
+            const secondaryParts = [p.street, p.locality || p.district, city, state, pincode].filter(
+              (x, idx, arr) => x && x !== mainText && arr.indexOf(x) === idx
+            );
+            candidates.push({
+              place_id: `photon_${p.osm_id || Math.random()}`,
+              description: [mainText, ...secondaryParts, p.country || 'India'].filter(Boolean).join(', '),
+              mainText,
+              secondaryText: secondaryParts.join(', '),
+              city,
+              state,
+              pincode,
+              lat: fLat,
+              lng: fLng,
+              source: 'photon'
+            });
           }
-        })
-        .catch(() => {})
-    );
-  }
+        }
+      })
+      .catch(() => {})
+  );
 
   await Promise.allSettled(fetchPromises);
 
-  // 7. Score, deduplicate, and sort candidates (MongoDB Cities -> Uttar Pradesh -> India)
+  // 7. Score, deduplicate, and sort candidates against MongoDB saved cities
   const seenKeys = new Set();
   const scoredResults = [];
 
   for (const item of candidates) {
-    const dedupKey = `${String(item.mainText || '').toLowerCase().trim()}|${String(item.city || '').toLowerCase().trim()}`;
+    const dedupKey = item.place_id || `${String(item.mainText || '').toLowerCase().trim()}|${String(item.secondaryText || '').toLowerCase().trim()}`;
     if (seenKeys.has(dedupKey)) continue;
     seenKeys.add(dedupKey);
 
     const priority = computeAddressPriorityScore(item, mongoCities, activeCityDoc?.name || activeCityName, refLat, refLng);
-    if (!priority.isIndia) continue; // Keep only Indian addresses
-
     const resolvedCity = priority.mongoCityName || item.city || activeCityDoc?.name || '';
     const resolvedPincode = item.pincode || priority.mongoCityPincode || '';
 
@@ -385,12 +310,13 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
         secondary_text: item.secondaryText
       },
       city: resolvedCity,
-      state: priority.isUttarPradesh ? 'Uttar Pradesh' : (item.state || 'India'),
+      state: priority.isUttarPradesh ? 'Uttar Pradesh' : (item.state || ''),
       pincode: resolvedPincode,
       lat: item.lat,
       lng: item.lng,
       distance_meters: priority.distance_meters,
       isMongoCity: priority.isMongoCity,
+      mongoCityName: priority.mongoCityName,
       isUttarPradesh: priority.isUttarPradesh,
       priorityScore: priority.score,
       source: item.source
@@ -403,7 +329,7 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
 
 /**
  * Reverse geocode coordinates (lat, lng) into a complete street/area/landmark address,
- * prioritizing saved MongoDB cities and Uttar Pradesh localities.
+ * matching against saved MongoDB cities fetched directly from the database.
  */
 export async function reverseGeocodeLocation({ lat, lng }) {
   const numLat = typeof lat === 'number' ? lat : parseFloat(lat);
@@ -413,19 +339,10 @@ export async function reverseGeocodeLocation({ lat, lng }) {
     return null;
   }
 
+  // Fetch saved cities from MongoDB FIRST
   const mongoCities = await City.find({ status: { $ne: 'inactive' } })
     .sort({ rankingScore: -1, sortOrder: 1 })
     .lean();
-
-  let nearestLandmark = null;
-  let minLmDist = Infinity;
-  for (const lm of UP_CITY_LANDMARKS) {
-    const distKm = calculateDistanceKm(numLat, numLng, lm.lat, lm.lng);
-    if (distKm < minLmDist) {
-      minLmDist = distKm;
-      nearestLandmark = { ...lm, distanceKm: distKm };
-    }
-  }
 
   let nearestCity = null;
   let minCityDist = Infinity;
@@ -441,60 +358,102 @@ export async function reverseGeocodeLocation({ lat, lng }) {
   }
 
   let streetAddress = '';
-  let areaOrLandmark = (nearestLandmark && nearestLandmark.distanceKm <= 0.8) ? nearestLandmark.name : '';
+  let areaOrLandmark = '';
   let detectedCity = (nearestCity && nearestCity.distanceKm <= (nearestCity.serviceRadiusKm || 30)) ? nearestCity.name : '';
   let detectedState = nearestCity?.state || 'Uttar Pradesh';
-  let detectedPincode = (nearestLandmark && nearestLandmark.distanceKm <= 0.8)
-    ? nearestLandmark.pincode
-    : (nearestCity?.pincodes?.[0] || '');
+  let detectedPincode = nearestCity?.pincodes?.[0] || '';
 
-  // 1. Try OpenStreetMap Nominatim Reverse (server-side with User-Agent)
-  try {
-    const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`;
-    const nomRes = await fetch(nomUrl, {
-      headers: {
-        'User-Agent': 'MaxHousekeepingApp/1.0 (https://maxhousekeeping.in)',
-        'Accept-Language': 'en'
-      },
-      signal: AbortSignal.timeout(3500)
-    });
-    if (nomRes.ok) {
-      const data = await nomRes.json();
-      const addr = data?.address || {};
-      const parts = [
-        data?.name,
-        addr.amenity || addr.building || addr.shop || addr.historic,
-        addr.road || addr.pedestrian || addr.street,
-        addr.neighbourhood || addr.suburb || addr.residential || addr.quarter || addr.village,
-        detectedCity || addr.city || addr.town || addr.county || addr.state_district,
-        addr.state || detectedState
-      ].filter((x, idx, arr) => x && arr.indexOf(x) === idx);
-
-      if (parts.length > 0) {
-        streetAddress = parts.join(', ');
-      } else if (data?.display_name) {
-        streetAddress = data.display_name;
-      }
-
-      if (!areaOrLandmark) {
-        areaOrLandmark = addr.amenity || addr.neighbourhood || addr.suburb || addr.road || '';
-      }
-      if (!detectedCity) {
-        detectedCity = addr.city || addr.town || addr.county || addr.state_district || '';
-      }
-      if (addr.state) {
-        detectedState = addr.state;
-      }
-      if (addr.postcode) {
-        const cleanPin = String(addr.postcode).replace(/\D/g, '').slice(0, 6);
-        if (cleanPin.length === 6) detectedPincode = cleanPin;
-      }
+  // 1. Try Google Maps Reverse Geocoding if API key is configured
+  let googleApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+  if (!googleApiKey) {
+    try {
+      const settings = await Settings.getSingleton();
+      googleApiKey = settings?.integrations?.googleMapsApiKey || '';
+    } catch {
+      // ignore
     }
-  } catch {
-    // fallback to Photon / BigDataCloud
   }
 
-  // 2. Fallback to Photon Komoot Reverse
+  if (googleApiKey && googleApiKey !== 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+    try {
+      const gRevUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${numLat},${numLng}&key=${googleApiKey}`;
+      const gRes = await fetch(gRevUrl, { signal: AbortSignal.timeout(3500) });
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        const first = gData?.results?.[0];
+        if (first) {
+          streetAddress = first.formatted_address || '';
+          for (const comp of first.address_components || []) {
+            const types = comp.types || [];
+            if (!areaOrLandmark && (types.includes('point_of_interest') || types.includes('establishment') || types.includes('sublocality') || types.includes('neighborhood'))) {
+              areaOrLandmark = comp.long_name;
+            }
+            if (!detectedCity && (types.includes('locality') || types.includes('administrative_area_level_2'))) {
+              detectedCity = comp.long_name;
+            }
+            if (types.includes('administrative_area_level_1')) {
+              detectedState = comp.long_name;
+            }
+            if (types.includes('postal_code')) {
+              detectedPincode = comp.long_name;
+            }
+          }
+        }
+      }
+    } catch {
+      // fallback to Nominatim
+    }
+  }
+
+  // 2. Try OpenStreetMap Nominatim Reverse
+  if (!streetAddress) {
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`;
+      const nomRes = await fetch(nomUrl, {
+        headers: {
+          'User-Agent': 'MaxHousekeepingApp/1.0 (https://maxhousekeeping.in)',
+          'Accept-Language': 'en'
+        },
+        signal: AbortSignal.timeout(3500)
+      });
+      if (nomRes.ok) {
+        const data = await nomRes.json();
+        const addr = data?.address || {};
+        const parts = [
+          data?.name,
+          addr.amenity || addr.building || addr.shop || addr.historic,
+          addr.road || addr.pedestrian || addr.street,
+          addr.neighbourhood || addr.suburb || addr.residential || addr.quarter || addr.village,
+          detectedCity || addr.city || addr.town || addr.county || addr.state_district,
+          addr.state || detectedState
+        ].filter((x, idx, arr) => x && arr.indexOf(x) === idx);
+
+        if (parts.length > 0) {
+          streetAddress = parts.join(', ');
+        } else if (data?.display_name) {
+          streetAddress = data.display_name;
+        }
+
+        if (!areaOrLandmark) {
+          areaOrLandmark = addr.amenity || addr.neighbourhood || addr.suburb || addr.road || '';
+        }
+        if (!detectedCity) {
+          detectedCity = addr.city || addr.town || addr.county || addr.state_district || '';
+        }
+        if (addr.state) {
+          detectedState = addr.state;
+        }
+        if (addr.postcode) {
+          const cleanPin = String(addr.postcode).replace(/\D/g, '').slice(0, 6);
+          if (cleanPin.length === 6) detectedPincode = cleanPin;
+        }
+      }
+    } catch {
+      // fallback to Photon
+    }
+  }
+
+  // 3. Fallback to Photon Komoot Reverse
   if (!streetAddress) {
     try {
       const photRes = await fetch(`https://photon.komoot.io/reverse?lat=${numLat}&lon=${numLng}`, {
@@ -531,15 +490,9 @@ export async function reverseGeocodeLocation({ lat, lng }) {
     }
   }
 
-  if (nearestLandmark && nearestLandmark.distanceKm <= 0.6 && !streetAddress.toLowerCase().includes(nearestLandmark.name.toLowerCase())) {
-    streetAddress = streetAddress
-      ? `Near ${nearestLandmark.name}, ${streetAddress}`
-      : `${nearestLandmark.name}, ${nearestLandmark.area}, ${nearestLandmark.city}, ${nearestLandmark.state}`;
-  }
-
-  const finalCity = detectedCity || nearestCity?.name || 'Moradabad';
-  const finalPincode = detectedPincode || nearestCity?.pincodes?.[0] || '244001';
-  const finalStreet = streetAddress || `${areaOrLandmark ? areaOrLandmark + ', ' : ''}${finalCity}, ${detectedState} ${finalPincode}`;
+  const finalCity = detectedCity || nearestCity?.name || '';
+  const finalPincode = detectedPincode || nearestCity?.pincodes?.[0] || '';
+  const finalStreet = streetAddress || [areaOrLandmark, finalCity, detectedState, finalPincode].filter(Boolean).join(', ');
 
   return {
     line1: finalStreet,
@@ -553,11 +506,11 @@ export async function reverseGeocodeLocation({ lat, lng }) {
 }
 
 /**
- * Resolves a customer's location against serviceable cities
+ * Resolves a customer's location against serviceable cities in MongoDB
  * Checks pincode first, then Geo coordinates
  */
 export async function resolveLocation({ pincode, lat, lng }) {
-  // 1. Try resolving by 6-digit Pincode
+  // 1. Try resolving by 6-digit Pincode in MongoDB
   if (pincode) {
     const cleanPincode = String(pincode).trim();
     const cityByPincode = await City.findOne({
@@ -575,9 +528,8 @@ export async function resolveLocation({ pincode, lat, lng }) {
     }
   }
 
-  // 2. Try resolving by GPS coordinates [lng, lat]
+  // 2. Try resolving by GPS coordinates [lng, lat] in MongoDB
   if (typeof lat === 'number' && typeof lng === 'number') {
-    // Attempt GeoJSON 2dsphere near query
     try {
       const nearbyCities = await City.aggregate([
         {
@@ -614,7 +566,6 @@ export async function resolveLocation({ pincode, lat, lng }) {
         }
       }
     } catch {
-      // Fallback in-memory distance calculation if geo index isn't ready
       const allActive = await City.find({ status: 'active' });
       let closest = null;
       let minDistance = Infinity;
@@ -651,7 +602,7 @@ export async function resolveLocation({ pincode, lat, lng }) {
 
   return {
     isServiced: false,
-    message: 'Location could not be matched with our active coverage zones in Western Uttar Pradesh.'
+    message: 'Location could not be matched with our active coverage zones in Uttar Pradesh.'
   };
 }
 

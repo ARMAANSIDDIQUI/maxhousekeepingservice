@@ -17,7 +17,7 @@ export default function Footer() {
     alternatePhone: '',
     email: 'contactmaxhousekeepingservice@gmail.com',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
-    address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001'
   };
 
   // Dynamic fetch to get live cities if not in context

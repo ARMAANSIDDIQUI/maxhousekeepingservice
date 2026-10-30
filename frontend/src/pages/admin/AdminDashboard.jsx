@@ -155,7 +155,7 @@ export default function AdminDashboard() {
     alternatePhone: '',
     whatsappNumber: '+91 98977 66002',
     email: 'contactmaxhousekeepingservice@gmail.com',
-    address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
+    address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
     acceptOnlinePayments: false,
@@ -8474,47 +8474,66 @@ export default function AdminDashboard() {
         )}
 
         {/* Admin Live Tracking Modal */}
-        {trackingBookingAdmin && (
-          <Modal
-            isOpen={Boolean(trackingBookingAdmin)}
-            onClose={() => setTrackingBookingAdmin(null)}
-            title={`Track Location · #${trackingBookingAdmin.bookingCode}`}
-            subtitle="Live location and route of the supervisor"
-            maxWidth="max-w-4xl"
-          >
-            <div className="space-y-4">
-              <LiveTrackingRadar
-                bookingCode={trackingBookingAdmin.bookingCode}
-                initialSupervisorLocation={trackingBookingAdmin.supervisorLiveLocation}
-                customerLocation={trackingBookingAdmin.address?.coordinates}
-                destinationAddress={`${trackingBookingAdmin.address?.houseOrFlat ? trackingBookingAdmin.address.houseOrFlat + ', ' : ''}${trackingBookingAdmin.address?.line1 || ''}, ${trackingBookingAdmin.cityName || ''}`}
-                supervisorInfo={{
-                  name: trackingBookingAdmin.assignedSupervisor?.name || trackingBookingAdmin.supervisor?.name || 'Field Supervisor',
-                  phone: trackingBookingAdmin.assignedSupervisor?.phone || trackingBookingAdmin.supervisor?.phone || '',
-                  role: 'Supervisor'
-                }}
-              />
-              <div className="flex items-center justify-between pt-2">
-                <a
-                  href={`/track/${trackingBookingAdmin.bookingCode}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
-                >
-                  <span>Open Fullscreen</span>
-                  <LuExternalLink className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setTrackingBookingAdmin(null)}
-                  className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
+        {trackingBookingAdmin && (() => {
+          const supName = (trackingBookingAdmin.assignedSupervisor?.name || trackingBookingAdmin.supervisor?.name || '').trim();
+          const hasAssignedSup = Boolean(
+            supName ||
+            trackingBookingAdmin.assignedSupervisor?.id ||
+            trackingBookingAdmin.supervisor?._id ||
+            (typeof trackingBookingAdmin.supervisor === 'string' && trackingBookingAdmin.supervisor.trim())
+          );
+          return (
+            <Modal
+              isOpen={Boolean(trackingBookingAdmin)}
+              onClose={() => setTrackingBookingAdmin(null)}
+              title={`Track Location · #${trackingBookingAdmin.bookingCode}`}
+              subtitle={
+                hasAssignedSup
+                  ? 'Live location and route of the supervisor'
+                  : 'Supervisor assignment status and service location'
+              }
+              maxWidth="max-w-4xl"
+            >
+              <div className="space-y-4">
+                <LiveTrackingRadar
+                  bookingCode={trackingBookingAdmin.bookingCode}
+                  isSupervisorAssigned={hasAssignedSup}
+                  initialSupervisorLocation={hasAssignedSup ? trackingBookingAdmin.supervisorLiveLocation : null}
+                  customerLocation={trackingBookingAdmin.address?.coordinates}
+                  destinationAddress={`${trackingBookingAdmin.address?.houseOrFlat ? trackingBookingAdmin.address.houseOrFlat + ', ' : ''}${trackingBookingAdmin.address?.line1 || ''}, ${trackingBookingAdmin.cityName || ''}`}
+                  supervisorInfo={
+                    hasAssignedSup
+                      ? {
+                          name: supName || 'Assigned Supervisor',
+                          phone: trackingBookingAdmin.assignedSupervisor?.phone || trackingBookingAdmin.supervisor?.phone || '',
+                          avatar: trackingBookingAdmin.assignedSupervisor?.avatar || trackingBookingAdmin.supervisor?.avatar || '',
+                          role: 'Supervisor'
+                        }
+                      : null
+                  }
+                />
+                <div className="flex items-center justify-between pt-2">
+                  <a
+                    href={`/track/${trackingBookingAdmin.bookingCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
+                  >
+                    <span>Open Fullscreen</span>
+                    <LuExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setTrackingBookingAdmin(null)}
+                    className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
-            </div>
-          </Modal>
-        )}
+            </Modal>
+          );
+        })()}
 
         {/* Global Action Confirmation Modal */}
         {confirmModalConfig && (

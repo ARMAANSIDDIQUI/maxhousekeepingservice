@@ -8,13 +8,12 @@ import {
   LuInfo,
   LuCircleAlert,
   LuCheck,
-  LuLoader
+  LuLoader,
+  LuLayers,
+  LuEye
 } from 'react-icons/lu';
 import { loadGoogleMapsScript } from '../../utils/googleMapsLoader';
 import {
-  DEFAULT_MONGO_UP_CITIES,
-  expandIndianSearchQueries,
-  matchLocalUpAndMongoCandidates,
   prioritizeIndianUpPredictions,
   getDefaultPincodeForCity
 } from '../../utils/addressPriority';
@@ -23,11 +22,9 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_
 
 /**
  * AddressPickerWithMap
- * Simple, accurate address autofill + interactive map picker.
- * Prioritizes:
- *   1. Saved MongoDB Cities (Moradabad, Rampur, Amroha, Sambhal, Chandausi, Gajraula, Bijnor, Dhampur, etc.)
- *   2. Uttar Pradesh locations
- *   3. Other Indian locations
+ * Live Google Places Autocomplete + Interactive Map Picker.
+ * Fetches saved serviceable cities from MongoDB (/api/v1/locations/cities) first
+ * and prioritizes predictions matching saved MongoDB cities -> Uttar Pradesh -> India.
  */
 export default function AddressPickerWithMap({
   value = {},
@@ -39,11 +36,12 @@ export default function AddressPickerWithMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [isLoadingKey, setIsLoadingKey] = useState(true);
-  const [mongoCities, setMongoCities] = useState(DEFAULT_MONGO_UP_CITIES);
+  const [mongoCities, setMongoCities] = useState([]);
+  const [mapViewMode, setMapViewMode] = useState('roadmap'); // 'roadmap' | 'hybrid' | 'streetview'
 
   // Address fields state
   const initialCity = value.cityText || value.city || defaultCity || 'Moradabad';
-  const initialPincode = value.pincode || getDefaultPincodeForCity(initialCity, DEFAULT_MONGO_UP_CITIES) || '244001';
+  const initialPincode = value.pincode || '244001';
 
   const [houseOrFlat, setHouseOrFlat] = useState(value.houseOrFlat || '');
   const [streetQuery, setStreetQuery] = useState(value.line1 || value.formattedAddress || '');
@@ -304,12 +302,24 @@ export default function AddressPickerWithMap({
       const map = new google.maps.Map(mapContainerRef.current, {
         center: initialPos,
         zoom: 16,
+        mapTypeId: 'roadmap',
         mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
+        streetViewControl: true,
+        fullscreenControl: true,
         zoomControl: true,
         gestureHandling: 'cooperative'
       });
+
+      const panorama = map.getStreetView();
+      if (panorama) {
+        panorama.addListener('visible_changed', () => {
+          if (panorama.getVisible()) {
+            setMapViewMode('streetview');
+          } else {
+            setMapViewMode((prev) => (prev === 'streetview' ? (map.getMapTypeId() || 'roadmap') : prev));
+          }
+        });
+      }
 
       const marker = new google.maps.Marker({
         position: initialPos,
@@ -345,53 +355,83 @@ export default function AddressPickerWithMap({
     }
   }, [mapLoaded, disabled]);
 
-  // Multi-source search combining:
-  // 1. Local UP landmarks & MongoDB saved cities
-  // 2. Google Places AutocompleteService (with phonetic query support)
-  // 3. Google Places TextSearch (catches mosques, landmarks & local spellings like "molsiry masjid")
-  // 4. Backend /api/v1/locations/autocomplete (MongoDB cities + Nominatim India + Photon UP)
-  const runMultiEngineAddressSearch = async (rawQuery, refLat, refLng) => {
-    const queryVariants = expandIndianSearchQueries(rawQuery, cityText);
-    const primaryQuery = queryVariants[0] || rawQuery;
-    const localMatches = matchLocalUpAndMongoCandidates(rawQuery, mongoCities, cityText, { lat: refLat, lng: refLng });
+  const handleSelectPickerMapType = (type) => {
+    if (!mapInstanceRef.current) return;
+    const pano = mapInstanceRef.current.getStreetView?.();
+    if (pano?.getVisible()) {
+      pano.setVisible(false);
+    }
+    mapInstanceRef.current.setMapTypeId(type);
+    setMapViewMode(type);
+  };
 
-    // Show instant local UP / MongoDB matches immediately while live APIs resolve
-    if (localMatches.length > 0) {
-      const initialRanked = prioritizeIndianUpPredictions(localMatches, mongoCities, cityText, { lat: refLat, lng: refLng });
-      setPredictions(initialRanked);
-      setShowPredictions(true);
+  const handleTogglePickerStreetView = () => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+    const google = window.google;
+    const pano = mapInstanceRef.current.getStreetView?.();
+    if (pano?.getVisible()) {
+      pano.setVisible(false);
+      setMapViewMode(mapInstanceRef.current.getMapTypeId() || 'roadmap');
+      return;
+    }
+    const targetPoint =
+      coordinates && typeof coordinates.lat === 'number'
+        ? coordinates
+        : { lat: 28.8386, lng: 78.7733 };
+
+    if (google.maps.StreetViewService && pano) {
+      const svService = new google.maps.StreetViewService();
+      svService.getPanorama({ location: targetPoint, radius: 250 }, (data, status) => {
+        if (status === google.maps.StreetViewStatus.OK && data?.location?.latLng) {
+          pano.setPosition(data.location.latLng);
+          pano.setPov({ heading: 0, pitch: 0 });
+          pano.setVisible(true);
+          setMapViewMode('streetview');
+        } else {
+          mapInstanceRef.current.setMapTypeId('hybrid');
+          mapInstanceRef.current.panTo(targetPoint);
+          mapInstanceRef.current.setZoom(19);
+          setMapViewMode('hybrid');
+          setRefinementTip('360° Street View imagery not available on this lane — switched to close-up Satellite View.');
+        }
+      });
+    }
+  };
+
+  // Live Google Places Autocomplete + TextSearch + Backend MongoDB City Ranking
+  // Uses the user's exact rawQuery (zero hardcoded landmarks or phonetic overrides)
+  const runMultiEngineAddressSearch = async (rawQuery, refLat, refLng) => {
+    const cleanQuery = String(rawQuery || '').trim();
+    if (!cleanQuery) {
+      setIsSearching(false);
+      return;
     }
 
     const tasks = [];
 
-    // Source A: Google Places AutocompleteService
+    // Source A: Direct Google Places AutocompleteService with exact rawQuery (just like Google Cloud Console Preview APIs)
     if (autocompleteServiceRef.current && !disabled) {
       tasks.push(
         new Promise((resolve) => {
           const request = {
-            input: primaryQuery,
-            componentRestrictions: { country: 'in' }
+            input: cleanQuery
           };
           if (sessionTokenRef.current) {
             request.sessionToken = sessionTokenRef.current;
-          }
-          if (window.google?.maps?.LatLng) {
-            try {
-              request.origin = new window.google.maps.LatLng(refLat, refLng);
-            } catch (_) {}
-          }
-          if (window.google?.maps?.Circle) {
-            try {
-              request.locationBias = new window.google.maps.Circle({
-                center: { lat: refLat, lng: refLng },
-                radius: 45000
-              });
-            } catch (_) {}
           }
 
           autocompleteServiceRef.current.getPlacePredictions(request, (results, status) => {
             const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
             if (status === isOk && Array.isArray(results)) {
+              // Immediately display Google Places predictions prioritized by saved MongoDB cities
+              const instantRanked = prioritizeIndianUpPredictions(results, mongoCities, cityText, {
+                lat: refLat,
+                lng: refLng
+              });
+              if (instantRanked.length > 0) {
+                setPredictions(instantRanked);
+                setShowPredictions(true);
+              }
               resolve(results);
             } else {
               resolve([]);
@@ -401,21 +441,14 @@ export default function AddressPickerWithMap({
       );
     }
 
-    // Source B: Google Places TextSearch (handles fuzzy landmark names like "molsiry masjid" -> Molsari Masjid)
+    // Source B: Google Places TextSearch using exact rawQuery
     if (placesServiceRef.current && !disabled) {
       tasks.push(
         new Promise((resolve) => {
-          const textQuery = queryVariants[queryVariants.length - 1] || `${primaryQuery}, ${cityText || 'Moradabad'}, Uttar Pradesh`;
           const req = {
-            query: textQuery,
+            query: cleanQuery,
             region: 'in'
           };
-          if (window.google?.maps?.LatLng) {
-            try {
-              req.location = new window.google.maps.LatLng(refLat, refLng);
-              req.radius = 35000;
-            } catch (_) {}
-          }
 
           placesServiceRef.current.textSearch(req, (results, status) => {
             const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
@@ -449,10 +482,10 @@ export default function AddressPickerWithMap({
       );
     }
 
-    // Source C: Backend Autocomplete API (MongoDB Saved Cities + Nominatim India + Photon UP)
+    // Source C: Backend Autocomplete API (MongoDB Saved Cities + Google Places + Nominatim + Photon)
     tasks.push(
       fetch(
-        `${API_BASE_URL}/locations/autocomplete?q=${encodeURIComponent(rawQuery)}&lat=${refLat}&lng=${refLng}&city=${encodeURIComponent(cityText || '')}`
+        `${API_BASE_URL}/locations/autocomplete?q=${encodeURIComponent(cleanQuery)}&lat=${refLat}&lng=${refLng}&city=${encodeURIComponent(cityText || '')}`
       )
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => (Array.isArray(data?.predictions) ? data.predictions : []))
@@ -460,7 +493,7 @@ export default function AddressPickerWithMap({
     );
 
     const settled = await Promise.all(tasks);
-    const combined = [...localMatches, ...settled.flat()];
+    const combined = settled.flat();
 
     const ranked = prioritizeIndianUpPredictions(combined, mongoCities, cityText, {
       lat: refLat,
@@ -486,19 +519,13 @@ export default function AddressPickerWithMap({
       return;
     }
 
-    // Instant local check before debounce timer completes
     const refLat = coordinates?.lat || 28.8386;
     const refLng = coordinates?.lng || 78.7733;
-    const instantLocal = matchLocalUpAndMongoCandidates(query, mongoCities, cityText, { lat: refLat, lng: refLng });
-    if (instantLocal.length > 0) {
-      setPredictions(prioritizeIndianUpPredictions(instantLocal, mongoCities, cityText, { lat: refLat, lng: refLng }));
-      setShowPredictions(true);
-    }
 
     debounceTimerRef.current = setTimeout(() => {
       setIsSearching(true);
       runMultiEngineAddressSearch(query, refLat, refLng);
-    }, 220);
+    }, 180);
   };
 
   // Search and move map pin when user clicks "Find on Map" or presses Enter
@@ -509,13 +536,10 @@ export default function AddressPickerWithMap({
     setShowPredictions(false);
     setIsSearching(true);
 
-    const expanded = expandIndianSearchQueries(query, cityText);
-    const fullSearchAddress = expanded[expanded.length - 1] || query;
-
     if (geocoderRef.current) {
       geocoderRef.current.geocode(
         {
-          address: fullSearchAddress,
+          address: query,
           componentRestrictions: { country: 'in' }
         },
         (results, status) => {
@@ -1103,7 +1127,7 @@ export default function AddressPickerWithMap({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder={`Type street, area, mosque or landmark in ${cityText || 'Uttar Pradesh'} (e.g. Molsari Masjid, Civil Lines)...`}
+              placeholder="Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001"
               value={streetQuery}
               disabled={disabled}
               onChange={handleStreetInputChange}
@@ -1235,7 +1259,7 @@ export default function AddressPickerWithMap({
               setLandmark(e.target.value);
               emitChange({ landmark: e.target.value });
             }}
-            placeholder="e.g. Near Molsari Masjid, Opp Park"
+            placeholder="e.g. Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001"
             className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none transition-all"
           />
         </div>
@@ -1327,7 +1351,7 @@ export default function AddressPickerWithMap({
               className="w-full h-60 sm:h-72 bg-[#ECE5D8] transition-all"
               style={{ minHeight: '240px' }}
             />
-            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none z-10">
+            <div className="absolute top-2.5 left-2.5 right-14 flex items-center justify-between gap-2 pointer-events-none z-10">
               <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 pointer-events-auto">
                 <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
                 <span>Tap map or drag pin to your house</span>
@@ -1344,6 +1368,46 @@ export default function AddressPickerWithMap({
                   <LuNavigation className="w-3 h-3 text-emerald-600" />
                 )}
                 <span>{isLocatingUser ? 'Finding...' : 'Current Location'}</span>
+              </button>
+            </div>
+
+            {/* Map View Switcher: Original Map / Satellite / Street View */}
+            <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1 p-1 rounded-xl bg-[#10231D]/95 backdrop-blur-md border border-[#2D453B] shadow-md">
+              <button
+                type="button"
+                onClick={() => handleSelectPickerMapType('roadmap')}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  mapViewMode === 'roadmap'
+                    ? 'bg-[#E9A23B] text-[#10231D]'
+                    : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+                }`}
+              >
+                <LuLayers className="w-3 h-3" />
+                <span>Map</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPickerMapType('hybrid')}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  mapViewMode === 'hybrid'
+                    ? 'bg-[#E9A23B] text-[#10231D]'
+                    : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+                }`}
+              >
+                <LuCompass className="w-3 h-3" />
+                <span>Sat View</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleTogglePickerStreetView}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  mapViewMode === 'streetview'
+                    ? 'bg-[#E9A23B] text-[#10231D]'
+                    : 'text-[#F4EFE6] hover:bg-[#2D453B]'
+                }`}
+              >
+                <LuEye className="w-3 h-3" />
+                <span>{mapViewMode === 'streetview' ? 'Exit Street View' : 'Street View'}</span>
               </button>
             </div>
           </div>
