@@ -674,7 +674,28 @@ export async function updateSettings(req, res, next) {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
-    const settings = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true });
+
+    const updatePayload = { ...req.body };
+    if (updatePayload.gstEnabled !== undefined) {
+      updatePayload.gstEnabled = Boolean(updatePayload.gstEnabled);
+    }
+    if (updatePayload.gstPercentage !== undefined) {
+      updatePayload.gstPercentage = Math.max(0, Math.min(100, Number(updatePayload.gstPercentage) || 0));
+    }
+    if (updatePayload.platformChargeEnabled !== undefined) {
+      updatePayload.platformChargeEnabled = Boolean(updatePayload.platformChargeEnabled);
+    }
+    if (updatePayload.platformChargeType !== undefined) {
+      updatePayload.platformChargeType = updatePayload.platformChargeType === 'percentage' ? 'percentage' : 'flat';
+    }
+    if (updatePayload.platformChargeAmount !== undefined) {
+      updatePayload.platformChargeAmount = Math.max(0, Number(updatePayload.platformChargeAmount) || 0);
+    }
+    if (updatePayload.platformChargeLabel !== undefined) {
+      updatePayload.platformChargeLabel = String(updatePayload.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges';
+    }
+
+    const settings = await Settings.findOneAndUpdate({}, updatePayload, { new: true, upsert: true });
     res.status(200).json({ success: true, settings });
   } catch (err) {
     next(err);
@@ -846,29 +867,151 @@ export async function getAdminCities(req, res, next) {
   }
 }
 
+// Known Uttar Pradesh & Regional City Geo-Metadata for instant automated setup
+const KNOWN_INDIAN_CITY_META = {
+  moradabad: { state: 'Uttar Pradesh', coords: [78.7733, 28.8386], pincodes: ['244001', '244002', '244102', '244103', '244104'], score: 1000, tier: 'primary', radius: 30 },
+  rampur: { state: 'Uttar Pradesh', coords: [79.0250, 28.8033], pincodes: ['244901', '244921', '244922', '244924'], score: 900, tier: 'tier_1', radius: 25 },
+  amroha: { state: 'Uttar Pradesh', coords: [78.4678, 28.9044], pincodes: ['244221', '244222', '244231'], score: 880, tier: 'tier_1', radius: 25 },
+  sambhal: { state: 'Uttar Pradesh', coords: [78.5667, 28.5833], pincodes: ['244302', '244303', '244304'], score: 860, tier: 'tier_1', radius: 25 },
+  chandausi: { state: 'Uttar Pradesh', coords: [78.7833, 28.4500], pincodes: ['244412', '244413'], score: 840, tier: 'tier_1', radius: 25 },
+  gajraula: { state: 'Uttar Pradesh', coords: [78.2333, 28.8500], pincodes: ['244235', '244223'], score: 820, tier: 'tier_1', radius: 25 },
+  bijnor: { state: 'Uttar Pradesh', coords: [78.1352, 29.3732], pincodes: ['246701', '246726', '246728'], score: 800, tier: 'tier_1', radius: 25 },
+  dhampur: { state: 'Uttar Pradesh', coords: [78.5100, 29.3100], pincodes: ['246761', '246762'], score: 780, tier: 'tier_2', radius: 25 },
+  noorpur: { state: 'Uttar Pradesh', coords: [78.4000, 29.1500], pincodes: ['246734'], score: 760, tier: 'tier_2', radius: 20 },
+  hassanpur: { state: 'Uttar Pradesh', coords: [78.2833, 28.7167], pincodes: ['244241', '244242'], score: 740, tier: 'tier_2', radius: 20 },
+  bareilly: { state: 'Uttar Pradesh', coords: [79.4304, 28.3670], pincodes: ['243001', '243002', '243003', '243005', '243006', '243122'], score: 890, tier: 'tier_1', radius: 30 },
+  meerut: { state: 'Uttar Pradesh', coords: [77.7064, 28.9845], pincodes: ['250001', '250002', '250003', '250004', '250005', '250110'], score: 870, tier: 'tier_1', radius: 30 },
+  hapur: { state: 'Uttar Pradesh', coords: [77.7759, 28.7306], pincodes: ['245101', '245201', '245304'], score: 790, tier: 'tier_1', radius: 25 },
+  ghaziabad: { state: 'Uttar Pradesh', coords: [77.4538, 28.6692], pincodes: ['201001', '201002', '201009', '201010', '201014'], score: 850, tier: 'tier_1', radius: 30 },
+  noida: { state: 'Uttar Pradesh', coords: [77.3910, 28.5355], pincodes: ['201301', '201303', '201304', '201307', '201310'], score: 850, tier: 'tier_1', radius: 30 },
+  'greater-noida': { state: 'Uttar Pradesh', coords: [77.5040, 28.4744], pincodes: ['201306', '201308', '201310'], score: 830, tier: 'tier_1', radius: 30 },
+  bulandshahr: { state: 'Uttar Pradesh', coords: [77.8498, 28.4070], pincodes: ['203001', '203002'], score: 770, tier: 'tier_2', radius: 25 },
+  aligarh: { state: 'Uttar Pradesh', coords: [78.0880, 27.8974], pincodes: ['202001', '202002'], score: 800, tier: 'tier_1', radius: 25 },
+  muzaffarnagar: { state: 'Uttar Pradesh', coords: [77.7085, 29.4727], pincodes: ['251001', '251002'], score: 780, tier: 'tier_1', radius: 25 },
+  saharanpur: { state: 'Uttar Pradesh', coords: [77.5460, 29.9680], pincodes: ['247001', '247002'], score: 780, tier: 'tier_1', radius: 25 },
+  budaun: { state: 'Uttar Pradesh', coords: [79.1215, 28.0340], pincodes: ['243601', '243632'], score: 750, tier: 'tier_2', radius: 25 },
+  shahjahanpur: { state: 'Uttar Pradesh', coords: [79.9119, 27.8815], pincodes: ['242001', '242226'], score: 760, tier: 'tier_2', radius: 25 },
+  pilibhit: { state: 'Uttar Pradesh', coords: [79.8044, 28.6312], pincodes: ['262001', '262121'], score: 750, tier: 'tier_2', radius: 25 },
+  najibabad: { state: 'Uttar Pradesh', coords: [78.3422, 29.6107], pincodes: ['246763', '246764'], score: 750, tier: 'tier_2', radius: 20 },
+  lucknow: { state: 'Uttar Pradesh', coords: [80.9462, 26.8467], pincodes: ['226001', '226010', '226016'], score: 850, tier: 'tier_1', radius: 35 },
+  agra: { state: 'Uttar Pradesh', coords: [78.0081, 27.1767], pincodes: ['282001', '282002', '282005'], score: 820, tier: 'tier_1', radius: 30 },
+  kashipur: { state: 'Uttarakhand', coords: [78.9619, 29.2104], pincodes: ['244713', '244714'], score: 720, tier: 'tier_2', radius: 25 },
+  rudrapur: { state: 'Uttarakhand', coords: [79.4036, 28.9875], pincodes: ['263153'], score: 720, tier: 'tier_2', radius: 25 },
+  haldwani: { state: 'Uttarakhand', coords: [79.5130, 29.2183], pincodes: ['263139'], score: 720, tier: 'tier_2', radius: 25 }
+};
+
+async function autoResolveCityGeoAndPincodes(cityName, stateName = 'Uttar Pradesh') {
+  const slugKey = String(cityName || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (KNOWN_INDIAN_CITY_META[slugKey]) {
+    return KNOWN_INDIAN_CITY_META[slugKey];
+  }
+
+  // Live fallback via OpenStreetMap Nominatim for any Indian city
+  try {
+    const q = encodeURIComponent(`${cityName}, ${stateName || 'Uttar Pradesh'}, India`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=3&countrycodes=in&q=${q}`, {
+      headers: { 'User-Agent': 'MaxHousekeepingService/1.0', 'Accept-Language': 'en' }
+    });
+    if (res.ok) {
+      const items = await res.json();
+      if (Array.isArray(items) && items.length > 0) {
+        const best = items[0];
+        const lat = parseFloat(best.lat);
+        const lng = parseFloat(best.lon);
+        const addr = best.address || {};
+        const detectedPins = [];
+        for (const it of items) {
+          const pc = String(it.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
+          if (pc.length === 6 && !detectedPins.includes(pc)) detectedPins.push(pc);
+        }
+        return {
+          state: addr.state || stateName || 'Uttar Pradesh',
+          coords: !isNaN(lat) && !isNaN(lng) ? [lng, lat] : [78.7733, 28.8386],
+          pincodes: detectedPins,
+          score: 800,
+          tier: 'tier_1',
+          radius: 25
+        };
+      }
+    }
+  } catch (_) {}
+
+  return {
+    state: stateName || 'Uttar Pradesh',
+    coords: [78.7733, 28.8386],
+    pincodes: [],
+    score: 800,
+    tier: 'tier_1',
+    radius: 25
+  };
+}
+
 /**
  * Create City (Admin)
  * POST /api/v1/admin/cities
  */
 export async function createCity(req, res, next) {
   try {
-    const { name, slug, state, serviceRadiusKm, pincodes, status, sortOrder, contactOverrides, tags, rankingScore, rankingTier } = req.body;
+    const {
+      name,
+      slug,
+      state,
+      serviceRadiusKm,
+      pincodes,
+      status,
+      sortOrder,
+      contactOverrides,
+      tags,
+      rankingScore,
+      rankingTier,
+      latitude,
+      longitude,
+      location
+    } = req.body;
+
     if (!name) {
       return res.status(400).json({ success: false, message: 'City name is required' });
     }
-    const finalSlug = (slug || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-');
-    const parsedTags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+
+    const finalSlug = (slug || name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const autoMeta = await autoResolveCityGeoAndPincodes(name, state);
+
+    // Resolve coordinates [lng, lat]
+    let resolvedCoords = autoMeta.coords;
+    if (Array.isArray(location?.coordinates) && location.coordinates.length === 2) {
+      const [lng, lat] = location.coordinates.map(Number);
+      if (!isNaN(lng) && !isNaN(lat)) resolvedCoords = [lng, lat];
+    } else if (latitude !== undefined && longitude !== undefined && latitude !== '' && longitude !== '') {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (!isNaN(lat) && !isNaN(lng)) resolvedCoords = [lng, lat];
+    }
+
+    let parsedPincodes = Array.isArray(pincodes)
+      ? pincodes
+      : (typeof pincodes === 'string' ? pincodes.split(',').map(p => p.trim()).filter(Boolean) : []);
+    if (parsedPincodes.length === 0 && autoMeta.pincodes?.length > 0) {
+      parsedPincodes = autoMeta.pincodes;
+    }
+
+    let parsedTags = Array.isArray(tags)
+      ? tags
+      : (typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+    if (parsedTags.length === 0) {
+      parsedTags = [finalSlug, 'uttar-pradesh', 'full-home-cleaning', 'doorstep-dispatch', 'same-day-service'];
+    }
+
     const city = await City.create({
       name: name.trim(),
       slug: finalSlug,
-      state: state || 'Uttar Pradesh',
-      location: { type: 'Point', coordinates: [78.7768, 28.8386] },
-      serviceRadiusKm: Number(serviceRadiusKm) || 25,
-      pincodes: Array.isArray(pincodes) ? pincodes : (typeof pincodes === 'string' ? pincodes.split(',').map(p => p.trim()).filter(Boolean) : []),
+      state: (state && state.trim()) || autoMeta.state || 'Uttar Pradesh',
+      location: { type: 'Point', coordinates: resolvedCoords },
+      serviceRadiusKm: Number(serviceRadiusKm) || autoMeta.radius || 25,
+      pincodes: parsedPincodes,
       status: status || 'active',
       sortOrder: Number(sortOrder) || 0,
-      rankingScore: Number(rankingScore) || 100,
-      rankingTier: rankingTier || 'primary',
+      rankingScore: Number(rankingScore) || autoMeta.score || 800,
+      rankingTier: rankingTier || autoMeta.tier || 'tier_1',
       tags: parsedTags,
       contactOverrides: contactOverrides || {}
     });
@@ -886,6 +1029,13 @@ export async function updateCity(req, res, next) {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
+
+    if (updateData.name && !updateData.slug) {
+      updateData.slug = String(updateData.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    } else if (updateData.slug) {
+      updateData.slug = String(updateData.slug).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
     if (typeof updateData.pincodes === 'string') {
       updateData.pincodes = updateData.pincodes.split(',').map(p => p.trim()).filter(Boolean);
     }
@@ -895,6 +1045,26 @@ export async function updateCity(req, res, next) {
     if (updateData.rankingScore !== undefined) {
       updateData.rankingScore = Number(updateData.rankingScore) || 100;
     }
+
+    // Update map coordinates if latitude & longitude provided, or auto-resolve if name changed
+    if (updateData.latitude !== undefined && updateData.longitude !== undefined && updateData.latitude !== '' && updateData.longitude !== '') {
+      const lat = Number(updateData.latitude);
+      const lng = Number(updateData.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        updateData.location = { type: 'Point', coordinates: [lng, lat] };
+      }
+      delete updateData.latitude;
+      delete updateData.longitude;
+    } else if (updateData.name && !updateData.location) {
+      const autoMeta = await autoResolveCityGeoAndPincodes(updateData.name, updateData.state);
+      if (autoMeta?.coords) {
+        updateData.location = { type: 'Point', coordinates: autoMeta.coords };
+      }
+      if ((!updateData.pincodes || updateData.pincodes.length === 0) && autoMeta?.pincodes?.length > 0) {
+        updateData.pincodes = autoMeta.pincodes;
+      }
+    }
+
     const city = await City.findByIdAndUpdate(id, updateData, { new: true });
     if (!city) {
       return res.status(404).json({ success: false, message: 'City not found' });

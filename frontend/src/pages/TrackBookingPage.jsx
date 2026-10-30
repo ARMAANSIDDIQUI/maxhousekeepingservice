@@ -392,6 +392,22 @@ export default function TrackBookingPage() {
                   </span>
                 </div>
               ))}
+              {booking.totals?.platformChargeAmount > 0 && (
+                <div className="flex justify-between items-center text-xs text-[#3D524A] pt-1">
+                  <span>{booking.totals.platformChargeLabel || 'Platform Charges'}</span>
+                  <span className="font-bold text-[#10231D] tnum">
+                    +₹{booking.totals.platformChargeAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+              {booking.totals?.gstAmount > 0 && (
+                <div className="flex justify-between items-center text-xs text-[#3D524A]">
+                  <span>GST ({booking.totals.gstPercentage || 18}% on Overall Service)</span>
+                  <span className="font-bold text-[#10231D] tnum">
+                    +₹{booking.totals.gstAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Accurate Payment & Settlement Card */}

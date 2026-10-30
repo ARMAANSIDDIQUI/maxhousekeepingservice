@@ -1786,6 +1786,24 @@ export default function BookingPage() {
                     </div>
                   )}
 
+                  {quote?.totals?.platformChargeEnabled && quote?.totals?.platformChargeAmount > 0 && (
+                    <div className="flex justify-between text-[#10231D]">
+                      <span>{quote.totals.platformChargeLabel || 'Platform Charges'}:</span>
+                      <span className="font-bold tnum">
+                        +₹{quote.totals.platformChargeAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  )}
+
+                  {quote?.totals?.gstEnabled && quote?.totals?.gstAmount > 0 && (
+                    <div className="flex justify-between text-[#10231D]">
+                      <span>GST ({quote.totals.gstPercentage || 18}% on Overall Service):</span>
+                      <span className="font-bold tnum">
+                        +₹{quote.totals.gstAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="pt-3 border-t-2 border-[#10231D] flex justify-between items-baseline">
                     <span className="font-display font-extrabold text-base text-[#10231D]">
                       Payable Amount:

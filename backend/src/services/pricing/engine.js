@@ -202,8 +202,9 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
  * @param {Array} items - List of items [{ service, selections, qty }]
  * @param {string} citySlug - Selected city slug
  * @param {Object} coupon - Optional active coupon object
+ * @param {Object} billingConfig - Dynamic business settings ({ gstEnabled, gstPercentage, platformChargeEnabled, platformChargeType, platformChargeAmount, platformChargeLabel })
  */
-export function calculateQuote(items = [], citySlug = null, coupon = null) {
+export function calculateQuote(items = [], citySlug = null, coupon = null, billingConfig = {}) {
   const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
   let subtotal = 0;
   let mrpTotal = 0;
@@ -290,7 +291,32 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
     }
   }
 
-  const finalTotal = Math.max(0, subtotal - couponDiscount);
+  const discountedServiceSubtotal = Math.max(0, subtotal - couponDiscount);
+
+  // Dynamic Platform Charges (controlled from Admin -> Business Settings)
+  const platformChargeEnabled = Boolean(billingConfig?.platformChargeEnabled);
+  const platformChargeType = billingConfig?.platformChargeType === 'percentage' ? 'percentage' : 'flat';
+  const platformChargeValue = Math.max(0, Number(billingConfig?.platformChargeAmount ?? 0) || 0);
+  const platformChargeLabel = String(billingConfig?.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges';
+
+  let platformChargeAmount = 0;
+  if (platformChargeEnabled && subtotal > 0 && platformChargeValue > 0) {
+    if (platformChargeType === 'percentage') {
+      platformChargeAmount = Math.round((discountedServiceSubtotal * platformChargeValue) / 100);
+    } else {
+      platformChargeAmount = Math.round(platformChargeValue);
+    }
+  }
+
+  // Dynamic Separate GST on Overall Service (controlled from Admin -> Business Settings)
+  const gstEnabled = Boolean(billingConfig?.gstEnabled);
+  const gstPercentage = gstEnabled ? Math.max(0, Number(billingConfig?.gstPercentage ?? 18) || 0) : 0;
+  let gstAmount = 0;
+  if (gstEnabled && subtotal > 0 && gstPercentage > 0) {
+    gstAmount = Math.round((discountedServiceSubtotal * gstPercentage) / 100);
+  }
+
+  const finalTotal = Math.max(0, discountedServiceSubtotal + platformChargeAmount + gstAmount);
   const totalSavings = Math.max(0, (mrpTotal - subtotal) + couponDiscount);
   const overallDiscountPct = mrpTotal > 0 ? Math.round((totalSavings / mrpTotal) * 100) : 0;
 
@@ -302,6 +328,14 @@ export function calculateQuote(items = [], citySlug = null, coupon = null) {
       outstationSurcharge: totalOutstationSurcharge,
       discount: mrpTotal - subtotal,
       couponDiscount,
+      gstEnabled,
+      gstPercentage,
+      gstAmount,
+      platformChargeEnabled,
+      platformChargeType,
+      platformChargeValue,
+      platformChargeAmount,
+      platformChargeLabel,
       total: finalTotal,
       customerSaved: totalSavings,
       overallDiscountPct

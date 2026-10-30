@@ -89,6 +89,32 @@ export async function sendBookingConfirmationEmail({ booking, customerEmail }) {
 
   const total = booking.totals?.total || booking.total || 0;
   const savings = booking.totals?.customerSaved || 0;
+  const platformFee = booking.totals?.platformChargeAmount || 0;
+  const platformLabel = booking.totals?.platformChargeLabel || 'Platform Charges';
+  const gstAmt = booking.totals?.gstAmount || 0;
+  const gstPct = booking.totals?.gstPercentage || 18;
+  const couponDisc = booking.totals?.couponDiscount || 0;
+
+  const extraChargeRows = `
+    ${couponDisc > 0 ? `
+      <tr>
+        <td colspan="2" style="color:#C2512D;">Coupon Discount</td>
+        <td style="text-align: right; color:#C2512D; font-weight: 700;">-₹${Number(couponDisc).toLocaleString('en-IN')}</td>
+      </tr>
+    ` : ''}
+    ${platformFee > 0 ? `
+      <tr>
+        <td colspan="2" style="color:#3D524A;">${platformLabel}</td>
+        <td style="text-align: right; font-weight: 600;">+₹${Number(platformFee).toLocaleString('en-IN')}</td>
+      </tr>
+    ` : ''}
+    ${gstAmt > 0 ? `
+      <tr>
+        <td colspan="2" style="color:#3D524A;">GST (${gstPct}% on Service)</td>
+        <td style="text-align: right; font-weight: 600;">+₹${Number(gstAmt).toLocaleString('en-IN')}</td>
+      </tr>
+    ` : ''}
+  `;
 
   const content = `
     <div style="text-align: center; margin-bottom: 24px;">
@@ -115,6 +141,7 @@ export async function sendBookingConfirmationEmail({ booking, customerEmail }) {
       </thead>
       <tbody>
         ${itemsRows}
+        ${extraChargeRows}
         <tr class="total-row">
           <td colspan="2">Total Payable</td>
           <td style="text-align: right; font-size: 16px; color: ${BRAND_DARK};">₹${Number(total).toLocaleString('en-IN')}</td>

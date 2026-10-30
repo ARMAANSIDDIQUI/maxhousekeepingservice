@@ -161,7 +161,13 @@ export default function AdminDashboard() {
     acceptOnlinePayments: false,
     paymentGatewayProvider: 'razorpay',
     razorpayKeyId: '',
-    razorpayKeySecret: ''
+    razorpayKeySecret: '',
+    gstEnabled: false,
+    gstPercentage: 18,
+    platformChargeEnabled: false,
+    platformChargeType: 'flat',
+    platformChargeAmount: 49,
+    platformChargeLabel: 'Platform Charges'
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -313,10 +319,13 @@ export default function AdminDashboard() {
   // City Modal & Form State
   const [cityModalOpen, setCityModalOpen] = useState(false);
   const [editingCity, setEditingCity] = useState(null);
+  const [isAutoDetectingCityGeo, setIsAutoDetectingCityGeo] = useState(false);
   const [cityForm, setCityForm] = useState({
     name: '',
     slug: '',
     state: 'Uttar Pradesh',
+    latitude: '28.8386',
+    longitude: '78.7733',
     serviceRadiusKm: 25,
     pincodes: '',
     status: 'active',
@@ -2604,6 +2613,8 @@ export default function AdminDashboard() {
 
   // Settings Handlers
   const [togglingOnlinePayments, setTogglingOnlinePayments] = useState(false);
+  const [togglingGst, setTogglingGst] = useState(false);
+  const [togglingPlatformCharge, setTogglingPlatformCharge] = useState(false);
 
   const handleToggleOnlinePayments = async (nextVal) => {
     setTogglingOnlinePayments(true);
@@ -2619,6 +2630,7 @@ export default function AdminDashboard() {
         if (typeof refreshSettings === 'function') {
           await refreshSettings();
         }
+        window.dispatchEvent(new Event('max_settings_updated'));
         toast.success(
           nextVal
             ? 'Online payments (Razorpay) activated! Customers can now pay online or choose Cash on Service.'
@@ -2636,19 +2648,103 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    setSavingSettings(true);
+  const handleToggleGst = async (nextVal) => {
+    setTogglingGst(true);
+    const pct = Number(settingsForm.gstPercentage ?? 18) || 18;
+    const updated = { ...settingsForm, gstEnabled: nextVal, gstPercentage: pct };
+    setSettingsForm(updated);
+
     try {
-      const res = await adminAPI.updateSettings(settingsForm);
-      if (res.success) {
-        toast.success('Business settings and contact configuration saved successfully!');
+      const res = await adminAPI.updateSettings(updated);
+      if (res && res.success !== false) {
         if (res.settings) {
           setSettingsForm(prev => ({ ...prev, ...res.settings }));
         }
         if (typeof refreshSettings === 'function') {
-          refreshSettings();
+          await refreshSettings();
         }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(
+          nextVal
+            ? `Separate GST (${pct}%) enabled on overall service bill!`
+            : 'Separate GST disabled on overall service bill.'
+        );
+      } else {
+        throw new Error(res?.message || 'Failed to update GST setting');
+      }
+    } catch (err) {
+      console.error('Failed toggling GST:', err);
+      toast.error('Failed to update GST setting. Please check your connection.');
+      setSettingsForm(prev => ({ ...prev, gstEnabled: !nextVal }));
+    } finally {
+      setTogglingGst(false);
+    }
+  };
+
+  const handleTogglePlatformCharge = async (nextVal) => {
+    setTogglingPlatformCharge(true);
+    const amt = Number(settingsForm.platformChargeAmount ?? 49) || 0;
+    const type = settingsForm.platformChargeType === 'percentage' ? 'percentage' : 'flat';
+    const label = (settingsForm.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges';
+    const updated = {
+      ...settingsForm,
+      platformChargeEnabled: nextVal,
+      platformChargeType: type,
+      platformChargeAmount: amt,
+      platformChargeLabel: label
+    };
+    setSettingsForm(updated);
+
+    try {
+      const res = await adminAPI.updateSettings(updated);
+      if (res && res.success !== false) {
+        if (res.settings) {
+          setSettingsForm(prev => ({ ...prev, ...res.settings }));
+        }
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(
+          nextVal
+            ? `${label} (${type === 'percentage' ? `${amt}%` : `₹${amt}`}) enabled on overall service bill!`
+            : `${label} disabled on overall service bill.`
+        );
+      } else {
+        throw new Error(res?.message || 'Failed to update platform charges setting');
+      }
+    } catch (err) {
+      console.error('Failed toggling platform charges:', err);
+      toast.error('Failed to update platform charges setting. Please check your connection.');
+      setSettingsForm(prev => ({ ...prev, platformChargeEnabled: !nextVal }));
+    } finally {
+      setTogglingPlatformCharge(false);
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const payload = {
+        ...settingsForm,
+        gstEnabled: Boolean(settingsForm.gstEnabled),
+        gstPercentage: Math.max(0, Math.min(100, Number(settingsForm.gstPercentage ?? 18) || 0)),
+        platformChargeEnabled: Boolean(settingsForm.platformChargeEnabled),
+        platformChargeType: settingsForm.platformChargeType === 'percentage' ? 'percentage' : 'flat',
+        platformChargeAmount: Math.max(0, Number(settingsForm.platformChargeAmount ?? 0) || 0),
+        platformChargeLabel: (settingsForm.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges'
+      };
+      const res = await adminAPI.updateSettings(payload);
+      if (res.success) {
+        toast.success('Business settings, GST, and Platform Charges saved successfully!');
+        if (res.settings) {
+          setSettingsForm(prev => ({ ...prev, ...res.settings }));
+        }
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
       }
     } catch (err) {
       toast.error(err.message || 'Failed to save settings.');
@@ -2834,14 +2930,178 @@ export default function AdminDashboard() {
     });
   };
 
+  // Automated City Presets (Uttar Pradesh & Neighboring Hubs) for 1-click / live typing auto-fill
+  const CITY_AUTO_PRESETS = {
+    moradabad: { name: 'Moradabad', state: 'Uttar Pradesh', lat: 28.8386, lng: 78.7733, pincodes: '244001, 244002, 244102, 244103, 244104', radius: 30, score: 1000, tier: 'primary', tags: 'headquarters, moradabad, uttar-pradesh, full-home-cleaning, zero-dispatch-fee, same-day-service' },
+    bareilly: { name: 'Bareilly', state: 'Uttar Pradesh', lat: 28.3670, lng: 79.4304, pincodes: '243001, 243002, 243003, 243005, 243006, 243122', radius: 30, score: 890, tier: 'tier_1', tags: 'bareilly, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service' },
+    meerut: { name: 'Meerut', state: 'Uttar Pradesh', lat: 28.9845, lng: 77.7064, pincodes: '250001, 250002, 250003, 250004, 250005, 250110', radius: 30, score: 870, tier: 'tier_1', tags: 'meerut, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service' },
+    sambhal: { name: 'Sambhal', state: 'Uttar Pradesh', lat: 28.5833, lng: 78.5667, pincodes: '244302, 244303, 244304', radius: 25, score: 860, tier: 'tier_1', tags: 'sambhal, uttar-pradesh, full-home-cleaning, doorstep-dispatch, same-day-service' },
+    rampur: { name: 'Rampur', state: 'Uttar Pradesh', lat: 28.8033, lng: 79.0250, pincodes: '244901, 244921, 244922, 244924', radius: 25, score: 900, tier: 'tier_1', tags: 'rampur, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, same-day-service' },
+    amroha: { name: 'Amroha', state: 'Uttar Pradesh', lat: 28.9044, lng: 78.4678, pincodes: '244221, 244222, 244231', radius: 25, score: 880, tier: 'tier_1', tags: 'amroha, uttar-pradesh, full-home-cleaning, doorstep-dispatch, same-day-service' },
+    chandausi: { name: 'Chandausi', state: 'Uttar Pradesh', lat: 28.4500, lng: 78.7833, pincodes: '244412, 244413', radius: 25, score: 840, tier: 'tier_1', tags: 'chandausi, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
+    gajraula: { name: 'Gajraula', state: 'Uttar Pradesh', lat: 28.8500, lng: 78.2333, pincodes: '244235, 244223', radius: 25, score: 820, tier: 'tier_1', tags: 'gajraula, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
+    bijnor: { name: 'Bijnor', state: 'Uttar Pradesh', lat: 29.3732, lng: 78.1352, pincodes: '246701, 246726, 246728', radius: 25, score: 800, tier: 'tier_1', tags: 'bijnor, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
+    dhampur: { name: 'Dhampur', state: 'Uttar Pradesh', lat: 29.3100, lng: 78.5100, pincodes: '246761, 246762', radius: 25, score: 780, tier: 'tier_2', tags: 'dhampur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    noorpur: { name: 'Noorpur', state: 'Uttar Pradesh', lat: 29.1500, lng: 78.4000, pincodes: '246734', radius: 20, score: 760, tier: 'tier_2', tags: 'noorpur, uttar-pradesh, doorstep-dispatch, fast-service' },
+    hassanpur: { name: 'Hassanpur', state: 'Uttar Pradesh', lat: 28.7167, lng: 78.2833, pincodes: '244241, 244242', radius: 20, score: 740, tier: 'tier_2', tags: 'hassanpur, uttar-pradesh, doorstep-dispatch, fast-service' },
+    hapur: { name: 'Hapur', state: 'Uttar Pradesh', lat: 28.7306, lng: 77.7759, pincodes: '245101, 245201, 245304', radius: 25, score: 790, tier: 'tier_1', tags: 'hapur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    ghaziabad: { name: 'Ghaziabad', state: 'Uttar Pradesh', lat: 28.6692, lng: 77.4538, pincodes: '201001, 201002, 201009, 201010, 201014', radius: 30, score: 850, tier: 'tier_1', tags: 'ghaziabad, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, fast-service' },
+    noida: { name: 'Noida', state: 'Uttar Pradesh', lat: 28.5355, lng: 77.3910, pincodes: '201301, 201303, 201304, 201307, 201310', radius: 30, score: 850, tier: 'tier_1', tags: 'noida, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, fast-service' },
+    bulandshahr: { name: 'Bulandshahr', state: 'Uttar Pradesh', lat: 28.4070, lng: 77.8498, pincodes: '203001, 203002', radius: 25, score: 770, tier: 'tier_2', tags: 'bulandshahr, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    aligarh: { name: 'Aligarh', state: 'Uttar Pradesh', lat: 27.8974, lng: 78.0880, pincodes: '202001, 202002', radius: 25, score: 800, tier: 'tier_1', tags: 'aligarh, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    muzaffarnagar: { name: 'Muzaffarnagar', state: 'Uttar Pradesh', lat: 29.4727, lng: 77.7085, pincodes: '251001, 251002', radius: 25, score: 780, tier: 'tier_1', tags: 'muzaffarnagar, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    saharanpur: { name: 'Saharanpur', state: 'Uttar Pradesh', lat: 29.9680, lng: 77.5460, pincodes: '247001, 247002', radius: 25, score: 780, tier: 'tier_1', tags: 'saharanpur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
+    budaun: { name: 'Budaun', state: 'Uttar Pradesh', lat: 28.0340, lng: 79.1215, pincodes: '243601, 243632', radius: 25, score: 750, tier: 'tier_2', tags: 'budaun, uttar-pradesh, doorstep-dispatch, fast-service' },
+    shahjahanpur: { name: 'Shahjahanpur', state: 'Uttar Pradesh', lat: 27.8815, lng: 79.9119, pincodes: '242001, 242226', radius: 25, score: 760, tier: 'tier_2', tags: 'shahjahanpur, uttar-pradesh, doorstep-dispatch, fast-service' },
+    pilibhit: { name: 'Pilibhit', state: 'Uttar Pradesh', lat: 28.6312, lng: 79.8044, pincodes: '262001, 262121', radius: 25, score: 750, tier: 'tier_2', tags: 'pilibhit, uttar-pradesh, doorstep-dispatch, fast-service' },
+    najibabad: { name: 'Najibabad', state: 'Uttar Pradesh', lat: 29.6107, lng: 78.3422, pincodes: '246763, 246764', radius: 20, score: 750, tier: 'tier_2', tags: 'najibabad, uttar-pradesh, doorstep-dispatch, fast-service' },
+    kashipur: { name: 'Kashipur', state: 'Uttarakhand', lat: 29.2104, lng: 78.9619, pincodes: '244713, 244714', radius: 25, score: 720, tier: 'tier_2', tags: 'kashipur, uttarakhand, full-home-cleaning, doorstep-dispatch' },
+    rudrapur: { name: 'Rudrapur', state: 'Uttarakhand', lat: 28.9875, lng: 79.4036, pincodes: '263153', radius: 25, score: 720, tier: 'tier_2', tags: 'rudrapur, uttarakhand, full-home-cleaning, doorstep-dispatch' },
+    haldwani: { name: 'Haldwani', state: 'Uttarakhand', lat: 29.2183, lng: 79.5130, pincodes: '263139', radius: 25, score: 720, tier: 'tier_2', tags: 'haldwani, uttarakhand, full-home-cleaning, doorstep-dispatch' }
+  };
+
+  const toCitySlug = (str = '') =>
+    String(str)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  // Handle typing City Name -> Automatically generate URL Slug & auto-fill preset metadata if matched
+  const handleCityNameAutoChange = (rawName) => {
+    const autoSlug = toCitySlug(rawName);
+    const preset = CITY_AUTO_PRESETS[autoSlug];
+
+    if (preset) {
+      setCityForm(prev => ({
+        ...prev,
+        name: rawName,
+        slug: autoSlug,
+        state: preset.state,
+        latitude: String(preset.lat),
+        longitude: String(preset.lng),
+        serviceRadiusKm: preset.radius,
+        pincodes: preset.pincodes,
+        rankingScore: preset.score,
+        rankingTier: preset.tier,
+        tags: preset.tags
+      }));
+    } else {
+      setCityForm(prev => ({
+        ...prev,
+        name: rawName,
+        slug: autoSlug,
+        tags: autoSlug
+          ? `${autoSlug}, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service`
+          : prev.tags
+      }));
+    }
+  };
+
+  // Live Map Lookup for ANY City Name -> Auto-fills Slug, GPS Lat/Lng, State, Covered Pincodes & SEO Tags
+  const handleAutoDetectCityFromMap = async (targetCityName = cityForm.name) => {
+    const cleanName = String(targetCityName || '').trim();
+    if (!cleanName) {
+      toast.error('Please enter a City Name first.');
+      return;
+    }
+
+    const autoSlug = toCitySlug(cleanName);
+    const preset = CITY_AUTO_PRESETS[autoSlug];
+    if (preset) {
+      setCityForm(prev => ({
+        ...prev,
+        name: preset.name,
+        slug: autoSlug,
+        state: preset.state,
+        latitude: String(preset.lat),
+        longitude: String(preset.lng),
+        serviceRadiusKm: preset.radius,
+        pincodes: preset.pincodes,
+        rankingScore: preset.score,
+        rankingTier: preset.tier,
+        tags: preset.tags
+      }));
+      toast.success(`Auto-filled slug, GPS coordinates, and covered pincodes for ${preset.name}!`);
+      return;
+    }
+
+    setIsAutoDetectingCityGeo(true);
+    try {
+      const q = encodeURIComponent(`${cleanName}, ${cityForm.state || 'Uttar Pradesh'}, India`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=in&q=${q}`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (res.ok) {
+        const results = await res.json();
+        if (Array.isArray(results) && results.length > 0) {
+          const best = results[0];
+          const lat = parseFloat(best.lat);
+          const lng = parseFloat(best.lon);
+          const detectedState = best.address?.state || cityForm.state || 'Uttar Pradesh';
+
+          const pinSet = new Set();
+          for (const r of results) {
+            const pc = String(r.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
+            if (pc.length === 6) pinSet.add(pc);
+          }
+
+          // If Nominatim search didn't include postcode, reverse-geocode the center point
+          if (pinSet.size === 0 && !isNaN(lat) && !isNaN(lng)) {
+            try {
+              const revRes = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`,
+                { headers: { 'Accept-Language': 'en' } }
+              );
+              if (revRes.ok) {
+                const revData = await revRes.json();
+                const revPin = String(revData?.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
+                if (revPin.length === 6) pinSet.add(revPin);
+              }
+            } catch (_) {}
+          }
+
+          const pinsStr = Array.from(pinSet).join(', ');
+          const stateSlug = toCitySlug(detectedState);
+
+          setCityForm(prev => ({
+            ...prev,
+            slug: autoSlug,
+            state: detectedState,
+            latitude: !isNaN(lat) ? lat.toFixed(4) : prev.latitude,
+            longitude: !isNaN(lng) ? lng.toFixed(4) : prev.longitude,
+            pincodes: pinsStr || prev.pincodes,
+            tags: `${autoSlug}, ${stateSlug || 'uttar-pradesh'}, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service`,
+            rankingScore: prev.rankingScore === 100 ? 800 : prev.rankingScore,
+            rankingTier: prev.rankingTier === 'primary' ? 'tier_1' : prev.rankingTier
+          }));
+
+          toast.success(`Map auto-filled coordinates (${lat.toFixed(4)}, ${lng.toFixed(4)})${pinsStr ? ` & pincode ${pinsStr}` : ''} for ${cleanName}!`);
+        } else {
+          toast.error(`Could not find "${cleanName}" on map. Please check spelling.`);
+        }
+      }
+    } catch (err) {
+      toast.error('Map lookup failed. Check your internet connection.');
+    } finally {
+      setIsAutoDetectingCityGeo(false);
+    }
+  };
+
   // Open City Modal
   const openCityModal = (city = null) => {
     if (city) {
       setEditingCity(city);
+      const [lng, lat] = Array.isArray(city.location?.coordinates) && city.location.coordinates.length === 2
+        ? city.location.coordinates
+        : [78.7733, 28.8386];
       setCityForm({
         name: city.name || '',
-        slug: city.slug || '',
+        slug: city.slug || toCitySlug(city.name || ''),
         state: city.state || 'Uttar Pradesh',
+        latitude: String(lat ?? 28.8386),
+        longitude: String(lng ?? 78.7733),
         serviceRadiusKm: city.serviceRadiusKm || 25,
         pincodes: Array.isArray(city.pincodes) ? city.pincodes.join(', ') : '',
         status: city.status || 'active',
@@ -2856,13 +3116,15 @@ export default function AdminDashboard() {
         name: '',
         slug: '',
         state: 'Uttar Pradesh',
+        latitude: '28.8386',
+        longitude: '78.7733',
         serviceRadiusKm: 25,
         pincodes: '',
         status: 'active',
         sortOrder: cities.length + 1,
         tags: '',
-        rankingScore: 100,
-        rankingTier: 'primary'
+        rankingScore: 800,
+        rankingTier: 'tier_1'
       });
     }
     setCityModalOpen(true);
@@ -2884,10 +3146,14 @@ export default function AdminDashboard() {
       ? (typeof cityForm.tags === 'string' ? cityForm.tags.split(',').map(t => t.trim()).filter(Boolean) : cityForm.tags)
       : [];
 
+    const generatedSlug = toCitySlug(cityForm.slug || cityForm.name);
+
     const payload = {
       name: cityForm.name.trim(),
-      slug: cityForm.slug.trim() || cityForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slug: generatedSlug,
       state: cityForm.state.trim() || 'Uttar Pradesh',
+      latitude: Number(cityForm.latitude) || 28.8386,
+      longitude: Number(cityForm.longitude) || 78.7733,
       serviceRadiusKm: Number(cityForm.serviceRadiusKm) || 25,
       pincodes: pincodesArray,
       status: cityForm.status,
@@ -5345,13 +5611,13 @@ export default function AdminDashboard() {
                 <span>Business & Operational Settings</span>
               </h3>
               <p className="text-xs text-[#6B8077] mt-0.5">
-                Manage online payment gateway options and customer transactions.
+                Dynamically manage online payments, separate GST on overall service, and platform charges.
               </p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
 
-              {/* Online Payment Settings */}
+              {/* 1. Online Payment Settings */}
               <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -5406,11 +5672,323 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* 2. Separate GST on Overall Service */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LuPercent className="w-5 h-5 text-[#E9A23B]" />
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Separate GST on Overall Service
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Add or remove a separate GST line on the overall service subtotal during customer checkout.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                    settingsForm.gstEnabled
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-stone-200 text-stone-700 border border-stone-300'
+                  }`}>
+                    {settingsForm.gstEnabled ? `Enabled (${settingsForm.gstPercentage ?? 18}% GST)` : 'Disabled'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8]">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-[#10231D] block">
+                      Charge separate GST on overall service bill
+                    </span>
+                    <p className="text-[11px] text-[#6B8077]">
+                      {settingsForm.gstEnabled
+                        ? `Adds ${settingsForm.gstPercentage ?? 18}% GST separately on top of the service subtotal at checkout.`
+                        : 'No separate GST is added to the service price at checkout.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    id="gstEnabledToggle"
+                    aria-checked={Boolean(settingsForm.gstEnabled)}
+                    disabled={togglingGst}
+                    onClick={() => handleToggleGst(!settingsForm.gstEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#E9A23B] focus:ring-offset-2 ${
+                      settingsForm.gstEnabled ? 'bg-emerald-600' : 'bg-stone-300'
+                    } ${togglingGst ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        settingsForm.gstEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-[#10231D] block">
+                        GST Rate (%)
+                      </label>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Standard Indian service GST rate is 18%. You can set any rate or tap a preset.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-28">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          value={settingsForm.gstPercentage ?? 18}
+                          onChange={(e) =>
+                            setSettingsForm(prev => ({
+                              ...prev,
+                              gstPercentage: e.target.value === '' ? '' : Number(e.target.value)
+                            }))
+                          }
+                          className="w-full px-3 py-2 pr-7 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#6B8077]">
+                          %
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={savingSettings}
+                        onClick={handleSaveSettings}
+                        className="px-3 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold cursor-pointer transition-colors"
+                      >
+                        Apply Rate
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold text-[#6B8077] uppercase mr-1">Quick Presets:</span>
+                    {[5, 12, 18, 28].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setSettingsForm(prev => ({ ...prev, gstPercentage: pct }))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                          Number(settingsForm.gstPercentage) === pct
+                            ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D]'
+                            : 'bg-[#F4EFE6] text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                        }`}
+                      >
+                        {pct}% GST
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Platform Charges on Overall Service */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LuCalculator className="w-5 h-5 text-[#E9A23B]" />
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Platform Charges on Overall Service
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Enable or disable a flat or percentage platform fee on customer service bookings.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                    settingsForm.platformChargeEnabled
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-stone-200 text-stone-700 border border-stone-300'
+                  }`}>
+                    {settingsForm.platformChargeEnabled
+                      ? `Enabled (${settingsForm.platformChargeType === 'percentage' ? `${settingsForm.platformChargeAmount ?? 0}%` : `₹${settingsForm.platformChargeAmount ?? 49}`})`
+                      : 'Disabled'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8]">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-[#10231D] block">
+                      Charge Platform Fee on customer bookings
+                    </span>
+                    <p className="text-[11px] text-[#6B8077]">
+                      {settingsForm.platformChargeEnabled
+                        ? `Adds ${settingsForm.platformChargeLabel || 'Platform Charges'} (${
+                            settingsForm.platformChargeType === 'percentage'
+                              ? `${settingsForm.platformChargeAmount ?? 0}%`
+                              : `₹${settingsForm.platformChargeAmount ?? 49}`
+                          }) to the overall service bill.`
+                        : 'No platform charge is added to customer bookings.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    id="platformChargeEnabledToggle"
+                    aria-checked={Boolean(settingsForm.platformChargeEnabled)}
+                    disabled={togglingPlatformCharge}
+                    onClick={() => handleTogglePlatformCharge(!settingsForm.platformChargeEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#E9A23B] focus:ring-offset-2 ${
+                      settingsForm.platformChargeEnabled ? 'bg-emerald-600' : 'bg-stone-300'
+                    } ${togglingPlatformCharge ? 'opacity-50 cursor-wait' : ''}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        settingsForm.platformChargeEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-[#10231D] block mb-1">
+                        Fee Type
+                      </label>
+                      <select
+                        value={settingsForm.platformChargeType || 'flat'}
+                        onChange={(e) =>
+                          setSettingsForm(prev => ({
+                            ...prev,
+                            platformChargeType: e.target.value
+                          }))
+                        }
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      >
+                        <option value="flat">Flat Amount (₹)</option>
+                        <option value="percentage">Percentage (%)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-[#10231D] block mb-1">
+                        {settingsForm.platformChargeType === 'percentage' ? 'Platform Fee (%)' : 'Platform Fee Amount (₹)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={settingsForm.platformChargeAmount ?? 49}
+                        onChange={(e) =>
+                          setSettingsForm(prev => ({
+                            ...prev,
+                            platformChargeAmount: e.target.value === '' ? '' : Number(e.target.value)
+                          }))
+                        }
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-[#10231D] block mb-1">
+                        Label Shown on Bill
+                      </label>
+                      <input
+                        type="text"
+                        value={settingsForm.platformChargeLabel || 'Platform Charges'}
+                        onChange={(e) =>
+                          setSettingsForm(prev => ({
+                            ...prev,
+                            platformChargeLabel: e.target.value
+                          }))
+                        }
+                        placeholder="Platform Charges"
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold text-[#6B8077] uppercase mr-1">Quick Amounts:</span>
+                      {(settingsForm.platformChargeType === 'percentage' ? [2, 5, 10] : [19, 29, 49, 99]).map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setSettingsForm(prev => ({ ...prev, platformChargeAmount: val }))}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                            Number(settingsForm.platformChargeAmount) === val
+                              ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D]'
+                              : 'bg-[#F4EFE6] text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                          }`}
+                        >
+                          {settingsForm.platformChargeType === 'percentage' ? `${val}%` : `₹${val}`}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={savingSettings}
+                      onClick={handleSaveSettings}
+                      className="px-3.5 py-2 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold cursor-pointer transition-colors"
+                    >
+                      Apply Platform Fee
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Live Bill Preview for Admin */}
+              {(() => {
+                const sampleService = 1000;
+                const samplePlatform = settingsForm.platformChargeEnabled
+                  ? (settingsForm.platformChargeType === 'percentage'
+                      ? Math.round((sampleService * (Number(settingsForm.platformChargeAmount) || 0)) / 100)
+                      : Math.round(Number(settingsForm.platformChargeAmount) || 0))
+                  : 0;
+                const sampleGst = settingsForm.gstEnabled
+                  ? Math.round((sampleService * (Number(settingsForm.gstPercentage ?? 18) || 0)) / 100)
+                  : 0;
+                const sampleTotal = sampleService + samplePlatform + sampleGst;
+
+                return (
+                  <div className="p-4 rounded-2xl bg-white/80 border border-[#E2D9C8] space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#10231D] uppercase tracking-wider text-[11px]">
+                        Live Checkout Bill Preview (Sample ₹1,000 Service)
+                      </span>
+                      <span className="text-[11px] text-[#6B8077]">Updates live on Booking Page</span>
+                    </div>
+                    <div className="space-y-1 pt-1 border-t border-[#E2D9C8]">
+                      <div className="flex justify-between text-[#3D524A]">
+                        <span>Service Subtotal:</span>
+                        <span className="font-mono font-semibold">₹{sampleService.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between text-[#3D524A]">
+                        <span>{settingsForm.platformChargeLabel || 'Platform Charges'}:</span>
+                        <span className={`font-mono font-semibold ${settingsForm.platformChargeEnabled ? 'text-[#10231D]' : 'text-stone-400'}`}>
+                          {settingsForm.platformChargeEnabled ? `+₹${samplePlatform.toLocaleString('en-IN')}` : '₹0 (Disabled)'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[#3D524A]">
+                        <span>Separate GST ({settingsForm.gstPercentage ?? 18}%):</span>
+                        <span className={`font-mono font-semibold ${settingsForm.gstEnabled ? 'text-[#10231D]' : 'text-stone-400'}`}>
+                          {settingsForm.gstEnabled ? `+₹${sampleGst.toLocaleString('en-IN')}` : '₹0 (Disabled)'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-black text-sm text-[#10231D] pt-1.5 border-t border-[#E2D9C8]">
+                        <span>Customer Payable Total:</span>
+                        <span className="font-mono">₹{sampleTotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="pt-2">
                 <button
                   type="submit"
                   disabled={savingSettings}
-                  className="px-6 py-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+                  className="px-6 py-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm cursor-pointer"
                 >
                   <LuCheck className="w-4 h-4 text-[#E9A23B]" />
                   <span>{savingSettings ? 'Saving Settings...' : 'Save All Business Settings'}</span>
@@ -5826,35 +6404,83 @@ export default function AdminDashboard() {
             isOpen={true}
             onClose={() => setCityModalOpen(false)}
             title={editingCity ? `Edit City: ${editingCity.name}` : 'Add New Operational City'}
-            subtitle="Manage service delivery city and covered pincodes"
-            maxWidth="max-w-md"
+            subtitle="Automated URL slug, map GPS coordinates & pincode detection for map auto-select"
+            maxWidth="max-w-lg"
           >
             <form onSubmit={handleSaveCity} className="space-y-4">
+              {/* 1-Click Quick Auto-Fill City Chips */}
+              <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10231D] flex items-center gap-1">
+                    <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>1-Click Auto-Fill UP & Nearby Cities:</span>
+                  </span>
+                  <span className="text-[10px] text-[#6B8077]">Fills Slug, GPS, Pincodes & SEO</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Bareilly', 'Meerut', 'Sambhal', 'Moradabad', 'Rampur', 'Amroha', 'Chandausi', 'Gajraula', 'Bijnor', 'Hapur', 'Ghaziabad', 'Noida', 'Haldwani'].map((cName) => (
+                    <button
+                      key={cName}
+                      type="button"
+                      onClick={() => handleAutoDetectCityFromMap(cName)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        cityForm.name.toLowerCase() === cName.toLowerCase()
+                          ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D]'
+                          : 'bg-white text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                      }`}
+                    >
+                      +{cName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  City Name:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-[#10231D]">
+                    City Name: <span className="text-[#C2512D]">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={isAutoDetectingCityGeo || !cityForm.name.trim()}
+                    onClick={() => handleAutoDetectCityFromMap(cityForm.name)}
+                    className="text-[11px] font-bold text-[#10231D] hover:text-[#E9A23B] bg-[#ECE5D8] hover:bg-[#E2D9C8] px-2.5 py-1 rounded-lg border border-[#D2C8B8] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <LuCompass className={`w-3.5 h-3.5 text-[#E9A23B] ${isAutoDetectingCityGeo ? 'animate-spin' : ''}`} />
+                    <span>{isAutoDetectingCityGeo ? 'Detecting from Map...' : 'Auto-Fill GPS & Pincodes from Map'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. Bareilly, Meerut, Sambhal"
+                  placeholder="e.g. Bareilly, Meerut, Sambhal (auto-generates slug & map data)"
                   value={cityForm.name}
-                  onChange={(e) => setCityForm({ ...cityForm, name: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                  onChange={(e) => handleCityNameAutoChange(e.target.value)}
+                  onBlur={() => {
+                    if (cityForm.name.trim() && !cityForm.pincodes.trim()) {
+                      handleAutoDetectCityFromMap(cityForm.name);
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm font-semibold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    URL Slug:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#10231D]">
+                      URL Slug:
+                    </label>
+                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Auto-Generated
+                    </span>
+                  </div>
                   <input
                     type="text"
                     placeholder="e.g. bareilly"
                     value={cityForm.slug}
-                    onChange={(e) => setCityForm({ ...cityForm, slug: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
+                    onChange={(e) => setCityForm({ ...cityForm, slug: toCitySlug(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                   />
                 </div>
 
@@ -5870,6 +6496,48 @@ export default function AdminDashboard() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Map GPS Center Coordinates (Used by Map Auto-Select & Locate Me GPS) */}
+              <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+                    <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+                    <span>Map Center GPS Coordinates (For Map Auto-Select)</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-700">Auto-Synced</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#6B8077] uppercase mb-1">
+                      Latitude (North):
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={cityForm.latitude}
+                      onChange={(e) => setCityForm({ ...cityForm, latitude: e.target.value })}
+                      placeholder="28.8386"
+                      className="w-full p-2 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#6B8077] uppercase mb-1">
+                      Longitude (East):
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={cityForm.longitude}
+                      onChange={(e) => setCityForm({ ...cityForm, longitude: e.target.value })}
+                      placeholder="78.7733"
+                      className="w-full p-2 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D]"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-[#6B8077] leading-snug">
+                  <strong>How Map Identifies This City:</strong> When a customer clicks <strong>Locate Me (GPS)</strong> or moves the map pin, the system matches (1) <strong>Covered Pincodes</strong>, (2) <strong>City Name / Slug</strong> from Google/OSM reverse-geocoding, and (3) <strong>GPS Radius ({cityForm.serviceRadiusKm || 25} km)</strong> around these coordinates.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -7264,6 +7932,22 @@ export default function AdminDashboard() {
                       <div className="flex justify-between text-emerald-700 font-semibold">
                         <span>Coupon ({viewBookingDetails.appliedCoupon.code}):</span>
                         <span className="font-mono">-₹{(viewBookingDetails.appliedCoupon.discountAmount || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {viewBookingDetails.totals?.platformChargeAmount > 0 && (
+                      <div className="flex justify-between text-[#3D524A] font-semibold">
+                        <span>{viewBookingDetails.totals.platformChargeLabel || 'Platform Charges'}:</span>
+                        <span className="font-mono text-[#10231D]">
+                          +₹{viewBookingDetails.totals.platformChargeAmount.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                    {viewBookingDetails.totals?.gstAmount > 0 && (
+                      <div className="flex justify-between text-[#3D524A] font-semibold">
+                        <span>GST ({viewBookingDetails.totals.gstPercentage || 18}%):</span>
+                        <span className="font-mono text-[#10231D]">
+                          +₹{viewBookingDetails.totals.gstAmount.toLocaleString('en-IN')}
+                        </span>
                       </div>
                     )}
                     {viewBookingDetails.totals?.customerSaved > 0 && (

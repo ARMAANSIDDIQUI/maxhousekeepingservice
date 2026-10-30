@@ -63,24 +63,31 @@ export function BookingProvider({ children }) {
           const lng = position.coords.longitude;
           let matchedCity = null;
 
-          // 1. Check with Google Maps Geocoder if loaded
+          // 1. Check with Google Maps Geocoder if loaded (matches Pincode first, then Locality/Slug)
           try {
             if (window.google?.maps?.Geocoder) {
               const geocoder = new window.google.maps.Geocoder();
               const response = await geocoder.geocode({ location: { lat, lng } });
               if (response?.results?.[0]?.address_components) {
                 const comps = response.results[0].address_components;
-                const locality = comps.find(c =>
-                  c.types.includes('locality') ||
-                  c.types.includes('administrative_area_level_2')
-                );
-                if (locality?.long_name) {
-                  const targetName = locality.long_name.toLowerCase();
-                  matchedCity = cities.find(c =>
-                    c.name.toLowerCase() === targetName ||
-                    targetName.includes(c.name.toLowerCase()) ||
-                    c.slug === targetName
+                const postal = comps.find(c => c.types.includes('postal_code'));
+                if (postal?.long_name) {
+                  const cleanPin = String(postal.long_name).trim();
+                  matchedCity = cities.find(c => Array.isArray(c.pincodes) && c.pincodes.includes(cleanPin));
+                }
+                if (!matchedCity) {
+                  const locality = comps.find(c =>
+                    c.types.includes('locality') ||
+                    c.types.includes('administrative_area_level_2')
                   );
+                  if (locality?.long_name) {
+                    const targetName = locality.long_name.toLowerCase();
+                    matchedCity = cities.find(c =>
+                      c.name.toLowerCase() === targetName ||
+                      targetName.includes(c.name.toLowerCase()) ||
+                      c.slug === targetName
+                    );
+                  }
                 }
               }
             }
@@ -88,14 +95,18 @@ export function BookingProvider({ children }) {
             console.warn('[City Geocoder lookup notice]:', e.message);
           }
 
-          // 2. Haversine distance proximity fallback against active service cities
+          // 2. Haversine distance proximity against MongoDB city coordinates (location.coordinates [lng, lat]) + serviceRadiusKm
           if (!matchedCity && cities.length > 0) {
             let closest = null;
             let minDistance = Infinity;
 
             for (const c of cities) {
-              const coords = CITY_COORDINATES[c.slug] || CITY_COORDINATES[c.name.toLowerCase()];
-              if (coords) {
+              const dbCoords =
+                Array.isArray(c.location?.coordinates) && c.location.coordinates.length === 2
+                  ? { lat: Number(c.location.coordinates[1]), lng: Number(c.location.coordinates[0]) }
+                  : null;
+              const coords = dbCoords || CITY_COORDINATES[c.slug] || CITY_COORDINATES[c.name?.toLowerCase()];
+              if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
                 const dLat = (lat - coords.lat) * (Math.PI / 180);
                 const dLng = (lng - coords.lng) * (Math.PI / 180);
                 const a =
@@ -110,7 +121,7 @@ export function BookingProvider({ children }) {
               }
             }
 
-            if (closest && minDistance <= 85) {
+            if (closest && minDistance <= Math.max(85, Number(closest.serviceRadiusKm) || 25)) {
               matchedCity = closest;
             } else if (closest) {
               matchedCity = cities.find(c => c.slug === 'moradabad') || closest;
@@ -211,7 +222,13 @@ export function BookingProvider({ children }) {
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
-    acceptOnlinePayments: false
+    acceptOnlinePayments: false,
+    gstEnabled: false,
+    gstPercentage: 18,
+    platformChargeEnabled: false,
+    platformChargeType: 'flat',
+    platformChargeAmount: 49,
+    platformChargeLabel: 'Platform Charges'
   });
 
   const refreshSettings = useCallback(async () => {
@@ -233,7 +250,13 @@ export function BookingProvider({ children }) {
           workingHours: res.settings.workingHours || prev.workingHours,
           address: res.settings.address || prev.address,
           ratingClaim: res.settings.ratingClaim || prev.ratingClaim,
-          acceptOnlinePayments: Boolean(res.settings.acceptOnlinePayments)
+          acceptOnlinePayments: Boolean(res.settings.acceptOnlinePayments),
+          gstEnabled: Boolean(res.settings.gstEnabled),
+          gstPercentage: Number(res.settings.gstPercentage ?? 18),
+          platformChargeEnabled: Boolean(res.settings.platformChargeEnabled),
+          platformChargeType: res.settings.platformChargeType === 'percentage' ? 'percentage' : 'flat',
+          platformChargeAmount: Number(res.settings.platformChargeAmount ?? 49),
+          platformChargeLabel: res.settings.platformChargeLabel || 'Platform Charges'
         }));
       }
     } catch (err) {
@@ -451,6 +474,23 @@ export function BookingProvider({ children }) {
         ? enriched.reduce((acc, it) => acc + ((it.outstationSurcharge || 0) * (it.qty || 1)), 0)
         : 0;
 
+      const platformChargeEnabled = Boolean(settings?.platformChargeEnabled);
+      const platformChargeType = settings?.platformChargeType === 'percentage' ? 'percentage' : 'flat';
+      const platformChargeValue = Math.max(0, Number(settings?.platformChargeAmount ?? 0) || 0);
+      const platformChargeLabel = settings?.platformChargeLabel || 'Platform Charges';
+      let platformChargeAmount = 0;
+      if (platformChargeEnabled && subtotal > 0 && platformChargeValue > 0) {
+        platformChargeAmount = platformChargeType === 'percentage'
+          ? Math.round((subtotal * platformChargeValue) / 100)
+          : Math.round(platformChargeValue);
+      }
+
+      const gstEnabled = Boolean(settings?.gstEnabled);
+      const gstPercentage = gstEnabled ? Math.max(0, Number(settings?.gstPercentage ?? 18) || 0) : 0;
+      const gstAmount = gstEnabled && subtotal > 0 && gstPercentage > 0
+        ? Math.round((subtotal * gstPercentage) / 100)
+        : 0;
+
       setQuote({
         items: enriched,
         totals: {
@@ -459,7 +499,15 @@ export function BookingProvider({ children }) {
           outstationSurcharge: totalOutstationSurcharge,
           discount: Math.max(0, mrpTotal - subtotal),
           couponDiscount: 0,
-          total: subtotal,
+          gstEnabled,
+          gstPercentage,
+          gstAmount,
+          platformChargeEnabled,
+          platformChargeType,
+          platformChargeValue,
+          platformChargeAmount,
+          platformChargeLabel,
+          total: subtotal + platformChargeAmount + gstAmount,
           customerSaved: Math.max(0, mrpTotal - subtotal),
           overallDiscountPct: mrpTotal > 0 ? Math.round(((mrpTotal - subtotal) / mrpTotal) * 100) : 0
         }
@@ -467,12 +515,32 @@ export function BookingProvider({ children }) {
     } finally {
       setIsQuoting(false);
     }
-  }, [selectedCity, couponCode]);
+  }, [
+    selectedCity,
+    couponCode,
+    settings?.gstEnabled,
+    settings?.gstPercentage,
+    settings?.platformChargeEnabled,
+    settings?.platformChargeType,
+    settings?.platformChargeAmount,
+    settings?.platformChargeLabel
+  ]);
 
-  // Recalculate quote whenever items change
+  // Recalculate quote whenever items or dynamic billing settings change
   useEffect(() => {
     refreshQuote(items, selectedCity?.slug, couponCode);
-  }, [items, selectedCity, couponCode, refreshQuote]);
+  }, [
+    items,
+    selectedCity,
+    couponCode,
+    settings?.gstEnabled,
+    settings?.gstPercentage,
+    settings?.platformChargeEnabled,
+    settings?.platformChargeType,
+    settings?.platformChargeAmount,
+    settings?.platformChargeLabel,
+    refreshQuote
+  ]);
 
   // Add a service item to booking cart
   const addItem = (service, selections = {}, qty = 1) => {

@@ -6,6 +6,7 @@ import City from '../models/City.js';
 import Coupon from '../models/Coupon.js';
 import User from '../models/User.js';
 import Counter from '../models/Counter.js';
+import Settings from '../models/Settings.js';
 import { calculateQuote } from '../services/pricing/engine.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
 
@@ -199,7 +200,8 @@ export async function getQuote(req, res, next) {
       preCouponError = validated.error;
     }
 
-    const calculation = calculateQuote(enrichedItems, citySlug, coupon);
+    const settings = await Settings.findOne().lean();
+    const calculation = calculateQuote(enrichedItems, citySlug, coupon, settings || {});
 
     // If pre-validation failed (e.g. not 1st booking or already used), convey clear error
     if (preCouponError && !calculation.couponError) {
@@ -334,7 +336,8 @@ export async function createBooking(req, res, next) {
       coupon = validated.coupon;
     }
 
-    const quote = calculateQuote(enrichedItems, cityDoc?.slug, coupon);
+    const settings = await Settings.findOne().lean();
+    const quote = calculateQuote(enrichedItems, cityDoc?.slug, coupon, settings || {});
 
     if (couponCode && quote.couponError) {
       return res.status(400).json({

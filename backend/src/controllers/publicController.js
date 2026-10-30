@@ -41,11 +41,24 @@ export async function getPublicSettings(req, res, next) {
         email: 'contactmaxhousekeepingservice@gmail.com',
         supportEmail: 'contactmaxhousekeepingservice@gmail.com',
         address: 'Kanth road, Behind Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
-        workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)'
+        workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
+        gstEnabled: false,
+        gstPercentage: 18,
+        platformChargeEnabled: false,
+        platformChargeType: 'flat',
+        platformChargeAmount: 49,
+        platformChargeLabel: 'Platform Charges'
       };
     }
     const publicSettings = settings.toObject ? settings.toObject() : { ...settings };
     delete publicSettings.razorpayKeySecret; // Never leak secret key
+
+    publicSettings.gstEnabled = Boolean(publicSettings.gstEnabled);
+    publicSettings.gstPercentage = Number(publicSettings.gstPercentage ?? 18);
+    publicSettings.platformChargeEnabled = Boolean(publicSettings.platformChargeEnabled);
+    publicSettings.platformChargeType = publicSettings.platformChargeType === 'percentage' ? 'percentage' : 'flat';
+    publicSettings.platformChargeAmount = Number(publicSettings.platformChargeAmount ?? 49);
+    publicSettings.platformChargeLabel = publicSettings.platformChargeLabel || 'Platform Charges';
 
     // Expose public Google Client ID for OAuth
     publicSettings.googleClientId =

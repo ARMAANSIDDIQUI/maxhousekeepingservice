@@ -890,25 +890,39 @@ export default function AddressPickerWithMap({
       } catch (_) {}
     }
 
-    // 6. Match nearest saved MongoDB city if within its radius
+    // 6. Match saved MongoDB city using 3-tier identification:
+    //    (a) Exact Covered Pincode match -> (b) City Name / Slug match -> (c) Closest GPS Radius (location.coordinates + serviceRadiusKm)
     let matchedMongoCity = null;
-    for (const c of mongoCities) {
-      if (resolvedCity && String(c.name || '').toLowerCase() === resolvedCity.toLowerCase()) {
-        matchedMongoCity = c;
-        break;
-      }
-      if (c.location?.coordinates?.length === 2) {
-        const [cLng, cLat] = c.location.coordinates;
-        const dLat = (lat - cLat) * (Math.PI / 180);
-        const dLon = (lng - cLng) * (Math.PI / 180);
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(cLat * (Math.PI / 180)) * Math.cos(lat * (Math.PI / 180)) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        if (distKm <= (c.serviceRadiusKm || 25)) {
-          matchedMongoCity = c;
-          break;
+    if (resolvedPincode) {
+      matchedMongoCity = mongoCities.find(
+        (c) => Array.isArray(c.pincodes) && c.pincodes.includes(String(resolvedPincode).trim())
+      );
+    }
+    if (!matchedMongoCity && resolvedCity) {
+      const targetLower = String(resolvedCity).trim().toLowerCase();
+      matchedMongoCity = mongoCities.find(
+        (c) =>
+          String(c.name || '').toLowerCase() === targetLower ||
+          String(c.slug || '').toLowerCase() === targetLower ||
+          targetLower.includes(String(c.name || '').toLowerCase())
+      );
+    }
+    if (!matchedMongoCity) {
+      let minDistKm = Infinity;
+      for (const c of mongoCities) {
+        if (c.location?.coordinates?.length === 2) {
+          const [cLng, cLat] = c.location.coordinates;
+          const dLat = (lat - cLat) * (Math.PI / 180);
+          const dLon = (lng - cLng) * (Math.PI / 180);
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(cLat * (Math.PI / 180)) * Math.cos(lat * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          if (distKm <= (c.serviceRadiusKm || 25) && distKm < minDistKm) {
+            minDistKm = distKm;
+            matchedMongoCity = c;
+          }
         }
       }
     }
