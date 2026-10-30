@@ -1,5 +1,28 @@
 import City from '../models/City.js';
-import { resolveLocation, searchAndPrioritizeAddresses } from '../services/location/locationService.js';
+import { resolveLocation, searchAndPrioritizeAddresses, reverseGeocodeLocation } from '../services/location/locationService.js';
+
+/**
+ * Reverse geocode GPS coordinates to street/area/landmark, city, and pincode
+ * GET /api/v1/locations/reverse?lat=...&lng=...
+ */
+export async function reverseGeocode(req, res, next) {
+  try {
+    const { lat, lng } = req.query;
+    const result = await reverseGeocodeLocation({ lat, lng });
+    if (!result) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid lat and lng query parameters are required.'
+      });
+    }
+    res.status(200).json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Search and prioritize autocomplete addresses (MongoDB Cities -> Uttar Pradesh -> India)
@@ -152,6 +175,7 @@ export async function getDrivingRoute(req, res, next) {
 export default {
   getCities,
   autocompleteLocations,
+  reverseGeocode,
   detectCoverage,
   getDrivingRoute
 };

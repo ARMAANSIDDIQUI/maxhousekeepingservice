@@ -66,6 +66,7 @@ export default function AddressPickerWithMap({
 
   // Google Maps SDK references
   const containerWrapperRef = useRef(null);
+  const searchInputRef = useRef(null);
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerInstanceRef = useRef(null);
@@ -75,6 +76,7 @@ export default function AddressPickerWithMap({
   const sessionTokenRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const reverseGeocodeRef = useRef(null);
+  const lastEmittedLine1Ref = useRef(value.line1 || value.formattedAddress || '');
 
   // Load saved serviceable cities from MongoDB backend
   useEffect(() => {
@@ -112,8 +114,15 @@ export default function AddressPickerWithMap({
     if (value.houseOrFlat !== undefined && value.houseOrFlat !== houseOrFlat) {
       setHouseOrFlat(value.houseOrFlat || '');
     }
-    if (value.line1 && value.line1 !== streetQuery && !showPredictions) {
+    if (
+      value.line1 !== undefined &&
+      value.line1 !== streetQuery &&
+      value.line1 !== lastEmittedLine1Ref.current &&
+      !showPredictions &&
+      !isLocatingUser
+    ) {
       setStreetQuery(value.line1 || value.formattedAddress || '');
+      lastEmittedLine1Ref.current = value.line1 || value.formattedAddress || '';
     }
     if (value.landmark !== undefined && value.landmark !== landmark) {
       setLandmark(value.landmark || '');
@@ -144,10 +153,13 @@ export default function AddressPickerWithMap({
       const fallbackPin = getDefaultPincodeForCity(nextCity, mongoCities) || '244001';
       const nextPin = updatedFields.pincode || pincode || fallbackPin;
 
+      const nextLine1 = updatedFields.line1 !== undefined ? updatedFields.line1 : streetQuery;
+      lastEmittedLine1Ref.current = nextLine1;
+
       const merged = {
         houseOrFlat,
-        line1: streetQuery,
-        formattedAddress: streetQuery,
+        line1: nextLine1,
+        formattedAddress: updatedFields.formattedAddress !== undefined ? updatedFields.formattedAddress : nextLine1,
         landmark,
         cityText: nextCity,
         city: nextCity,
@@ -713,8 +725,25 @@ export default function AddressPickerWithMap({
     let resolvedState = '';
     let resolvedPincode = '';
 
-    // 1. Try Google Geocoder first (if available and enabled on API key)
-    if (geocoderRef.current) {
+    // 1. Try our Backend Reverse Geocoding API first (combines MongoDB UP Cities + Nominatim + Photon)
+    try {
+      const backendRes = await fetch(
+        `${API_BASE_URL}/locations/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+      );
+      if (backendRes.ok) {
+        const bData = await backendRes.json();
+        if (bData?.success) {
+          resolvedAddress = bData.line1 || bData.formattedAddress || '';
+          resolvedLandmark = bData.landmark || '';
+          resolvedCity = bData.city || '';
+          resolvedState = bData.state || '';
+          resolvedPincode = bData.pincode || '';
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try Google Geocoder (if available and enabled on API key)
+    if ((!resolvedAddress || !resolvedPincode) && geocoderRef.current) {
       try {
         const geoRes = await new Promise((resolve) => {
           geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
@@ -727,20 +756,25 @@ export default function AddressPickerWithMap({
         });
 
         if (geoRes) {
-          // Prefer a street/sublocality/neighborhood address over a raw Plus Code (like "RPQ9+abc")
           const bestReadable = geoRes.find(
             (r) => r.formatted_address && !/^[A-Z0-9]{4}\+[A-Z0-9]{2,}/i.test(r.formatted_address.trim())
           ) || geoRes[0];
-          resolvedAddress = bestReadable?.formatted_address || '';
+          if (!resolvedAddress && bestReadable?.formatted_address) {
+            resolvedAddress = bestReadable.formatted_address;
+          }
           const comps = extractFromGeocodeResults(geoRes);
-          resolvedCity = comps.city || '';
-          resolvedState = comps.state || '';
-          resolvedPincode = comps.pincode || '';
+          if (!resolvedCity && comps.city) resolvedCity = comps.city;
+          if (!resolvedState && comps.state) resolvedState = comps.state;
+          if (!resolvedPincode && comps.pincode) resolvedPincode = comps.pincode;
 
-          // Extract sublocality / neighborhood for landmark if available
           for (const res of geoRes) {
             for (const c of res.address_components || []) {
-              if (!resolvedLandmark && (c.types?.includes('sublocality_level_1') || c.types?.includes('neighborhood') || c.types?.includes('point_of_interest'))) {
+              if (
+                !resolvedLandmark &&
+                (c.types?.includes('sublocality_level_1') ||
+                  c.types?.includes('neighborhood') ||
+                  c.types?.includes('point_of_interest'))
+              ) {
                 resolvedLandmark = c.long_name;
               }
             }
@@ -749,7 +783,7 @@ export default function AddressPickerWithMap({
       } catch (_) {}
     }
 
-    // 2. Fallback / Enrichment via OpenStreetMap Nominatim Reverse Geocoding (works even if Google Geocoding API is restricted)
+    // 3. Fallback / Enrichment via OpenStreetMap Nominatim Reverse Geocoding
     if (!resolvedAddress || !resolvedPincode || !resolvedCity) {
       try {
         const nomRes = await fetch(
@@ -791,7 +825,7 @@ export default function AddressPickerWithMap({
       } catch (_) {}
     }
 
-    // 3. Secondary Fallback via Photon Komoot Reverse Geocoding
+    // 4. Secondary Fallback via Photon Komoot Reverse Geocoding
     if (!resolvedAddress || !resolvedCity) {
       try {
         const photRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
@@ -821,7 +855,42 @@ export default function AddressPickerWithMap({
       } catch (_) {}
     }
 
-    // 4. Match nearest saved MongoDB city if within its radius
+    // 5. Tertiary Fallback via BigDataCloud Client Reverse Geocoding (CORS-friendly, zero API key required)
+    if (!resolvedAddress || !resolvedCity || !resolvedPincode) {
+      try {
+        const bdcRes = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
+        );
+        if (bdcRes.ok) {
+          const bdc = await bdcRes.json();
+          const areaParts = [
+            bdc.locality,
+            bdc.city,
+            bdc.principalSubdivision,
+            bdc.postcode
+          ].filter((x, i, a) => x && a.indexOf(x) === i);
+
+          if (!resolvedAddress && areaParts.length > 0) {
+            resolvedAddress = areaParts.join(', ');
+          }
+          if (!resolvedLandmark && bdc.locality) {
+            resolvedLandmark = bdc.locality;
+          }
+          if (!resolvedCity && (bdc.city || bdc.locality)) {
+            resolvedCity = bdc.city || bdc.locality;
+          }
+          if (!resolvedState && bdc.principalSubdivision) {
+            resolvedState = bdc.principalSubdivision;
+          }
+          if (!resolvedPincode && bdc.postcode) {
+            const cleanPin = String(bdc.postcode).replace(/\D/g, '').slice(0, 6);
+            if (cleanPin.length === 6) resolvedPincode = cleanPin;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 6. Match nearest saved MongoDB city if within its radius
     let matchedMongoCity = null;
     for (const c of mongoCities) {
       if (resolvedCity && String(c.name || '').toLowerCase() === resolvedCity.toLowerCase()) {
@@ -846,25 +915,36 @@ export default function AddressPickerWithMap({
 
     const finalCity = matchedMongoCity?.name || resolvedCity || cityText || defaultCity || 'Moradabad';
     const finalState = resolvedState || matchedMongoCity?.state || stateText || 'Uttar Pradesh';
-    const finalPincode = resolvedPincode || matchedMongoCity?.pincodes?.[0] || getDefaultPincodeForCity(finalCity, mongoCities) || pincode || '244001';
-    const finalAddress = resolvedAddress || `${finalCity}, ${finalState} ${finalPincode}`;
-    const finalLandmark = landmark || resolvedLandmark || '';
+    const finalPincode =
+      resolvedPincode ||
+      matchedMongoCity?.pincodes?.[0] ||
+      getDefaultPincodeForCity(finalCity, mongoCities) ||
+      pincode ||
+      '244001';
+    const finalAddress =
+      resolvedAddress ||
+      (resolvedLandmark
+        ? `${resolvedLandmark}, ${finalCity}, ${finalState} - ${finalPincode}`
+        : `${finalCity}, ${finalState} - ${finalPincode}`);
+    const finalLandmark = resolvedLandmark || landmark || '';
 
     setCityText(finalCity);
     setStateText(finalState);
     setPincode(finalPincode);
     if (updateSearchBar || !streetQuery) {
+      lastEmittedLine1Ref.current = finalAddress;
       setStreetQuery(finalAddress);
     }
-    if (!landmark && resolvedLandmark) {
+    if (resolvedLandmark) {
       setLandmark(resolvedLandmark);
     }
 
-    setRefinementTip(`GPS location autofilled: ${finalAddress}`);
+    setRefinementTip(`GPS location autofilled in search bar: ${finalAddress}`);
 
+    const nextLine1 = (updateSearchBar || !streetQuery) ? finalAddress : streetQuery;
     emitChange({
       coordinates: newCoords,
-      line1: (updateSearchBar || !streetQuery) ? finalAddress : streetQuery,
+      line1: nextLine1,
       formattedAddress: finalAddress,
       landmark: finalLandmark,
       cityText: finalCity,
@@ -879,34 +959,73 @@ export default function AddressPickerWithMap({
     reverseGeocodeRef.current = reverseGeocodeAndAutofill;
   }, [reverseGeocodeAndAutofill]);
 
-  // Use Current Phone/Browser Location ("Locate Me (GPS)") & Autofill Search Bar
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Location is not supported by your browser.');
-      return;
-    }
-
+  // Use Current Phone/Browser Location ("Locate Me (GPS)") & Autofill "Search Street / Area / Landmark:" Bar
+  const handleUseCurrentLocation = async () => {
     setIsLocatingUser(true);
     setShowPredictions(false);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const newCoords = { lat, lng };
 
-        try {
-          await reverseGeocodeAndAutofill(newCoords, true);
-        } finally {
-          setIsLocatingUser(false);
+    const getBrowserCoords = (options) =>
+      new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation not supported'));
+          return;
         }
-      },
-      (err) => {
-        setIsLocatingUser(false);
-        console.warn('Geolocation error:', err.message);
-        alert('Could not find your current location. Please allow location access in your browser or type your area above.');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+
+    let detectedCoords = null;
+
+    // Step 1: Try High-Accuracy GPS first
+    try {
+      const pos = await getBrowserCoords({
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 0
+      });
+      detectedCoords = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
+    } catch (_) {
+      // Step 2: Retry with Standard/Network Location (faster on laptops & desktops)
+      try {
+        const posLow = await getBrowserCoords({
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 300000
+        });
+        detectedCoords = {
+          lat: posLow.coords.latitude,
+          lng: posLow.coords.longitude
+        };
+      } catch (_) {}
+    }
+
+    // Step 3: If browser geolocation timed out or was blocked, fall back to IP/Client location or current map pin
+    if (!detectedCoords) {
+      try {
+        const ipRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
+            detectedCoords = { lat: ipData.latitude, lng: ipData.longitude };
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!detectedCoords) {
+      detectedCoords =
+        coordinates && typeof coordinates.lat === 'number'
+          ? coordinates
+          : { lat: 28.8386, lng: 78.7733 };
+    }
+
+    try {
+      await reverseGeocodeAndAutofill(detectedCoords, true);
+    } finally {
+      setIsLocatingUser(false);
+    }
   };
 
   return (
@@ -947,7 +1066,7 @@ export default function AddressPickerWithMap({
         <div className="flex items-center justify-between mb-1">
           <label className="block text-xs font-bold text-[#10231D] flex items-center gap-1.5">
             <LuSearch className="w-4 h-4 text-[#E9A23B]" />
-            <span>Search Area, Street, Mosque or Landmark:</span>
+            <span>Search Street / Area / Landmark:</span>
             <span className="text-[#C2512D]">*</span>
           </label>
           <button
@@ -961,15 +1080,16 @@ export default function AddressPickerWithMap({
             ) : (
               <LuNavigation className="w-3 h-3 text-[#E9A23B]" />
             )}
-            <span>{isLocatingUser ? 'Finding your address...' : 'Locate Me (GPS)'}</span>
+            <span>{isLocatingUser ? 'Autofilling GPS Address...' : 'Locate Me (GPS)'}</span>
           </button>
         </div>
 
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder={`Type area, mosque, colony or road in ${cityText || 'Uttar Pradesh'} (e.g. Molsari Masjid, Civil Lines)...`}
+              placeholder={`Type street, area, mosque or landmark in ${cityText || 'Uttar Pradesh'} (e.g. Molsari Masjid, Civil Lines)...`}
               value={streetQuery}
               disabled={disabled}
               onChange={handleStreetInputChange}

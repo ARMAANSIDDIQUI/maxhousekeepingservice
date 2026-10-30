@@ -402,6 +402,157 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
 }
 
 /**
+ * Reverse geocode coordinates (lat, lng) into a complete street/area/landmark address,
+ * prioritizing saved MongoDB cities and Uttar Pradesh localities.
+ */
+export async function reverseGeocodeLocation({ lat, lng }) {
+  const numLat = typeof lat === 'number' ? lat : parseFloat(lat);
+  const numLng = typeof lng === 'number' ? lng : parseFloat(lng);
+
+  if (isNaN(numLat) || isNaN(numLng)) {
+    return null;
+  }
+
+  const mongoCities = await City.find({ status: { $ne: 'inactive' } })
+    .sort({ rankingScore: -1, sortOrder: 1 })
+    .lean();
+
+  let nearestLandmark = null;
+  let minLmDist = Infinity;
+  for (const lm of UP_CITY_LANDMARKS) {
+    const distKm = calculateDistanceKm(numLat, numLng, lm.lat, lm.lng);
+    if (distKm < minLmDist) {
+      minLmDist = distKm;
+      nearestLandmark = { ...lm, distanceKm: distKm };
+    }
+  }
+
+  let nearestCity = null;
+  let minCityDist = Infinity;
+  for (const c of mongoCities) {
+    if (c.location?.coordinates?.length === 2) {
+      const [cLng, cLat] = c.location.coordinates;
+      const distKm = calculateDistanceKm(numLat, numLng, cLat, cLng);
+      if (distKm < minCityDist) {
+        minCityDist = distKm;
+        nearestCity = { ...c, distanceKm: distKm };
+      }
+    }
+  }
+
+  let streetAddress = '';
+  let areaOrLandmark = (nearestLandmark && nearestLandmark.distanceKm <= 0.8) ? nearestLandmark.name : '';
+  let detectedCity = (nearestCity && nearestCity.distanceKm <= (nearestCity.serviceRadiusKm || 30)) ? nearestCity.name : '';
+  let detectedState = nearestCity?.state || 'Uttar Pradesh';
+  let detectedPincode = (nearestLandmark && nearestLandmark.distanceKm <= 0.8)
+    ? nearestLandmark.pincode
+    : (nearestCity?.pincodes?.[0] || '');
+
+  // 1. Try OpenStreetMap Nominatim Reverse (server-side with User-Agent)
+  try {
+    const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`;
+    const nomRes = await fetch(nomUrl, {
+      headers: {
+        'User-Agent': 'MaxHousekeepingApp/1.0 (https://maxhousekeeping.in)',
+        'Accept-Language': 'en'
+      },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (nomRes.ok) {
+      const data = await nomRes.json();
+      const addr = data?.address || {};
+      const parts = [
+        data?.name,
+        addr.amenity || addr.building || addr.shop || addr.historic,
+        addr.road || addr.pedestrian || addr.street,
+        addr.neighbourhood || addr.suburb || addr.residential || addr.quarter || addr.village,
+        detectedCity || addr.city || addr.town || addr.county || addr.state_district,
+        addr.state || detectedState
+      ].filter((x, idx, arr) => x && arr.indexOf(x) === idx);
+
+      if (parts.length > 0) {
+        streetAddress = parts.join(', ');
+      } else if (data?.display_name) {
+        streetAddress = data.display_name;
+      }
+
+      if (!areaOrLandmark) {
+        areaOrLandmark = addr.amenity || addr.neighbourhood || addr.suburb || addr.road || '';
+      }
+      if (!detectedCity) {
+        detectedCity = addr.city || addr.town || addr.county || addr.state_district || '';
+      }
+      if (addr.state) {
+        detectedState = addr.state;
+      }
+      if (addr.postcode) {
+        const cleanPin = String(addr.postcode).replace(/\D/g, '').slice(0, 6);
+        if (cleanPin.length === 6) detectedPincode = cleanPin;
+      }
+    }
+  } catch {
+    // fallback to Photon / BigDataCloud
+  }
+
+  // 2. Fallback to Photon Komoot Reverse
+  if (!streetAddress) {
+    try {
+      const photRes = await fetch(`https://photon.komoot.io/reverse?lat=${numLat}&lon=${numLng}`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (photRes.ok) {
+        const photData = await photRes.json();
+        const p = photData?.features?.[0]?.properties;
+        if (p) {
+          const parts = [
+            p.name,
+            p.street,
+            p.locality || p.district,
+            detectedCity || p.city || p.county,
+            p.state || detectedState
+          ].filter((x, idx, arr) => x && arr.indexOf(x) === idx);
+          if (parts.length > 0) {
+            streetAddress = parts.join(', ');
+          }
+          if (!areaOrLandmark) {
+            areaOrLandmark = p.name || p.locality || p.street || '';
+          }
+          if (!detectedCity && (p.city || p.district || p.county)) {
+            detectedCity = p.city || p.district || p.county;
+          }
+          if (p.postcode) {
+            const cleanPin = String(p.postcode).replace(/\D/g, '').slice(0, 6);
+            if (cleanPin.length === 6) detectedPincode = cleanPin;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (nearestLandmark && nearestLandmark.distanceKm <= 0.6 && !streetAddress.toLowerCase().includes(nearestLandmark.name.toLowerCase())) {
+    streetAddress = streetAddress
+      ? `Near ${nearestLandmark.name}, ${streetAddress}`
+      : `${nearestLandmark.name}, ${nearestLandmark.area}, ${nearestLandmark.city}, ${nearestLandmark.state}`;
+  }
+
+  const finalCity = detectedCity || nearestCity?.name || 'Moradabad';
+  const finalPincode = detectedPincode || nearestCity?.pincodes?.[0] || '244001';
+  const finalStreet = streetAddress || `${areaOrLandmark ? areaOrLandmark + ', ' : ''}${finalCity}, ${detectedState} ${finalPincode}`;
+
+  return {
+    line1: finalStreet,
+    formattedAddress: finalStreet,
+    landmark: areaOrLandmark,
+    city: finalCity,
+    state: detectedState,
+    pincode: finalPincode,
+    coordinates: { lat: numLat, lng: numLng }
+  };
+}
+
+/**
  * Resolves a customer's location against serviceable cities
  * Checks pincode first, then Geo coordinates
  */
@@ -509,5 +660,6 @@ export default {
   resolveLocation,
   expandIndianQueryVariants,
   computeAddressPriorityScore,
-  searchAndPrioritizeAddresses
+  searchAndPrioritizeAddresses,
+  reverseGeocodeLocation
 };
