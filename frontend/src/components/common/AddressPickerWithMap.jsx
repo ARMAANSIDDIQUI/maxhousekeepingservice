@@ -398,7 +398,7 @@ export default function AddressPickerWithMap({
     }
   };
 
-  // Live Google Places Autocomplete + TextSearch + Backend MongoDB City Ranking
+  // Live Google Places Autocomplete (Places API New + Legacy) + Backend MongoDB City Ranking
   // Uses the user's exact rawQuery (zero hardcoded landmarks or phonetic overrides)
   const runMultiEngineAddressSearch = async (rawQuery, refLat, refLng) => {
     const cleanQuery = String(rawQuery || '').trim();
@@ -409,7 +409,60 @@ export default function AddressPickerWithMap({
 
     const tasks = [];
 
-    // Source A: Direct Google Places AutocompleteService with exact rawQuery (just like Google Cloud Console Preview APIs)
+    // Source A1: Google Places API (New) — AutocompleteSuggestion.fetchAutocompleteSuggestions
+    // This is the exact API used by Google Cloud Console's "Preview APIs" widget!
+    if (window.google?.maps?.places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions && !disabled) {
+      tasks.push(
+        (async () => {
+          try {
+            const req = { input: cleanQuery };
+            if (sessionTokenRef.current) {
+              req.sessionToken = sessionTokenRef.current;
+            }
+            const response = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(req);
+            const suggestions = response?.suggestions || [];
+            const mapped = suggestions
+              .map((s) => {
+                const p = s?.placePrediction;
+                if (!p) return null;
+                const fullText = p.text?.toString?.() || p.text?.text || '';
+                const mainText = p.mainText?.toString?.() || p.mainText?.text || fullText.split(',')[0] || '';
+                const secondaryText =
+                  p.secondaryText?.toString?.() ||
+                  p.secondaryText?.text ||
+                  fullText.split(',').slice(1).join(',').trim();
+                const pinMatch = fullText.match(/\b([1-9][0-9]{5})\b/);
+                return {
+                  place_id: p.placeId,
+                  description: fullText || [mainText, secondaryText].filter(Boolean).join(', '),
+                  structured_formatting: {
+                    main_text: mainText,
+                    secondary_text: secondaryText
+                  },
+                  pincode: pinMatch ? pinMatch[1] : '',
+                  placePredictionObj: p,
+                  source: 'google_places_new'
+                };
+              })
+              .filter(Boolean);
+
+            if (mapped.length > 0) {
+              const instantRanked = prioritizeIndianUpPredictions(mapped, mongoCities, cityText, {
+                lat: refLat,
+                lng: refLng
+              });
+              setPredictions(instantRanked);
+              setShowPredictions(true);
+            }
+            return mapped;
+          } catch (_) {
+            return [];
+          }
+        })()
+      );
+    }
+
+    // Source A2: Direct Google Places AutocompleteService (Legacy) with exact rawQuery
     if (autocompleteServiceRef.current && !disabled) {
       tasks.push(
         new Promise((resolve) => {
@@ -423,7 +476,6 @@ export default function AddressPickerWithMap({
           autocompleteServiceRef.current.getPlacePredictions(request, (results, status) => {
             const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
             if (status === isOk && Array.isArray(results)) {
-              // Immediately display Google Places predictions prioritized by saved MongoDB cities
               const instantRanked = prioritizeIndianUpPredictions(results, mongoCities, cityText, {
                 lat: refLat,
                 lng: refLng
@@ -604,12 +656,12 @@ export default function AddressPickerWithMap({
   };
 
   // When user picks a recommendation from the dropdown
-  const handleSelectPrediction = (prediction) => {
+  const handleSelectPrediction = async (prediction) => {
     setShowPredictions(false);
     const chosenText = prediction.description || prediction.structured_formatting?.main_text || '';
     setStreetQuery(chosenText);
 
-    // If prediction already has lat/lng (from local UP landmark, backend autocomplete, Photon, Nominatim, or Google TextSearch)
+    // 1. If prediction already has lat/lng
     if (typeof prediction.lat === 'number' && typeof prediction.lng === 'number') {
       const newCoords = { lat: prediction.lat, lng: prediction.lng };
       const resolvedCity = prediction.city || prediction.mongoCityName || cityText;
@@ -623,6 +675,7 @@ export default function AddressPickerWithMap({
       return;
     }
 
+    // 2. If prediction has geometry.location
     if (prediction.geometry?.location) {
       const lat = typeof prediction.geometry.location.lat === 'function'
         ? prediction.geometry.location.lat()
@@ -641,6 +694,52 @@ export default function AddressPickerWithMap({
       return;
     }
 
+    // 3. Try Places API (New): placePredictionObj.toPlace().fetchFields(...)
+    if (prediction.placePredictionObj?.toPlace || (window.google?.maps?.places?.Place && prediction.place_id)) {
+      try {
+        setIsSearching(true);
+        const placeObj = prediction.placePredictionObj?.toPlace
+          ? prediction.placePredictionObj.toPlace()
+          : new window.google.maps.places.Place({ id: prediction.place_id });
+        await placeObj.fetchFields({
+          fields: ['displayName', 'formattedAddress', 'location', 'addressComponents']
+        });
+        if (window.google?.maps?.places?.AutocompleteSessionToken) {
+          sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+        }
+        if (placeObj.location) {
+          const lat = typeof placeObj.location.lat === 'function' ? placeObj.location.lat() : placeObj.location.lat;
+          const lng = typeof placeObj.location.lng === 'function' ? placeObj.location.lng() : placeObj.location.lng;
+          let detectedCity = '';
+          let detectedState = '';
+          let detectedPincode = '';
+          for (const comp of placeObj.addressComponents || []) {
+            const types = comp.types || [];
+            const val = comp.longText || comp.shortText || '';
+            if (!detectedPincode && types.includes('postal_code')) detectedPincode = val;
+            if (!detectedCity && (types.includes('locality') || types.includes('administrative_area_level_2'))) detectedCity = val;
+            if (!detectedState && types.includes('administrative_area_level_1')) detectedState = val;
+          }
+          const finalCity = detectedCity || prediction.city || prediction.mongoCityName || cityText;
+          const finalPin = detectedPincode || prediction.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
+          setIsSearching(false);
+          applyLocationCoordinates(
+            { lat, lng },
+            {
+              line1: chosenText || placeObj.formattedAddress,
+              city: finalCity,
+              state: detectedState || 'Uttar Pradesh',
+              pincode: finalPin
+            }
+          );
+          return;
+        }
+      } catch (_) {
+        // Fall through to legacy getDetails / Geocoder
+      }
+    }
+
+    // 4. Try Legacy PlacesService.getDetails or Geocoder by placeId
     if (!placesServiceRef.current || !prediction.place_id) {
       handleRefineLocationFromSearch(chosenText);
       return;
@@ -688,6 +787,24 @@ export default function AddressPickerWithMap({
               pincode: comps.pincode
             });
           }
+        } else if (geocoderRef.current && prediction.place_id) {
+          geocoderRef.current.geocode({ placeId: prediction.place_id }, (geoResults, geoStatus) => {
+            if (geoStatus === 'OK' && geoResults?.[0]?.geometry?.location) {
+              const loc = geoResults[0].geometry.location;
+              const newCoords = { lat: loc.lat(), lng: loc.lng() };
+              const comps = extractFromGeocodeResults(geoResults);
+              const finalCity = comps.city || prediction.city || cityText;
+              const finalPin = comps.pincode || prediction.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
+              applyLocationCoordinates(newCoords, {
+                line1: chosenText,
+                city: finalCity,
+                state: comps.state || 'Uttar Pradesh',
+                pincode: finalPin
+              });
+            } else {
+              handleRefineLocationFromSearch(chosenText);
+            }
+          });
         } else {
           handleRefineLocationFromSearch(chosenText);
         }

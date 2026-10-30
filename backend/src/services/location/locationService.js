@@ -169,8 +169,43 @@ export async function searchAndPrioritizeAddresses({ query, lat, lng, city: acti
 
   const fetchPromises = [];
 
-  // 4. Google Places Autocomplete & TextSearch using the user's exact rawQuery
+  // 4. Google Places API (New v1 + Legacy) using the user's exact rawQuery
   if (googleApiKey && googleApiKey !== 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+    // 4a. Google Places API (New) — v1/places:autocomplete
+    fetchPromises.push(
+      fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': googleApiKey
+        },
+        body: JSON.stringify({ input: rawQuery }),
+        signal: AbortSignal.timeout(3500)
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (Array.isArray(data?.suggestions)) {
+            for (const s of data.suggestions) {
+              const p = s?.placePrediction;
+              if (!p) continue;
+              const desc = p.text?.text || '';
+              const mainText = p.structuredFormat?.mainText?.text || desc.split(',')[0] || '';
+              const secondaryText = p.structuredFormat?.secondaryText?.text || desc.split(',').slice(1).join(',').trim();
+              const pMatch = desc.match(/\b([1-9][0-9]{5})\b/);
+              candidates.push({
+                place_id: p.placeId,
+                description: desc || [mainText, secondaryText].filter(Boolean).join(', '),
+                mainText,
+                secondaryText,
+                pincode: pMatch ? pMatch[1] : '',
+                source: 'google_autocomplete'
+              });
+            }
+          }
+        })
+        .catch(() => {})
+    );
+
     const autoUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(rawQuery)}&location=${refLat},${refLng}&radius=45000&key=${googleApiKey}`;
     fetchPromises.push(
       fetch(autoUrl, { signal: AbortSignal.timeout(3500) })
