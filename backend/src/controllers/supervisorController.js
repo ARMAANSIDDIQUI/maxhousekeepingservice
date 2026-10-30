@@ -191,7 +191,7 @@ export async function getSupervisorSchedule(req, res, next) {
 
     const bookings = await Booking.find(scheduleFilter)
       .select('bookingCode serviceTitle customer address status slot assignedSlot serviceOtp otpVerified photos messages totals supervisor assignedSupervisor')
-      .populate('supervisor', 'name phone email avatar')
+      .populate('supervisor', 'name phone email avatar avatarUrl')
       .sort({ createdAt: 1 })
       .lean();
 
@@ -320,7 +320,7 @@ export async function getSupervisorBookings(req, res, next) {
     const skip = (Number(page) - 1) * Number(limit);
     const total = await Booking.countDocuments(query);
     const bookings = await Booking.find(query)
-      .populate('supervisor', 'name phone email avatar status')
+      .populate('supervisor', 'name phone email avatar avatarUrl status')
       .sort({ 'assignedSlot.date': 1, 'slot.date': 1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -727,7 +727,7 @@ export async function addSupervisorBookingMessage(req, res, next) {
 export async function getSupervisorsList(req, res, next) {
   try {
     const supervisors = await User.find({ role: 'supervisor' })
-      .select('name email phone status city avatar')
+      .select('name email phone status city avatar avatarUrl')
       .lean();
     res.status(200).json({ success: true, supervisors });
   } catch (err) {
@@ -970,6 +970,14 @@ export async function updateSupervisorLiveLocation(req, res, next) {
       });
     }
 
+    // Reject inaccurate cellular ISP / cell tower fallback fixes (>5000m)
+    if (accuracy && Number(accuracy) > 5000) {
+      return res.status(200).json({
+        success: false,
+        message: 'Cellular network tower estimate skipped. High-accuracy GPS fix required.'
+      });
+    }
+
     booking.supervisorLiveLocation = {
       lat: isSharing ? lat : (booking.supervisorLiveLocation?.lat || 0),
       lng: isSharing ? lng : (booking.supervisorLiveLocation?.lng || 0),
@@ -1035,6 +1043,14 @@ export async function broadcastSupervisorLiveLocation(req, res, next) {
       return res.status(400).json({
         success: false,
         message: 'Valid latitude (-90 to 90) and longitude (-180 to 180) are required.'
+      });
+    }
+
+    // Reject inaccurate cellular ISP / cell tower fallback fixes (>5000m)
+    if (accuracy && Number(accuracy) > 5000) {
+      return res.status(200).json({
+        success: false,
+        message: 'Cellular network tower estimate skipped. High-accuracy GPS fix required.'
       });
     }
 

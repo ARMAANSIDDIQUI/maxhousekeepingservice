@@ -2055,5 +2055,57 @@ export default {
   updateSupervisor,
   deleteSupervisor,
   assignSupervisorToBooking,
-  getSupervisorSlotAvailability
+  getSupervisorSlotAvailability,
+  updateBookingSupervisorLocation
 };
+
+/**
+ * Admin: Update/Calibrate Supervisor Live Location for a Booking
+ * PUT /api/v1/admin/bookings/:id/supervisor-location
+ */
+export async function updateBookingSupervisorLocation(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { lat, lng, isSharing = true } = req.body;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ success: false, message: 'Valid latitude and longitude coordinates are required.' });
+    }
+
+    let booking = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingCode: id });
+    }
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found.' });
+    }
+
+    const locData = {
+      lat,
+      lng,
+      heading: 0,
+      speed: 0,
+      accuracy: 10,
+      updatedAt: new Date(),
+      isSharing: Boolean(isSharing)
+    };
+
+    booking.supervisorLiveLocation = locData;
+    await booking.save();
+
+    if (booking.supervisor) {
+      await User.findByIdAndUpdate(booking.supervisor, { lastKnownLocation: locData }).catch(() => {});
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Supervisor location updated successfully by administrator.',
+      supervisorLiveLocation: locData
+    });
+  } catch (err) {
+    next(err);
+  }
+}

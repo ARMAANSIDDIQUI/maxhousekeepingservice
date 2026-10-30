@@ -209,7 +209,7 @@ export default function TrackBookingPage() {
             {/* ASSIGNED SUPERVISOR & TIME SLOT */}
             {Boolean(booking.assignedSupervisor?.name || booking.supervisor?.name) ? (() => {
               const sup = booking.assignedSupervisor?.name ? booking.assignedSupervisor : booking.supervisor;
-              const avatarUrl = sup.avatar || sup.photo;
+              const avatarUrl = sup.avatarUrl || sup.avatar || sup.photo;
               return (
                 <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                   <div className="flex items-center gap-3">

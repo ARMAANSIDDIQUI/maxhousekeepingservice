@@ -367,6 +367,7 @@ export const adminAPI = {
   updateSupervisor: (id, data) => apiRequest(`/admin/supervisors/${id}`, { method: 'PUT', body: data }),
   deleteSupervisor: (id) => apiRequest(`/admin/supervisors/${id}`, { method: 'DELETE' }),
   assignBookingSupervisor: (id, data) => apiRequest(`/admin/bookings/${id}/assign`, { method: 'PUT', body: data }),
+  updateBookingSupervisorLocation: (id, data) => apiRequest(`/admin/bookings/${id}/supervisor-location`, { method: 'PUT', body: data }),
   updateSettings: async (data) => {
     clearCacheByPrefix('/public/settings');
     clearCacheByPrefix('/settings');

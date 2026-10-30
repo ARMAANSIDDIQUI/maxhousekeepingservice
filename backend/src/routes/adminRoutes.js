@@ -37,7 +37,8 @@ import {
   updateSupervisor,
   deleteSupervisor,
   assignSupervisorToBooking,
-  getSupervisorSlotAvailability
+  getSupervisorSlotAvailability,
+  updateBookingSupervisorLocation
 } from '../controllers/adminController.js';
 import { uploadImage, uploadMultipleImages, uploadVideo, deleteImage } from '../controllers/uploadController.js';
 import { upload, uploadVideo as multerUploadVideo } from '../middleware/upload.js';
@@ -55,6 +56,7 @@ router.get('/stats', getStats);
 router.get('/bookings', getAdminBookings);
 router.put('/bookings/:id', updateBooking);
 router.put('/bookings/:id/assign', assignSupervisorToBooking);
+router.put('/bookings/:id/supervisor-location', updateBookingSupervisorLocation);
 router.delete('/bookings/:id', deleteBooking);
 
 // Supervisor ID Management (Created & Managed by Admins)

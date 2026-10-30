@@ -42,6 +42,7 @@ import SEO from '../../components/common/SEO';
 import Modal from '../../components/common/Modal';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
+import UserAvatar from '../../components/common/UserAvatar';
 import { formatDateDMY } from '../../utils/date';
 import { calculateDistanceKm, getEtaInfo } from '../../utils/geoUtils';
 
@@ -159,19 +160,23 @@ export default function SupervisorDashboard() {
   const [deviceGpsCoords, setDeviceGpsCoords] = useState(null);
   const locationWatchIdRef = useRef(null);
   const lastSentGpsRef = useRef(null);
+  const heartbeatTimerRef = useRef(null);
 
-  // Background device location fix for zero-cost distance calculation
+  // Background device location fix for zero-cost distance calculation (Requires high accuracy)
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setDeviceGpsCoords({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          });
+          // Reject wild cellular IP gateway readings (e.g. Meerut 200km away)
+          if (pos.coords.accuracy <= 5000) {
+            setDeviceGpsCoords({
+              lat: Number(pos.coords.latitude.toFixed(6)),
+              lng: Number(pos.coords.longitude.toFixed(6))
+            });
+          }
         },
         () => {},
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     }
   }, []);
@@ -209,6 +214,12 @@ export default function SupervisorDashboard() {
       const accuracy = pos.coords.accuracy || 10;
       const now = Date.now();
 
+      // Reject inaccurate cellular ISP / cell tower fallback readings (e.g. Meerut gateway 200km away)
+      if (accuracy > 5000) {
+        console.warn(`[Supervisor GPS] Skipping inaccurate ISP / cell tower reading (${accuracy}m). High-accuracy GPS fix required.`);
+        return;
+      }
+
       const coords = { lat, lng, heading, speed, accuracy, updatedAt: new Date() };
       setLastGpsCoords(coords);
       setDeviceGpsCoords({ lat, lng });
@@ -226,8 +237,8 @@ export default function SupervisorDashboard() {
         movedDistanceM = Math.sqrt(dLat * dLat + dLng * dLng);
       }
 
-      // Throttle: Send if first fix OR >12 seconds elapsed OR moved >15 meters (0 Google API cost)
-      if (!last || timeDiff >= 12000 || movedDistanceM >= 15) {
+      // Fast, constant GPS sync: Send if first fix OR >3 seconds elapsed OR moved >3 meters
+      if (!last || timeDiff >= 3000 || movedDistanceM >= 3) {
         lastSentGpsRef.current = { lat, lng, time: now };
 
         // 1. Send server-side broadcast command to persist location across all active bookings & supervisor profile
@@ -260,7 +271,7 @@ export default function SupervisorDashboard() {
       console.warn('[Supervisor GPS auto-broadcast notice]:', err.message);
     };
 
-    // Immediate fix
+    // Immediate fix with high accuracy
     navigator.geolocation.getCurrentPosition(onPosSuccess, onPosError, {
       enableHighAccuracy: true,
       timeout: 10000,
@@ -271,10 +282,24 @@ export default function SupervisorDashboard() {
     if (locationWatchIdRef.current === null) {
       locationWatchIdRef.current = navigator.geolocation.watchPosition(onPosSuccess, onPosError, {
         enableHighAccuracy: true,
-        maximumAge: 4000,
-        timeout: 20000
+        maximumAge: 3000,
+        timeout: 15000
       });
     }
+
+    // Active continuous heartbeat every 4 seconds to guarantee constant GPS broadcast even when stationary
+    if (heartbeatTimerRef.current === null) {
+      heartbeatTimerRef.current = setInterval(() => {
+        if (!document.hidden && typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(onPosSuccess, onPosError, {
+            enableHighAccuracy: true,
+            maximumAge: 3000,
+            timeout: 8000
+          });
+        }
+      }, 4000);
+    }
+  };
   };
 
   // Auto-start GPS broadcasting on load without asking supervisor

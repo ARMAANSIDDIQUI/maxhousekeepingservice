@@ -60,6 +60,7 @@ import CustomSelect from '../../components/common/CustomSelect';
 import { getServiceIcon, AVAILABLE_ICONS } from '../../utils/iconHelper';
 import ServiceCarousel from '../../components/common/ServiceCarousel';
 import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
+import UserAvatar from '../../components/common/UserAvatar';
 import SEO from '../../components/common/SEO';
 
 const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
@@ -3830,6 +3831,46 @@ export default function AdminDashboard() {
     setAssignModalOpen(true);
   };
 
+  const handleAdminUpdateSupervisorLocation = async (booking) => {
+    if (!booking) return;
+    const defaultCoords = booking.supervisorLiveLocation?.lat
+      ? `${booking.supervisorLiveLocation.lat}, ${booking.supervisorLiveLocation.lng}`
+      : '28.8410, 78.7785';
+
+    const input = window.prompt(
+      `Enter Latitude, Longitude for supervisor (e.g. 28.8410, 78.7785 for Moradabad, or your desired location):`,
+      defaultCoords
+    );
+    if (!input) return;
+
+    const parts = input.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      toast.error('Invalid coordinates format. Please enter format: 28.8410, 78.7785');
+      return;
+    }
+
+    try {
+      const res = await adminAPI.updateBookingSupervisorLocation(booking._id, {
+        lat: parts[0],
+        lng: parts[1],
+        isSharing: true
+      });
+      if (res?.success) {
+        toast.success('Supervisor location updated successfully on live map!');
+        setTrackingBookingAdmin(prev => prev ? {
+          ...prev,
+          supervisorLiveLocation: res.supervisorLiveLocation
+        } : prev);
+        setBookings(prev => prev.map(b => b._id === booking._id ? {
+          ...b,
+          supervisorLiveLocation: res.supervisorLiveLocation
+        } : b));
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update supervisor location.');
+    }
+  };
+
   // Real-time slot availability check whenever modal is open and date/slot/supervisor changes
   useEffect(() => {
     if (!assignModalOpen || !assignDate) {
@@ -4618,10 +4659,10 @@ export default function AdminDashboard() {
                         <tr key={sup._id} className="hover:bg-[#F4EFE6]/50">
                           <td className="py-3 px-3 font-bold text-[#10231D]">
                             <div className="flex items-center gap-2.5">
-                              <img
-                                src={sup.avatarUrl || sup.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent((sup.name || 'MH').slice(0, 2))}&backgroundColor=10231D&textColor=F4EFE6&radius=50`}
-                                alt={sup.name}
-                                className="w-8 h-8 rounded-full border border-[#E2D9C8] bg-white object-cover shrink-0"
+                              <UserAvatar
+                                user={sup}
+                                avatarUrl={sup.avatarUrl || sup.avatar}
+                                size="sm"
                               />
                               <div>
                                 <p className="font-bold text-xs text-[#10231D]">{sup.name}</p>
@@ -5794,10 +5835,10 @@ export default function AdminDashboard() {
                       <tr key={u._id} className="hover:bg-[#F4EFE6]/50">
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-2.5">
-                            <img
-                              src={u.avatarUrl || 'https://api.dicebear.com/7.x/initials/svg?seed=MH'}
-                              alt={u.name}
-                              className="w-8 h-8 rounded-full border border-[#E2D9C8] bg-white object-cover shrink-0"
+                            <UserAvatar
+                              user={u}
+                              avatarUrl={u.avatarUrl || u.avatar}
+                              size="sm"
                             />
                             <div>
                               <p className="font-bold text-[#10231D]">{u.name}</p>
@@ -8118,11 +8159,18 @@ export default function AdminDashboard() {
                   <div className="p-3 rounded-xl bg-white border border-[#E2D9C8] space-y-1">
                     <span className="text-[10px] font-mono text-[#6B8077] uppercase block">Assigned Supervisor</span>
                     {viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name ? (
-                      <div>
-                        <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
-                          <span>{viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name}</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-100 text-emerald-800 font-bold uppercase">Dispatched</span>
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          user={viewBookingDetails.assignedSupervisor || viewBookingDetails.supervisor}
+                          avatarUrl={viewBookingDetails.assignedSupervisor?.avatarUrl || viewBookingDetails.assignedSupervisor?.avatar || viewBookingDetails.supervisor?.avatarUrl || viewBookingDetails.supervisor?.avatar}
+                          name={viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name}
+                          size="md"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
+                            <span>{viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-100 text-emerald-800 font-bold uppercase">Dispatched</span>
+                          </p>
                         {(viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone) && (
                           <a
                             href={`tel:${viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone}`}
@@ -8221,6 +8269,7 @@ export default function AdminDashboard() {
                         supervisorInfo={{
                           name: viewBookingDetails.assignedSupervisor?.name || viewBookingDetails.supervisor?.name,
                           phone: viewBookingDetails.assignedSupervisor?.phone || viewBookingDetails.supervisor?.phone,
+                          avatar: viewBookingDetails.assignedSupervisor?.avatarUrl || viewBookingDetails.assignedSupervisor?.avatar || viewBookingDetails.supervisor?.avatarUrl || viewBookingDetails.supervisor?.avatar || '',
                           role: 'Field Supervisor'
                         }}
                       />
@@ -9008,13 +9057,13 @@ export default function AdminDashboard() {
                       ? {
                           name: supName || 'Assigned Supervisor',
                           phone: trackingBookingAdmin.assignedSupervisor?.phone || trackingBookingAdmin.supervisor?.phone || '',
-                          avatar: trackingBookingAdmin.assignedSupervisor?.avatar || trackingBookingAdmin.supervisor?.avatar || '',
+                          avatar: trackingBookingAdmin.assignedSupervisor?.avatarUrl || trackingBookingAdmin.assignedSupervisor?.avatar || trackingBookingAdmin.supervisor?.avatarUrl || trackingBookingAdmin.supervisor?.avatar || '',
                           role: 'Supervisor'
                         }
                       : null
                   }
                 />
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                   <a
                     href={`/track/${trackingBookingAdmin.bookingCode}`}
                     target="_blank"
@@ -9024,13 +9073,24 @@ export default function AdminDashboard() {
                     <span>Open Fullscreen</span>
                     <LuExternalLink className="w-3.5 h-3.5" />
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => setTrackingBookingAdmin(null)}
-                    className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
-                  >
-                    Close
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAdminUpdateSupervisorLocation(trackingBookingAdmin)}
+                      className="px-3.5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      title="Update/Calibrate supervisor coordinates"
+                    >
+                      <LuMapPin className="w-3.5 h-3.5" />
+                      <span>Update Location (Admin)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTrackingBookingAdmin(null)}
+                      className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </Modal>

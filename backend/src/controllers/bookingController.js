@@ -548,7 +548,7 @@ export async function trackBooking(req, res, next) {
     const { code } = req.params;
     const booking = await Booking.findOne({ bookingCode: code.toUpperCase() })
       .populate('city', 'name contactOverrides')
-      .populate('supervisor', 'name phone email avatar role status');
+      .populate('supervisor', 'name phone email avatar avatarUrl role status');
 
     if (!booking) {
       return res.status(404).json({
@@ -620,7 +620,7 @@ export async function getMyBookings(req, res, next) {
         { user: req.user._id },
         { 'customer.phone': req.user.phone }
       ]
-    }).populate('supervisor', 'name phone email avatar role status')
+    }).populate('supervisor', 'name phone email avatar avatarUrl role status')
       .sort({ createdAt: -1 });
 
     // Ensure each booking has a serviceOtp
@@ -1003,12 +1003,12 @@ export async function getBookingLiveLocation(req, res, next) {
 
     let supervisorUser = null;
     if (booking.supervisor) {
-      supervisorUser = await User.findById(booking.supervisor).select('lastKnownLocation name phone avatar');
+      supervisorUser = await User.findById(booking.supervisor).select('lastKnownLocation name phone avatar avatarUrl');
     }
 
     const assignedName = (booking.assignedSupervisor?.name || supervisorUser?.name || '').trim();
     const assignedPhone = (booking.assignedSupervisor?.phone || supervisorUser?.phone || '').trim();
-    const assignedAvatar = booking.assignedSupervisor?.avatar || supervisorUser?.avatar || '';
+    const assignedAvatar = booking.assignedSupervisor?.avatarUrl || booking.assignedSupervisor?.avatar || supervisorUser?.avatarUrl || supervisorUser?.avatar || '';
 
     const isSupervisorAssigned = Boolean(
       booking.supervisor ||
@@ -1127,7 +1127,8 @@ export async function getBookingLiveLocation(req, res, next) {
       supervisor: isSupervisorAssigned ? {
         name: assignedName || 'Assigned Supervisor',
         phone: assignedPhone,
-        avatar: assignedAvatar
+        avatar: assignedAvatar,
+        avatarUrl: assignedAvatar
       } : null,
       supervisorLocation: isLive ? liveLoc : null,
       customerLocation: customerLoc,

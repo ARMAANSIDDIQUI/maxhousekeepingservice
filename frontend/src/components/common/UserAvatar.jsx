@@ -24,7 +24,9 @@ export default function UserAvatar({
   const [imgError, setImgError] = useState(false);
 
   const displayName = name || user?.name || '';
-  const photoUrl = avatarUrl !== undefined ? avatarUrl : user?.avatarUrl;
+  const photoUrl = (avatarUrl !== undefined && avatarUrl !== '')
+    ? avatarUrl
+    : (user?.avatarUrl || user?.avatar || user?.photo || '');
   const initials = getInitials(displayName);
 
   // Size variations

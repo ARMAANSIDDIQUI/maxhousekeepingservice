@@ -1053,7 +1053,7 @@ export default function CustomerDashboard() {
                         {/* Assigned Supervisor Card */}
                         {(b.assignedSupervisor?.name || b.supervisor?.name) ? (() => {
                           const sup = b.assignedSupervisor?.name ? b.assignedSupervisor : b.supervisor;
-                          const supAvatar = sup.avatar || sup.photo;
+                          const supAvatar = sup.avatarUrl || sup.avatar || sup.photo;
                           return (
                             <div className="p-3.5 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                               <div className="flex items-center gap-3">
@@ -2391,7 +2391,7 @@ export default function CustomerDashboard() {
                       ? {
                           name: supName || 'Assigned Supervisor',
                           phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
-                          avatar: trackingModalBooking.assignedSupervisor?.avatar || trackingModalBooking.supervisor?.avatar || '',
+                          avatar: trackingModalBooking.assignedSupervisor?.avatarUrl || trackingModalBooking.assignedSupervisor?.avatar || trackingModalBooking.supervisor?.avatarUrl || trackingModalBooking.supervisor?.avatar || '',
                           role: 'Supervisor'
                         }
                       : null

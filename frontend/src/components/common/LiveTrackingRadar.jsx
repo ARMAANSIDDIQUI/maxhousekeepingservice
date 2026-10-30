@@ -10,9 +10,11 @@ import {
   LuUser,
   LuCircleCheck,
   LuLayers,
-  LuEye
+  LuEye,
+  LuRotateCcw
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
+import UserAvatar from './UserAvatar';
 import { loadGoogleMapsScript } from '../../utils/googleMapsLoader';
 import { calculateDistanceKm, getEtaInfo } from '../../utils/geoUtils';
 
@@ -69,6 +71,8 @@ export default function LiveTrackingRadar({
   const [distanceKm, setDistanceKm] = useState(null);
   const [mapViewMode, setMapViewMode] = useState('roadmap'); // 'roadmap' | 'hybrid' | 'streetview'
   const [streetViewNotice, setStreetViewNotice] = useState('');
+  const [updatingLocation, setUpdatingLocation] = useState(false);
+  const [updateNotice, setUpdateNotice] = useState('');
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -469,6 +473,51 @@ export default function LiveTrackingRadar({
     }
   };
 
+  const handleTriggerLocationUpdate = async () => {
+    if (updatingLocation) return;
+    setUpdatingLocation(true);
+    setUpdateNotice('Querying latest satellite / device GPS fix...');
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          const accuracy = pos.coords.accuracy || 10;
+          const heading = pos.coords.heading || 0;
+          const speed = pos.coords.speed || 0;
+
+          if (accuracy <= 5000) {
+            try {
+              const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
+              await fetch(`${apiBase}/supervisor/location/broadcast`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lng, heading, speed, accuracy })
+              }).catch(() => {});
+            } catch {}
+          }
+          await fetchLiveLocation();
+          setUpdatingLocation(false);
+          setUpdateNotice('Location updated successfully!');
+          setTimeout(() => setUpdateNotice(''), 3500);
+        },
+        async () => {
+          await fetchLiveLocation();
+          setUpdatingLocation(false);
+          setUpdateNotice('Latest server location synchronized.');
+          setTimeout(() => setUpdateNotice(''), 3500);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    } else {
+      await fetchLiveLocation();
+      setUpdatingLocation(false);
+      setUpdateNotice('Latest server location synchronized.');
+      setTimeout(() => setUpdateNotice(''), 3500);
+    }
+  };
+
   const handleSelectMapType = (type) => {
     setStreetViewNotice('');
     if (!mapInstanceRef.current) return;
@@ -667,6 +716,17 @@ export default function LiveTrackingRadar({
 
         {/* Floating Map Navigation Controls */}
         <div className="absolute top-3 right-14 flex flex-col gap-1.5 z-10">
+          <button
+            type="button"
+            onClick={handleTriggerLocationUpdate}
+            disabled={updatingLocation}
+            className="px-2.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
+            title="Update live location & sync GPS"
+          >
+            <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation ? 'animate-spin' : ''}`} />
+            <span>Update Location</span>
+          </button>
+
           {hasSupervisor && (
             <button
               type="button"
@@ -699,6 +759,15 @@ export default function LiveTrackingRadar({
             </button>
           )}
         </div>
+
+        {updateNotice && (
+          <div className="absolute top-16 right-14 z-20 pointer-events-none">
+            <div className="bg-[#10231D]/95 backdrop-blur-md text-[#F4EFE6] border border-[#E9A23B]/60 px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{updateNotice}</span>
+            </div>
+          </div>
+        )}
 
         {/* Smart Banner on Map when Supervisor is NOT Yet Assigned */}
         {!hasSupervisor && (
@@ -760,9 +829,12 @@ export default function LiveTrackingRadar({
       <div className="p-3.5 bg-[#0C1B16] border-t border-[#2D453B]/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         {hasSupervisor ? (
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-[#2D453B] border border-[#E9A23B]/40 flex items-center justify-center text-[#E9A23B] font-bold">
-              {currentSupervisor?.name ? currentSupervisor.name.charAt(0).toUpperCase() : <LuUser className="w-4 h-4" />}
-            </div>
+            <UserAvatar
+              user={currentSupervisor}
+              avatarUrl={currentSupervisor?.avatarUrl || currentSupervisor?.avatar || currentSupervisor?.photo}
+              name={currentSupervisor?.name}
+              size="md"
+            />
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="font-bold text-[#F4EFE6]">{currentSupervisor?.name || 'Assigned Supervisor'}</p>
