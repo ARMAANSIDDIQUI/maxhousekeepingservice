@@ -4,6 +4,9 @@ import { useToast } from './ToastContext';
 
 const AuthContext = createContext(null);
 
+const AUTH_USER_STORAGE_KEY = 'mh_cached_user_v1';
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
+
 function cleanUser(raw) {
   if (!raw) return null;
   return {
@@ -12,16 +15,105 @@ function cleanUser(raw) {
   };
 }
 
+/**
+ * Decode JWT payload locally in O(1) without network round-trip to check 30-day expiry
+ */
+function isJwtTokenLocallyValid(token) {
+  if (!token || typeof token !== 'string') return false;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (!payload || !payload.id) return false;
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getCachedUserFromStorage() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const token = localStorage.getItem('token');
+    if (!isJwtTokenLocallyValid(token)) {
+      localStorage.removeItem('token');
+      localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+      return null;
+    }
+    const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return cleanUser(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function persistAuthSession(token, userObj) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+    if (userObj) {
+      localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(cleanUser(userObj)));
+    }
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+function clearAuthSession() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Instantly hydrate user & loading state synchronously from cached 30-day JWT + profile (0ms wait)
+  const [user, setUser] = useState(() => getCachedUserFromStorage());
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const token = localStorage.getItem('token');
+    if (!isJwtTokenLocallyValid(token)) return false;
+    // If we already have the cached user profile, do not block UI on mount!
+    return !localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  });
   const { toast } = useToast();
 
-  // Restore user session on initial mount
+  const updateAndCacheUser = (updaterOrUser) => {
+    setUser((prev) => {
+      const nextRaw = typeof updaterOrUser === 'function' ? updaterOrUser(prev) : updaterOrUser;
+      const cleaned = cleanUser(nextRaw);
+      if (cleaned) {
+        persistAuthSession(null, cleaned);
+      } else {
+        clearAuthSession();
+      }
+      return cleaned;
+    });
+  };
+
+  // Restore / background-verify user session on initial mount
   useEffect(() => {
     async function checkAuth() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      if (!token) {
+      if (!isJwtTokenLocallyValid(token)) {
+        clearAuthSession();
         setUser(null);
         setIsLoading(false);
         return;
@@ -30,12 +122,15 @@ export function AuthProvider({ children }) {
       try {
         const data = await apiRequest('/auth/me');
         if (data.success && data.user) {
-          setUser(cleanUser(data.user));
+          updateAndCacheUser(data.user);
         }
-      } catch {
-        // User token expired or invalid, reset state
-        localStorage.removeItem('token');
-        setUser(null);
+      } catch (err) {
+        // Only clear session if the server explicitly rejected the token (401 / expired / invalid)
+        const msg = String(err?.message || '').toLowerCase();
+        if (msg.includes('invalid') || msg.includes('expired') || msg.includes('authentication required') || msg.includes('not found')) {
+          clearAuthSession();
+          setUser(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -69,8 +164,8 @@ export function AuthProvider({ children }) {
         body: userData
       });
       if (data.success && data.user) {
-        if (data.token) localStorage.setItem('token', data.token);
-        setUser(data.user);
+        persistAuthSession(data.token, data.user);
+        updateAndCacheUser(data.user);
         toast.success(`Account created! Welcome, ${data.user.name}!`);
         return { success: true, user: data.user };
       }
@@ -88,8 +183,8 @@ export function AuthProvider({ children }) {
         body: { identifier, password }
       });
       if (data.success && data.user) {
-        if (data.token) localStorage.setItem('token', data.token);
-        setUser(data.user);
+        persistAuthSession(data.token, data.user);
+        updateAndCacheUser(data.user);
         toast.success(`Welcome back, ${data.user.name}!`);
         return { success: true, user: data.user };
       }
@@ -124,8 +219,8 @@ export function AuthProvider({ children }) {
         body: { email, code, name, phone }
       });
       if (data.success && data.user) {
-        if (data.token) localStorage.setItem('token', data.token);
-        setUser(data.user);
+        persistAuthSession(data.token, data.user);
+        updateAndCacheUser(data.user);
         toast.success(`Verified! Welcome to Max Housekeeping, ${data.user.name}.`);
         return { success: true, user: data.user };
       }
@@ -143,8 +238,8 @@ export function AuthProvider({ children }) {
         body: googlePayload
       });
       if (data.success && data.user) {
-        if (data.token) localStorage.setItem('token', data.token);
-        setUser(cleanUser(data.user));
+        persistAuthSession(data.token, data.user);
+        updateAndCacheUser(data.user);
         toast.success(`Signed in with Google as ${data.user.name}`);
         return { success: true, user: cleanUser(data.user) };
       }
@@ -161,7 +256,7 @@ export function AuthProvider({ children }) {
     } catch {
       // Ignore
     } finally {
-      localStorage.removeItem('token');
+      clearAuthSession();
       setUser(null);
       toast.info('Logged out successfully.');
     }
@@ -175,7 +270,7 @@ export function AuthProvider({ children }) {
         body: addressData
       });
       if (data.success && data.addresses) {
-        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        updateAndCacheUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
         toast.success('Address saved to your profile.');
         return { success: true, addresses: data.addresses };
       }
@@ -192,7 +287,7 @@ export function AuthProvider({ children }) {
         method: 'DELETE'
       });
       if (data.success && data.addresses) {
-        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        updateAndCacheUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
         toast.info('Address removed from profile.');
         return { success: true };
       }
@@ -209,7 +304,7 @@ export function AuthProvider({ children }) {
         method: 'PUT'
       });
       if (data.success && data.addresses) {
-        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        updateAndCacheUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
         toast.success('Default address updated.');
         return { success: true, addresses: data.addresses };
       }
@@ -227,7 +322,7 @@ export function AuthProvider({ children }) {
         body: addressData
       });
       if (data.success && data.addresses) {
-        setUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
+        updateAndCacheUser((prev) => prev ? { ...prev, addresses: data.addresses } : null);
         toast.success('Address updated successfully.');
         return { success: true, addresses: data.addresses };
       }
@@ -299,7 +394,7 @@ export function AuthProvider({ children }) {
         body: profileData
       });
       if (data.success && data.user) {
-        setUser((prev) => cleanUser({ ...prev, ...data.user }));
+        updateAndCacheUser((prev) => cleanUser({ ...prev, ...data.user }));
         toast.success(data.message || 'Profile updated successfully.');
         return { success: true, user: cleanUser(data.user) };
       }
@@ -315,7 +410,7 @@ export function AuthProvider({ children }) {
     try {
       const data = await apiRequest('/auth/me', { noCache: true });
       if (data.success && data.user) {
-        setUser(cleanUser(data.user));
+        updateAndCacheUser(data.user);
         return data.user;
       }
     } catch {

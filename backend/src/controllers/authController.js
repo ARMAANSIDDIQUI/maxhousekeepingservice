@@ -4,24 +4,25 @@ import User from '../models/User.js';
 import OtpVerification from '../models/OtpVerification.js';
 import { sendOtpEmail } from '../config/email.js';
 import { sendWelcomeEmail, sendPasswordResetSuccessEmail } from '../services/emailService.js';
+import { invalidateAuthUserCache } from '../middleware/auth.js';
 
-// Helper to sign JWT token (strictly valid for 7 days)
+// Helper to sign JWT token (strictly valid for 30 days)
 function generateToken(user) {
   return jwt.sign(
     { id: user._id, role: user.role, email: user.email },
     process.env.JWT_SECRET || 'max_housekeeping_super_secret_jwt_key_2026',
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    { expiresIn: process.env.JWT_EXPIRE || '30d' }
   );
 }
 
-// Helper to attach 7-day persistent session cookie
+// Helper to attach 30-day persistent session cookie
 function sendTokenResponse(user, statusCode, res) {
   const token = generateToken(user);
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds (604,800,000 ms)
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds (2,592,000,000 ms)
 
   const cookieOptions = {
-    expires: new Date(Date.now() + SEVEN_DAYS_MS),
-    maxAge: SEVEN_DAYS_MS,
+    expires: new Date(Date.now() + THIRTY_DAYS_MS),
+    maxAge: THIRTY_DAYS_MS,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
@@ -488,7 +489,8 @@ export async function googleLogin(req, res, next) {
  */
 export async function getMe(req, res, next) {
   try {
-    const user = await User.findById(req.user._id).select('-passwordHash -otpSecret');
+    // Use the already-resolved req.user from verifyAuth middleware for instant response
+    const user = req.user || (await User.findById(req.user?._id).select('-passwordHash -otpSecret'));
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
@@ -509,11 +511,14 @@ export async function getMe(req, res, next) {
       }
       if (hadDuplicates) {
         user.addresses = unique;
-        await user.save();
+        if (typeof user.save === 'function') {
+          await user.save();
+          invalidateAuthUserCache(user._id);
+        }
       }
     }
 
-    const userObj = user.toObject();
+    const userObj = typeof user.toObject === 'function' ? user.toObject() : { ...user };
     if (userObj.phone && userObj.phone.startsWith('g_')) {
       userObj.phone = '';
     }
@@ -602,6 +607,7 @@ export async function addAddress(req, res, next) {
 
     user.addresses.push(newAddress);
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(201).json({
       success: true,
@@ -622,6 +628,7 @@ export async function deleteAddress(req, res, next) {
     const user = await User.findById(req.user._id);
     user.addresses = user.addresses.filter(addr => addr._id.toString() !== req.params.id);
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(200).json({
       success: true,
@@ -647,6 +654,7 @@ export async function setDefaultAddress(req, res, next) {
       addr.isDefault = addr._id.toString() === req.params.id;
     });
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(200).json({
       success: true,
@@ -707,6 +715,7 @@ export async function updateAddress(req, res, next) {
     }
 
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(200).json({
       success: true,
@@ -776,6 +785,7 @@ export async function updateProfile(req, res, next) {
     }
 
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(200).json({
       success: true,
