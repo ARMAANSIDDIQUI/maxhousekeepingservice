@@ -3542,8 +3542,18 @@ export default function AdminDashboard() {
     try {
       const res = await adminAPI.updateUserRole(userId, newRole);
       if (res.success) {
-        toast.success(`User role updated to ${newRole}.`);
+        toast.success(`User role updated to ${newRole === 'supervisor' ? 'Supervisor' : newRole}.`);
         setUsers(prev => prev.map(u => u._id === userId ? { ...u, role: newRole } : u));
+
+        // Keep supervisors list synchronized in real time
+        try {
+          const supRes = await adminAPI.getSupervisors();
+          if (supRes?.success && Array.isArray(supRes.supervisors)) {
+            setSupervisors(supRes.supervisors);
+          }
+        } catch {
+          // silent sync catch
+        }
       }
     } catch (err) {
       toast.error(err.message || 'Failed to update user role.');
@@ -3713,7 +3723,8 @@ export default function AdminDashboard() {
       password: '',
       phone: sup.phone || '',
       city: sup.city || 'moradabad',
-      status: sup.status || 'active'
+      status: sup.status || 'active',
+      role: sup.role || 'supervisor'
     });
     setSupervisorModalOpen(true);
   };
@@ -3736,7 +3747,12 @@ export default function AdminDashboard() {
         const res = await adminAPI.updateSupervisor(editingSupervisor._id, payload);
         if (res.success && res.supervisor) {
           toast.success(`Supervisor "${res.supervisor.name}" updated successfully.`);
-          setSupervisors(prev => prev.map(s => s._id === res.supervisor._id ? { ...s, ...res.supervisor } : s));
+          if (res.supervisor.role && res.supervisor.role !== 'supervisor') {
+            setSupervisors(prev => prev.filter(s => s._id !== res.supervisor._id));
+          } else {
+            setSupervisors(prev => prev.map(s => s._id === res.supervisor._id ? { ...s, ...res.supervisor } : s));
+          }
+          setUsers(prev => prev.map(u => u._id === res.supervisor._id ? { ...u, ...res.supervisor } : u));
           setSupervisorModalOpen(false);
         }
       } else {
@@ -3744,6 +3760,7 @@ export default function AdminDashboard() {
         if (res.success && res.supervisor) {
           toast.success(`Supervisor "${res.supervisor.name}" created successfully.`);
           setSupervisors(prev => [res.supervisor, ...prev]);
+          setUsers(prev => [res.supervisor, ...prev]);
           setSupervisorModalOpen(false);
         }
       }
@@ -4557,6 +4574,7 @@ export default function AdminDashboard() {
                     <th className="py-3 px-3">Supervisor Name</th>
                     <th className="py-3 px-3">Contact Email & Phone</th>
                     <th className="py-3 px-3">City Region</th>
+                    <th className="py-3 px-3">Authority / Role</th>
                     <th className="py-3 px-3 text-center">Assigned Jobs</th>
                     <th className="py-3 px-3 text-center">Completed</th>
                     <th className="py-3 px-3">Status</th>
@@ -4566,7 +4584,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-[#E2D9C8]/60">
                   {filteredSupervisorsList.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-xs text-[#6B8077]">
+                      <td colSpan={8} className="py-12 text-center text-xs text-[#6B8077]">
                         <p className="font-bold text-[#10231D] mb-1">No supervisor accounts found.</p>
                         <p>Click "+ Create Supervisor Account" above to register field supervisors.</p>
                       </td>
@@ -4606,6 +4624,20 @@ export default function AdminDashboard() {
                             <span className="capitalize font-mono px-2 py-0.5 rounded-full bg-white border border-[#E2D9C8] text-[#10231D] text-[10px] font-bold">
                               {sup.city || 'moradabad'}
                             </span>
+                          </td>
+                          <td className="py-3 px-3 min-w-[135px]">
+                            <CustomSelect
+                              size="sm"
+                              value={sup.role || 'supervisor'}
+                              onChange={(val) => handleUpdateUserRole(sup._id, val)}
+                              options={[
+                                { value: 'supervisor', label: 'Supervisor' },
+                                { value: 'admin', label: 'Administrator' },
+                                { value: 'cleaner', label: 'Cleaner Staff' },
+                                { value: 'customer', label: 'Customer' }
+                              ]}
+                              placeholder="Authority..."
+                            />
                           </td>
                           <td className="py-3 px-3 text-center font-mono font-bold text-xs text-[#10231D]">
                             {supBookings.length}
@@ -5663,7 +5695,8 @@ export default function AdminDashboard() {
                     options={[
                       { value: 'all', label: 'All Roles' },
                       { value: 'customer', label: 'Customers' },
-                      { value: 'cleaner', label: 'Staff' },
+                      { value: 'cleaner', label: 'Cleaner Staff' },
+                      { value: 'supervisor', label: 'Supervisors' },
                       { value: 'admin', label: 'Admins' }
                     ]}
                     placeholder="Filter Role..."
@@ -5781,6 +5814,7 @@ export default function AdminDashboard() {
                             options={[
                               { value: 'customer', label: 'Customer' },
                               { value: 'cleaner', label: 'Cleaner Staff' },
+                              { value: 'supervisor', label: 'Supervisor' },
                               { value: 'admin', label: 'Administrator' }
                             ]}
                             placeholder="Role..."
@@ -8674,6 +8708,22 @@ export default function AdminDashboard() {
                     )}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Account Authority / Role:
+                </label>
+                <select
+                  value={supervisorForm.role || 'supervisor'}
+                  onChange={(e) => setSupervisorForm(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
+                >
+                  <option value="supervisor">Supervisor (Field Dispatch & Job Allocation)</option>
+                  <option value="admin">Administrator (Full Dashboard Access)</option>
+                  <option value="cleaner">Cleaner Staff</option>
+                  <option value="customer">Customer</option>
+                </select>
               </div>
 
               <div>

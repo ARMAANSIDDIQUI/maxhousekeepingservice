@@ -1440,10 +1440,10 @@ export async function createSupervisor(req, res, next) {
 export async function updateSupervisor(req, res, next) {
   try {
     const { id } = req.params;
-    const { name, email, phone, password, isActive, status } = req.body;
+    const { name, email, phone, password, isActive, status, role } = req.body;
 
     const supervisor = await User.findById(id);
-    if (!supervisor || supervisor.role !== 'supervisor') {
+    if (!supervisor) {
       return res.status(404).json({ success: false, message: 'Supervisor account not found.' });
     }
 
@@ -1452,6 +1452,9 @@ export async function updateSupervisor(req, res, next) {
     if (phone !== undefined) supervisor.phone = phone ? phone.trim().replace(/\D/g, '') : '';
     if (status !== undefined) supervisor.isActive = (status === 'active');
     if (isActive !== undefined) supervisor.isActive = Boolean(isActive);
+    if (role && ['customer', 'cleaner', 'admin', 'supervisor'].includes(role)) {
+      supervisor.role = role;
+    }
 
     if (password && password.trim().length >= 6) {
       supervisor.passwordHash = password.trim(); // Will be hashed by pre-save hook
