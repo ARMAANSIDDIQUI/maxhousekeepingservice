@@ -946,31 +946,50 @@ export async function getBookingLiveLocation(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
     }
 
-    let liveLoc = booking.supervisorLiveLocation;
-    let hasCoords = Boolean(liveLoc && typeof liveLoc.lat === 'number' && typeof liveLoc.lng === 'number' && liveLoc.lat !== 0);
-
-    // If booking doesn't have coordinates yet, fallback to supervisor user's lastKnownLocation
-    if (!hasCoords && booking.supervisor) {
-      const supervisorUser = await User.findById(booking.supervisor).select('lastKnownLocation name phone avatar');
-      if (supervisorUser?.lastKnownLocation?.lat && supervisorUser.lastKnownLocation.lat !== 0) {
-        liveLoc = supervisorUser.lastKnownLocation;
-        hasCoords = true;
-      }
+    let supervisorUser = null;
+    if (booking.supervisor) {
+      supervisorUser = await User.findById(booking.supervisor).select('lastKnownLocation name phone avatar');
     }
 
-    // Location sharing persists indefinitely for active bookings even if supervisor closes panel
-    const isLive = Boolean(hasCoords && !['completed', 'cancelled'].includes(booking.status));
+    const assignedName = (booking.assignedSupervisor?.name || supervisorUser?.name || '').trim();
+    const assignedPhone = (booking.assignedSupervisor?.phone || supervisorUser?.phone || '').trim();
+    const assignedAvatar = booking.assignedSupervisor?.avatar || supervisorUser?.avatar || '';
+
+    const isSupervisorAssigned = Boolean(
+      booking.supervisor ||
+      booking.assignedSupervisor?.id ||
+      assignedName
+    );
+
+    let liveLoc = booking.supervisorLiveLocation;
+    let hasCoords = Boolean(
+      isSupervisorAssigned &&
+      liveLoc &&
+      typeof liveLoc.lat === 'number' &&
+      typeof liveLoc.lng === 'number' &&
+      liveLoc.lat !== 0
+    );
+
+    // If booking doesn't have coordinates yet, fallback to supervisor user's lastKnownLocation
+    if (isSupervisorAssigned && !hasCoords && supervisorUser?.lastKnownLocation?.lat && supervisorUser.lastKnownLocation.lat !== 0) {
+      liveLoc = supervisorUser.lastKnownLocation;
+      hasCoords = true;
+    }
+
+    // Location sharing is only active when a supervisor is actually assigned and has valid coordinates
+    const isLive = Boolean(isSupervisorAssigned && hasCoords && !['completed', 'cancelled'].includes(booking.status));
 
     res.status(200).json({
       success: true,
       bookingCode: booking.bookingCode,
       status: booking.status,
+      isSupervisorAssigned,
       isSharing: isLive,
-      supervisor: {
-        name: booking.assignedSupervisor?.name || 'Assigned Lead',
-        phone: booking.assignedSupervisor?.phone || '',
-        avatar: booking.assignedSupervisor?.avatar || ''
-      },
+      supervisor: isSupervisorAssigned ? {
+        name: assignedName || 'Assigned Supervisor',
+        phone: assignedPhone,
+        avatar: assignedAvatar
+      } : null,
       supervisorLocation: isLive ? {
         lat: liveLoc.lat,
         lng: liveLoc.lng,

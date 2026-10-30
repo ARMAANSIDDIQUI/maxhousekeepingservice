@@ -19,20 +19,51 @@ import { calculateDistanceKm, getEtaInfo } from '../../utils/geoUtils';
  * Interactive Real-Time Map showing Supervisor Live Vehicle Location & Customer Doorstep Pin.
  * Displays live Uber/Rapido-style distance and ETA calculated client-side with Zero ($0.00) Google API fees.
  */
+const PLACEHOLDER_SUPERVISOR_NAMES = new Set([
+  'field supervisor',
+  'assigned lead',
+  'assigned lead supervisor',
+  'not assigned',
+  'unassigned',
+  'pending'
+]);
+
+function isGenuineSupervisor(sup) {
+  if (!sup) return false;
+  if (sup.id || sup._id) return true;
+  const cleanName = String(sup.name || '').trim().toLowerCase();
+  return Boolean(cleanName && !PLACEHOLDER_SUPERVISOR_NAMES.has(cleanName));
+}
+
 export default function LiveTrackingRadar({
   bookingCode,
   initialSupervisorLocation = null,
   customerLocation = null,
   destinationAddress = '',
   supervisorInfo = null,
+  isSupervisorAssigned: initialAssignedProp = undefined,
   pollIntervalMs = 12000
 }) {
+  const initialHasSupervisor =
+    typeof initialAssignedProp === 'boolean'
+      ? initialAssignedProp
+      : isGenuineSupervisor(supervisorInfo);
+
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [liveLocation, setLiveLocation] = useState(initialSupervisorLocation);
-  const [isSharing, setIsSharing] = useState(Boolean(initialSupervisorLocation?.isSharing ?? true));
-  const [lastUpdated, setLastUpdated] = useState(initialSupervisorLocation?.updatedAt ? new Date(initialSupervisorLocation.updatedAt) : new Date());
+  const [hasSupervisor, setHasSupervisor] = useState(initialHasSupervisor);
+  const [liveLocation, setLiveLocation] = useState(
+    initialHasSupervisor && initialSupervisorLocation?.lat ? initialSupervisorLocation : null
+  );
+  const [isSharing, setIsSharing] = useState(
+    Boolean(initialHasSupervisor && initialSupervisorLocation?.lat && (initialSupervisorLocation?.isSharing ?? true))
+  );
+  const [lastUpdated, setLastUpdated] = useState(
+    initialSupervisorLocation?.updatedAt ? new Date(initialSupervisorLocation.updatedAt) : new Date()
+  );
   const [resolvedCustomerLoc, setResolvedCustomerLoc] = useState(customerLocation);
-  const [resolvedSupervisor, setResolvedSupervisor] = useState(supervisorInfo);
+  const [resolvedSupervisor, setResolvedSupervisor] = useState(
+    initialHasSupervisor && isGenuineSupervisor(supervisorInfo) ? supervisorInfo : null
+  );
   const [distanceKm, setDistanceKm] = useState(null);
 
   const mapContainerRef = useRef(null);
@@ -176,10 +207,18 @@ export default function LiveTrackingRadar({
   }, [customerLocation]);
 
   useEffect(() => {
-    if (supervisorInfo && !resolvedSupervisor) {
+    const propAssigned =
+      typeof initialAssignedProp === 'boolean'
+        ? initialAssignedProp
+        : isGenuineSupervisor(supervisorInfo);
+    setHasSupervisor(propAssigned);
+    if (propAssigned && isGenuineSupervisor(supervisorInfo)) {
       setResolvedSupervisor(supervisorInfo);
+    } else if (!propAssigned) {
+      setResolvedSupervisor(null);
+      setIsSharing(false);
     }
-  }, [supervisorInfo]);
+  }, [supervisorInfo, initialAssignedProp]);
 
   // Poll live location endpoint
   const fetchLiveLocation = async () => {
@@ -191,14 +230,36 @@ export default function LiveTrackingRadar({
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setIsSharing(Boolean(data.isSharing));
+          const assigned =
+            typeof data.isSupervisorAssigned === 'boolean'
+              ? data.isSupervisorAssigned
+              : isGenuineSupervisor(data.supervisor);
+
+          setHasSupervisor(assigned);
+          setIsSharing(Boolean(assigned && data.isSharing));
+
           if (data.customerLocation && !resolvedCustomerLoc) {
             setResolvedCustomerLoc(data.customerLocation);
           }
-          if (data.supervisor) {
-            setResolvedSupervisor((prev) => ({ ...prev, ...data.supervisor }));
+
+          if (assigned && data.supervisor) {
+            setResolvedSupervisor((prev) => ({ ...(prev || {}), ...data.supervisor }));
+          } else if (!assigned) {
+            setResolvedSupervisor(null);
+            setLiveLocation(null);
+            setDistanceKm(null);
+            if (supervisorMarkerRef.current) {
+              supervisorMarkerRef.current.setVisible(false);
+            }
+            if (routePolylineRef.current) {
+              routePolylineRef.current.setMap(null);
+            }
+            if (directionsRendererRef.current) {
+              directionsRendererRef.current.setMap(null);
+            }
           }
-          if (data.supervisorLocation) {
+
+          if (assigned && data.supervisorLocation) {
             setLiveLocation(data.supervisorLocation);
             setLastUpdated(new Date(data.supervisorLocation.updatedAt || Date.now()));
 
@@ -209,6 +270,7 @@ export default function LiveTrackingRadar({
                 lng: data.supervisorLocation.lng
               };
               supervisorMarkerRef.current.setPosition(newPos);
+              supervisorMarkerRef.current.setVisible(true);
               if (resolvedCustomerLoc || customerLocation) {
                 updateRouteLine(newPos, resolvedCustomerLoc || customerLocation);
               }
@@ -245,7 +307,7 @@ export default function LiveTrackingRadar({
   // Calculate distance between supervisor and customer doorstep (Zero Google API costs)
   useEffect(() => {
     const cust = resolvedCustomerLoc || customerLocation;
-    if (cust?.lat && liveLocation?.lat) {
+    if (hasSupervisor && cust?.lat && liveLocation?.lat) {
       const dist = calculateDistanceKm(
         cust.lat,
         cust.lng,
@@ -253,10 +315,12 @@ export default function LiveTrackingRadar({
         liveLocation.lng
       );
       setDistanceKm(dist);
+    } else if (!hasSupervisor) {
+      setDistanceKm(null);
     }
-  }, [resolvedCustomerLoc, customerLocation, liveLocation]);
+  }, [hasSupervisor, resolvedCustomerLoc, customerLocation, liveLocation]);
 
-  const etaInfo = getEtaInfo(distanceKm);
+  const etaInfo = hasSupervisor ? getEtaInfo(distanceKm) : null;
 
   // Load Google Maps SDK
   useEffect(() => {
@@ -287,13 +351,11 @@ export default function LiveTrackingRadar({
           ? cust
           : { lat: 28.8389, lng: 78.7768 };
 
-      const supPos =
-        liveLocation && typeof liveLocation.lat === 'number'
-          ? liveLocation
-          : custPos;
+      const hasSupCoords = hasSupervisor && liveLocation && typeof liveLocation.lat === 'number';
+      const supPos = hasSupCoords ? liveLocation : custPos;
 
       const map = new google.maps.Map(mapContainerRef.current, {
-        center: supPos,
+        center: hasSupCoords ? supPos : custPos,
         zoom: 15,
         mapTypeControl: false,
         streetViewControl: false,
@@ -326,6 +388,7 @@ export default function LiveTrackingRadar({
       const supMarker = new google.maps.Marker({
         position: supPos,
         map: map,
+        visible: Boolean(hasSupCoords),
         title: `${resolvedSupervisor?.name || 'Supervisor'} (Live Position)`,
         icon: {
           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
@@ -342,13 +405,9 @@ export default function LiveTrackingRadar({
       customerMarkerRef.current = custMarker;
       supervisorMarkerRef.current = supMarker;
 
-      // Draw Route Line between Supervisor and Customer Doorstep
-      if (cust && liveLocation) {
+      // Draw Route Line between Supervisor and Customer Doorstep only when supervisor is assigned & has coords
+      if (hasSupCoords && cust) {
         updateRouteLine(supPos, custPos);
-      }
-
-      // Adjust bounds to fit both markers
-      if (cust && liveLocation) {
         const bounds = new google.maps.LatLngBounds();
         bounds.extend(custPos);
         bounds.extend(supPos);
@@ -357,10 +416,18 @@ export default function LiveTrackingRadar({
     } catch (err) {
       console.warn('[LiveTrackingRadar] Map canvas error:', err);
     }
-  }, [mapLoaded, resolvedCustomerLoc, customerLocation, liveLocation]);
+  }, [mapLoaded, resolvedCustomerLoc, customerLocation, liveLocation, hasSupervisor]);
+
+  // Keep supervisor marker visibility synced with assignment state
+  useEffect(() => {
+    if (supervisorMarkerRef.current) {
+      const showMarker = Boolean(hasSupervisor && liveLocation && typeof liveLocation.lat === 'number');
+      supervisorMarkerRef.current.setVisible(showMarker);
+    }
+  }, [hasSupervisor, liveLocation]);
 
   const handleRecenterSupervisor = () => {
-    if (mapInstanceRef.current && liveLocation?.lat) {
+    if (mapInstanceRef.current && hasSupervisor && liveLocation?.lat) {
       mapInstanceRef.current.panTo({ lat: liveLocation.lat, lng: liveLocation.lng });
       mapInstanceRef.current.setZoom(16);
     }
@@ -376,7 +443,7 @@ export default function LiveTrackingRadar({
 
   const handleFitRoute = () => {
     const cust = resolvedCustomerLoc || customerLocation;
-    if (mapInstanceRef.current && cust?.lat && liveLocation?.lat && window.google?.maps) {
+    if (mapInstanceRef.current && hasSupervisor && cust?.lat && liveLocation?.lat && window.google?.maps) {
       const bounds = new window.google.maps.LatLngBounds();
       bounds.extend(cust);
       bounds.extend(liveLocation);
@@ -389,43 +456,63 @@ export default function LiveTrackingRadar({
     ? `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinationAddress || 'Moradabad')}`;
 
-  const currentSupervisor = resolvedSupervisor || supervisorInfo;
+  const currentSupervisor = hasSupervisor ? (resolvedSupervisor || (isGenuineSupervisor(supervisorInfo) ? supervisorInfo : null)) : null;
 
   return (
     <div className="bg-[#10231D] text-[#F4EFE6] rounded-3xl border-2 border-[#2D453B] overflow-hidden shadow-2xl">
-      {/* Header with Uber/Rapido-Style Distance & ETA */}
+      {/* Smart Header: Checks if Supervisor is Assigned First */}
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2D453B]/70 bg-[#0C1B16]">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <span className={`w-3.5 h-3.5 rounded-full ${isSharing ? 'bg-[#25D366]' : 'bg-[#6B8077]'} block`} />
-            {isSharing && (
+            <span
+              className={`w-3.5 h-3.5 rounded-full block ${
+                !hasSupervisor
+                  ? 'bg-[#E9A23B]'
+                  : isSharing
+                    ? 'bg-[#25D366]'
+                    : 'bg-[#6B8077]'
+              }`}
+            />
+            {hasSupervisor && isSharing && (
               <span className="w-3.5 h-3.5 rounded-full bg-[#25D366] absolute inset-0 animate-ping opacity-75" />
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#E9A23B]">
-                {isSharing ? 'LIVE LOCATION MAP' : 'SUPERVISOR ASSIGNED'}
+                {!hasSupervisor
+                  ? 'SUPERVISOR NOT YET ASSIGNED'
+                  : isSharing
+                    ? 'LIVE LOCATION MAP'
+                    : 'SUPERVISOR ASSIGNED'}
               </span>
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
-                isSharing ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' : 'bg-[#2D453B] text-[#A3B8B0]'
-              }`}>
-                {isSharing ? 'Sharing On' : 'Sharing Off'}
+              <span
+                className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
+                  !hasSupervisor
+                    ? 'bg-amber-950/90 text-[#E9A23B] border border-[#E9A23B]/40'
+                    : isSharing
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                      : 'bg-[#2D453B] text-[#A3B8B0]'
+                }`}
+              >
+                {!hasSupervisor ? 'Not Assigned Yet' : isSharing ? 'Sharing On' : 'Sharing Off'}
               </span>
             </div>
             <p className="text-xs text-[#A3B8B0] mt-0.5">
-              {isSharing
-                ? etaInfo
-                  ? `${etaInfo.statusText} · Ref: #${bookingCode}`
-                  : `Supervisor en route to your address · Ref: #${bookingCode}`
-                : `Supervisor assigned to your visit · Ref: #${bookingCode}`}
+              {!hasSupervisor
+                ? `Field supervisor not yet assigned to your visit · Ref: #${bookingCode}`
+                : isSharing
+                  ? etaInfo
+                    ? `${etaInfo.statusText} · Ref: #${bookingCode}`
+                    : `Supervisor en route to your address · Ref: #${bookingCode}`
+                  : `Supervisor assigned to your visit · Ref: #${bookingCode}`}
             </p>
           </div>
         </div>
 
-        {/* Uber/Rapido Distance & ETA Pill */}
+        {/* Uber/Rapido Distance & ETA Pill (Only when Supervisor is Assigned & Sharing) */}
         <div className="flex items-center gap-2.5">
-          {distanceKm !== null && isSharing && etaInfo && (
+          {hasSupervisor && distanceKm !== null && isSharing && etaInfo && (
             <div className="px-4 py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-3.5 shadow-sm">
               <div>
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">Distance</span>
@@ -460,15 +547,17 @@ export default function LiveTrackingRadar({
 
         {/* Floating Map Navigation Controls */}
         <div className="absolute top-3 right-3 flex flex-col gap-1.5 z-10">
-          <button
-            type="button"
-            onClick={handleRecenterSupervisor}
-            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#E9A23B] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
-            title="Focus on Supervisor"
-          >
-            <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B]" />
-            <span className="hidden sm:inline">Supervisor</span>
-          </button>
+          {hasSupervisor && (
+            <button
+              type="button"
+              onClick={handleRecenterSupervisor}
+              className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#E9A23B] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              title="Focus on Supervisor"
+            >
+              <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B]" />
+              <span className="hidden sm:inline">Supervisor</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={handleRecenterDestination}
@@ -478,19 +567,40 @@ export default function LiveTrackingRadar({
             <LuMapPin className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden sm:inline">Doorstep</span>
           </button>
-          <button
-            type="button"
-            onClick={handleFitRoute}
-            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#A3B8B0] hover:text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
-            title="Fit Full Route"
-          >
-            <LuCompass className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Fit Route</span>
-          </button>
+          {hasSupervisor && (
+            <button
+              type="button"
+              onClick={handleFitRoute}
+              className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#A3B8B0] hover:text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              title="Fit Full Route"
+            >
+              <LuCompass className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Fit Route</span>
+            </button>
+          )}
         </div>
 
-        {/* Floating Uber/Rapido Live Arrival Pill on Map */}
-        {isSharing && etaInfo && (
+        {/* Smart Banner on Map when Supervisor is NOT Yet Assigned */}
+        {!hasSupervisor && (
+          <div className="absolute top-3 left-3 right-16 sm:max-w-md z-10 pointer-events-none">
+            <div className="backdrop-blur-md bg-[#10231D]/95 border border-[#E9A23B]/60 text-[#F4EFE6] px-4 py-3 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto">
+              <div className="w-8 h-8 rounded-xl bg-[#E9A23B]/20 border border-[#E9A23B]/40 flex items-center justify-center shrink-0 mt-0.5">
+                <LuClock className="w-4 h-4 text-[#E9A23B]" />
+              </div>
+              <div>
+                <p className="font-bold text-xs text-[#E9A23B] uppercase tracking-wide">
+                  Supervisor Not Yet Assigned
+                </p>
+                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed">
+                  Our dispatch team is allocating a field supervisor for your booking. Live route & ETA will start automatically once assigned.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Uber/Rapido Live Arrival Pill on Map (Only when Supervisor is Assigned & Sharing) */}
+        {hasSupervisor && isSharing && etaInfo && (
           <div className="absolute top-3 left-3 right-16 sm:right-auto z-10 pointer-events-none">
             <div className={`backdrop-blur-md px-4 py-2.5 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
               etaInfo.isArrived
@@ -526,41 +636,60 @@ export default function LiveTrackingRadar({
         </div>
       </div>
 
-      {/* Footer Info: Supervisor Details & Doorstep Address */}
+      {/* Footer Info: Smart Check for Supervisor Assignment vs Pending */}
       <div className="p-3.5 bg-[#0C1B16] border-t border-[#2D453B]/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-full bg-[#2D453B] border border-[#E9A23B]/40 flex items-center justify-center text-[#E9A23B] font-bold">
-            {currentSupervisor?.name ? currentSupervisor.name.charAt(0).toUpperCase() : <LuUser className="w-4 h-4" />}
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="font-bold text-[#F4EFE6]">{currentSupervisor?.name || 'Assigned Lead Supervisor'}</p>
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#E9A23B]/20 text-[#E9A23B] font-bold">
-                Lead
-              </span>
+        {hasSupervisor ? (
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-[#2D453B] border border-[#E9A23B]/40 flex items-center justify-center text-[#E9A23B] font-bold">
+              {currentSupervisor?.name ? currentSupervisor.name.charAt(0).toUpperCase() : <LuUser className="w-4 h-4" />}
             </div>
-            {currentSupervisor?.phone && (
-              <div className="flex items-center gap-3 mt-0.5">
-                <a
-                  href={`tel:${currentSupervisor.phone}`}
-                  className="text-[11px] text-[#A3B8B0] hover:text-[#E9A23B] flex items-center gap-1 transition-colors"
-                >
-                  <LuPhone className="w-3 h-3 text-[#25D366]" />
-                  <span>Call: +91 {currentSupervisor.phone}</span>
-                </a>
-                <a
-                  href={`https://wa.me/91${currentSupervisor.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${currentSupervisor.name || ''}, tracking booking #${bookingCode}.`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] text-[#25D366] hover:underline flex items-center gap-1 transition-colors"
-                >
-                  <FaWhatsapp className="w-3 h-3" />
-                  <span>WhatsApp</span>
-                </a>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-[#F4EFE6]">{currentSupervisor?.name || 'Assigned Supervisor'}</p>
+                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#E9A23B]/20 text-[#E9A23B] font-bold">
+                  Lead
+                </span>
               </div>
-            )}
+              {currentSupervisor?.phone && (
+                <div className="flex items-center gap-3 mt-0.5">
+                  <a
+                    href={`tel:${currentSupervisor.phone}`}
+                    className="text-[11px] text-[#A3B8B0] hover:text-[#E9A23B] flex items-center gap-1 transition-colors"
+                  >
+                    <LuPhone className="w-3 h-3 text-[#25D366]" />
+                    <span>Call: +91 {currentSupervisor.phone}</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/91${currentSupervisor.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${currentSupervisor.name || ''}, tracking booking #${bookingCode}.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-[#25D366] hover:underline flex items-center gap-1 transition-colors"
+                  >
+                    <FaWhatsapp className="w-3 h-3" />
+                    <span>WhatsApp</span>
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-[#2D453B]/60 border border-[#E9A23B]/30 flex items-center justify-center text-[#E9A23B]">
+              <LuClock className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-[#F4EFE6]">Supervisor Not Yet Assigned</p>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-[#E9A23B] border border-[#E9A23B]/30 font-bold">
+                  Pending
+                </span>
+              </div>
+              <p className="text-[11px] text-[#A3B8B0] mt-0.5">
+                Supervisor contact & live GPS route will unlock once assigned
+              </p>
+            </div>
+          </div>
+        )}
 
         {destinationAddress && (
           <div className="text-left sm:text-right max-w-sm truncate text-[11px] text-[#A3B8B0]">

@@ -2386,46 +2386,65 @@ export default function CustomerDashboard() {
 
 
         {/* Track Live Location Modal */}
-        {trackingModalBooking && (
-          <Modal
-            isOpen={Boolean(trackingModalBooking)}
-            onClose={() => setTrackingModalBooking(null)}
-            title={`Track Location · #${trackingModalBooking.bookingCode}`}
-            subtitle="Live location and route to your address"
-            maxWidth="max-w-4xl"
-          >
-            <div className="space-y-4">
-              <LiveTrackingRadar
-                bookingCode={trackingModalBooking.bookingCode}
-                initialSupervisorLocation={trackingModalBooking.supervisorLiveLocation}
-                customerLocation={trackingModalBooking.address?.coordinates}
-                destinationAddress={`${trackingModalBooking.address?.houseOrFlat ? trackingModalBooking.address.houseOrFlat + ', ' : ''}${trackingModalBooking.address?.line1 || ''}, ${trackingModalBooking.cityName || ''}`}
-                supervisorInfo={{
-                  name: trackingModalBooking.assignedSupervisor?.name || trackingModalBooking.supervisor?.name || 'Field Supervisor',
-                  phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
-                  role: 'Supervisor'
-                }}
-              />
-              <div className="flex items-center justify-between pt-2">
-                <Link
-                  to={`/track/${trackingModalBooking.bookingCode}`}
-                  target="_blank"
-                  className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
-                >
-                  <span>Open Fullscreen</span>
-                  <LuNavigation className="w-3 h-3" />
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setTrackingModalBooking(null)}
-                  className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
+        {trackingModalBooking && (() => {
+          const supName = (trackingModalBooking.assignedSupervisor?.name || trackingModalBooking.supervisor?.name || '').trim();
+          const hasAssignedSup = Boolean(
+            supName ||
+            trackingModalBooking.assignedSupervisor?.id ||
+            trackingModalBooking.supervisor?._id ||
+            (typeof trackingModalBooking.supervisor === 'string' && trackingModalBooking.supervisor.trim())
+          );
+          return (
+            <Modal
+              isOpen={Boolean(trackingModalBooking)}
+              onClose={() => setTrackingModalBooking(null)}
+              title={`Track Location · #${trackingModalBooking.bookingCode}`}
+              subtitle={
+                hasAssignedSup
+                  ? 'Live location and route of the supervisor'
+                  : 'Supervisor assignment status and service location'
+              }
+              maxWidth="max-w-4xl"
+            >
+              <div className="space-y-4">
+                <LiveTrackingRadar
+                  bookingCode={trackingModalBooking.bookingCode}
+                  isSupervisorAssigned={hasAssignedSup}
+                  initialSupervisorLocation={hasAssignedSup ? trackingModalBooking.supervisorLiveLocation : null}
+                  customerLocation={trackingModalBooking.address?.coordinates}
+                  destinationAddress={`${trackingModalBooking.address?.houseOrFlat ? trackingModalBooking.address.houseOrFlat + ', ' : ''}${trackingModalBooking.address?.line1 || ''}, ${trackingModalBooking.cityName || ''}`}
+                  supervisorInfo={
+                    hasAssignedSup
+                      ? {
+                          name: supName || 'Assigned Supervisor',
+                          phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
+                          avatar: trackingModalBooking.assignedSupervisor?.avatar || trackingModalBooking.supervisor?.avatar || '',
+                          role: 'Supervisor'
+                        }
+                      : null
+                  }
+                />
+                <div className="flex items-center justify-between pt-2">
+                  <Link
+                    to={`/track/${trackingModalBooking.bookingCode}`}
+                    target="_blank"
+                    className="text-xs text-[#E9A23B] hover:underline font-bold flex items-center gap-1"
+                  >
+                    <span>Open Fullscreen</span>
+                    <LuNavigation className="w-3 h-3" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setTrackingModalBooking(null)}
+                    className="px-4 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold hover:bg-[#3D524A] transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
-            </div>
-          </Modal>
-        )}
+            </Modal>
+          );
+        })()}
 
         {/* Action Confirmation & Prompt Modal */}
         {confirmModalConfig && (

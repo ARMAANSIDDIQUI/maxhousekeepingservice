@@ -302,9 +302,10 @@ export default function TrackBookingPage() {
             )}
 
             {/* REAL-TIME SUPERVISOR LIVE TRACKING RADAR */}
-            {booking.status !== 'cancelled' && (booking.supervisor || booking.assignedSupervisor?.name) && (
+            {booking.status !== 'cancelled' && (
               <LiveTrackingRadar
                 bookingCode={booking.bookingCode}
+                isSupervisorAssigned={Boolean(booking.supervisor || booking.assignedSupervisor?.name || booking.assignedSupervisor?.id)}
                 initialSupervisorLocation={booking.supervisorLiveLocation}
                 customerLocation={booking.address?.coordinates}
                 destinationAddress={`${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.cityName || ''}`}
