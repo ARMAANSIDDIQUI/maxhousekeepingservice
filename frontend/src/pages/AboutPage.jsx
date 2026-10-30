@@ -232,7 +232,7 @@ export default function AboutPage() {
                 className="px-5 py-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md flex items-center gap-2"
               >
                 <LuCalendar className="w-4 h-4 text-[#E9A23B]" />
-                <span>Book a Cleaning Slot</span>
+                <span>Book a Service</span>
               </Link>
               <a
                 href={`tel:${hotline.replace(/[^0-9+]/g, '')}`}
