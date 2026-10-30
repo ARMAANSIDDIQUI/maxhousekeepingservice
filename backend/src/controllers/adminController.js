@@ -428,6 +428,10 @@ function processVariantsPayload(payload) {
         }
       }
 
+      payload.variantGroupKey = groupKey;
+      payload.variantGroupLabel = groupLabel;
+      payload.variants = validVariants;
+
       payload.matrix = validVariants.map(v => ({
         selection: { [groupKey]: v.key },
         price: v.price,
@@ -459,6 +463,7 @@ function processVariantsPayload(payload) {
         }
       ];
     } else if (payload.pricingType !== 'unit') {
+      payload.variants = [];
       payload.matrix = [];
       payload.optionGroups = [];
       payload.pricingMode = 'fixed';

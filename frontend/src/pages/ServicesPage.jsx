@@ -148,17 +148,35 @@ export default function ServicesPage() {
 
   // Helper to calculate exact city-dependent rate & unit label
   const getServiceDisplayPricing = (service, citySlug) => {
-    if (service.pricingType === 'unit') {
-      const isMbd = !citySlug || citySlug === 'moradabad' || citySlug === 'all';
-      let rate = isMbd ? (service.unitRateMoradabad ?? service.price) : (service.unitRateOther ?? service.price);
-      if (!isMbd && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
-        const matched = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
-        if (matched && typeof matched.rate === 'number') {
-          rate = matched.rate;
+    const isMbd = !citySlug || citySlug === 'moradabad' || citySlug === 'all';
+    const targetSlug = String(citySlug || 'moradabad').toLowerCase().trim();
+
+    // Check custom city-specific rates configured at service level
+    let cityRateMatched = false;
+    let cityMatchedRate = null;
+    let cityMatchedMrp = null;
+
+    if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && !isMbd) {
+      const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+      if (match && typeof match.rate === 'number' && match.rate > 0) {
+        cityRateMatched = true;
+        cityMatchedRate = match.rate;
+        if (typeof match.mrp === 'number' && match.mrp > 0) {
+          cityMatchedMrp = match.mrp;
         }
       }
+    }
+
+    if (service.pricingType === 'unit') {
+      let rate = isMbd ? (service.unitRateMoradabad ?? service.price) : (service.unitRateOther ?? service.price);
+      if (cityRateMatched && cityMatchedRate !== null) {
+        rate = cityMatchedRate;
+      }
       const unit = service.unitLabel || (service.pricingUnit === 'litre' ? 'Litre' : 'Sq. Ft.');
-      const mrp = service.mrp || 0;
+      let mrp = cityMatchedMrp !== null ? cityMatchedMrp : (service.mrp || 0);
+      if (mrp <= rate && rate > 0) {
+        mrp = Math.round(rate * 1.25);
+      }
       const savings = mrp > rate ? mrp - rate : 0;
       const discountPct = mrp > rate ? Math.round(((mrp - rate) / mrp) * 100) : 0;
       return {
@@ -173,44 +191,89 @@ export default function ServicesPage() {
       };
     }
 
-    let price = service.price || 0;
-    let mrp = service.mrp || 0;
-    if (citySlug && citySlug !== 'moradabad' && citySlug !== 'all') {
+    // Identify primary default variant if present
+    const defaultVar = (Array.isArray(service.variants) && service.variants.length > 0)
+      ? (service.variants.find(v => v.isDefault && v.isActive !== false) || service.variants.find(v => v.isActive !== false) || service.variants[0])
+      : null;
+
+    let defaultRow = null;
+    if (!defaultVar && Array.isArray(service.matrix) && service.matrix.length > 0) {
+      const optGroup = service.optionGroups?.[0];
+      const groupKey = optGroup?.key || 'size';
+      const defaultOpt = optGroup?.options?.find(o => o.isDefault) || optGroup?.options?.[0];
+      defaultRow = (defaultOpt && service.matrix.find(r => {
+        const sel = r.selection instanceof Map ? Object.fromEntries(r.selection) : (r.selection || {});
+        return String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase() === String(defaultOpt.key).toLowerCase();
+      })) || service.matrix[0];
+    }
+
+    const defaultOpt = (!defaultVar && !defaultRow && service.optionGroups?.[0]?.options)
+      ? (service.optionGroups[0].options.find(o => o.isDefault && o.isActive !== false) || service.optionGroups[0].options[0])
+      : null;
+
+    let price = defaultVar?.price ?? defaultRow?.price ?? service.price ?? 0;
+    let mrp = defaultVar?.mrp ?? defaultRow?.mrp ?? service.mrp ?? price;
+
+    if (!isMbd) {
       let matchedVariantCity = false;
-      if (Array.isArray(service.matrix) && service.matrix.length > 0) {
-        const optGroup = service.optionGroups?.[0];
-        const groupKey = optGroup?.key || 'size';
-        const defaultOpt = optGroup?.options?.find(o => o.isDefault) || optGroup?.options?.[0];
-        const defaultRow = (defaultOpt && service.matrix.find(r => {
-          const sel = r.selection instanceof Map ? Object.fromEntries(r.selection) : (r.selection || {});
-          return String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase() === String(defaultOpt.key).toLowerCase();
-        })) || service.matrix[0];
-        if (defaultRow && Array.isArray(defaultRow.cityRates)) {
-          const rowMatch = defaultRow.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
-          if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
-            price = rowMatch.rate;
-            if (rowMatch.mrp && rowMatch.mrp > 0) mrp = rowMatch.mrp;
-            matchedVariantCity = true;
-          }
+
+      // 1. Check variant-level city rate
+      if (defaultVar && Array.isArray(defaultVar.cityRates) && defaultVar.cityRates.length > 0) {
+        const vMatch = defaultVar.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (vMatch && typeof vMatch.rate === 'number' && vMatch.rate > 0) {
+          price = vMatch.rate;
+          mrp = (typeof vMatch.mrp === 'number' && vMatch.mrp > 0) ? vMatch.mrp : Math.round(vMatch.rate * 1.25);
+          matchedVariantCity = true;
+          cityRateMatched = true;
+        }
+      } else if (defaultRow && Array.isArray(defaultRow.cityRates) && defaultRow.cityRates.length > 0) {
+        const rowMatch = defaultRow.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
+          price = rowMatch.rate;
+          mrp = (typeof rowMatch.mrp === 'number' && rowMatch.mrp > 0) ? rowMatch.mrp : Math.round(rowMatch.rate * 1.25);
+          matchedVariantCity = true;
+          cityRateMatched = true;
+        }
+      } else if (defaultOpt && Array.isArray(defaultOpt.cityRates) && defaultOpt.cityRates.length > 0) {
+        const optMatch = defaultOpt.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (optMatch && typeof optMatch.rate === 'number' && optMatch.rate > 0) {
+          price = optMatch.rate;
+          mrp = (typeof optMatch.mrp === 'number' && optMatch.mrp > 0) ? optMatch.mrp : Math.round(optMatch.rate * 1.25);
+          matchedVariantCity = true;
+          cityRateMatched = true;
         }
       }
-      if (!matchedVariantCity && service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
-        const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
-        if (match && typeof match.rate === 'number' && match.rate > 0) {
-          price = match.rate;
-          if (match.mrp && match.mrp > 0) mrp = match.mrp;
+
+      // 2. Check service-level city rate (either scale variant proportionally or set flat price)
+      if (!matchedVariantCity && cityRateMatched && cityMatchedRate !== null) {
+        if ((defaultVar || defaultRow) && service.price && service.price > 0) {
+          const ratio = cityMatchedRate / service.price;
+          price = Math.round((defaultVar?.price ?? defaultRow?.price ?? service.price) * ratio);
+          const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+          mrp = Math.round((defaultVar?.mrp ?? defaultRow?.mrp ?? service.mrp ?? price) * mrpRatio);
+        } else {
+          price = cityMatchedRate;
+          mrp = cityMatchedMrp !== null ? cityMatchedMrp : Math.round(cityMatchedRate * 1.25);
         }
       } else if (!matchedVariantCity && Array.isArray(service.cityOverrides)) {
-        const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === citySlug && o.isActive !== false);
+        const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === targetSlug && o.isActive !== false);
         if (override) {
           if (override.priceOverride) price = override.priceOverride;
           if (override.mrpOverride) mrp = override.mrpOverride;
           else if (override.multiplier) {
             price = Math.round(price * override.multiplier);
+            mrp = Math.round(mrp * override.multiplier);
           }
         }
       }
+
+      // 3. Outstation dispatch surcharge if outside Moradabad and no city-specific rate was defined
+      if (!cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+        price += service.cityExtraCharge;
+        mrp += service.cityExtraCharge;
+      }
     }
+
     const savings = mrp > price ? mrp - price : 0;
     const discountPct = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
     return {

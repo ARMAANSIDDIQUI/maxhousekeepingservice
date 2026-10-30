@@ -73,7 +73,77 @@ function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad'
     }
   }
 
-  // 1. Matrix row match
+  // 0. Dedicated Unit Pricing
+  if (service.pricingType === 'unit' && (!service.matrix || service.matrix.length === 0)) {
+    let activeRate = isMoradabad
+      ? (typeof service.unitRateMoradabad === 'number' ? service.unitRateMoradabad : (service.price || 10))
+      : (typeof service.unitRateOther === 'number' ? service.unitRateOther : (service.unitRateMoradabad || service.price || 15));
+
+    if (cityRateMatched && cityMatchedRate !== null) {
+      activeRate = cityMatchedRate;
+    }
+    const minQty = Number(service.minUnitQuantity) || 1;
+    let p = Math.round(activeRate * minQty);
+    const mrpFactor = (service.mrp && service.price && service.mrp > service.price) ? (service.mrp / service.price) : 1.25;
+    let m = cityMatchedMrp ? Math.round(cityMatchedMrp * minQty) : Math.round(p * mrpFactor);
+
+    if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+      p += service.cityExtraCharge;
+      m += service.cityExtraCharge;
+    }
+    return {
+      price: p,
+      mrp: m,
+      duration: service.duration || '1-2 hrs',
+      activeRate,
+      isUnit: true
+    };
+  }
+
+  // 1. Service Variants match (first-class variants support)
+  if (Array.isArray(service.variants) && service.variants.length > 0) {
+    const matchedVar = service.variants.find(v => {
+      if (v.isActive === false) return false;
+      const vKey = String(v.key || '').toLowerCase().trim();
+      return vKey === String(optKey).toLowerCase().trim() || (!optKey && v.isDefault);
+    }) || service.variants.find(v => v.isDefault) || service.variants[0];
+
+    if (matchedVar) {
+      let p = matchedVar.price;
+      let m = matchedVar.mrp || matchedVar.price;
+      let varCityMatched = false;
+
+      if (Array.isArray(matchedVar.cityRates) && matchedVar.cityRates.length > 0 && targetSlug) {
+        const vMatch = matchedVar.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (vMatch && typeof vMatch.rate === 'number' && vMatch.rate > 0) {
+          p = vMatch.rate;
+          m = (typeof vMatch.mrp === 'number' && vMatch.mrp > 0) ? vMatch.mrp : Math.round(vMatch.rate * 1.25);
+          varCityMatched = true;
+          cityRateMatched = true;
+        }
+      }
+
+      if (!varCityMatched && cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+        const ratio = cityMatchedRate / service.price;
+        p = Math.round(matchedVar.price * ratio);
+        const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+        m = Math.round((matchedVar.mrp || matchedVar.price) * mrpRatio);
+      }
+
+      if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+        p += service.cityExtraCharge;
+        m += service.cityExtraCharge;
+      }
+
+      return {
+        price: p,
+        mrp: m,
+        duration: matchedVar.duration || service.duration || '1 hr'
+      };
+    }
+  }
+
+  // 2. Matrix row match
   if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
     for (const row of service.matrix) {
       if (row.isActive === false) continue;
@@ -117,7 +187,7 @@ function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad'
     }
   }
 
-  // 2. Option group delta / multiplier match
+  // 3. Option group delta / multiplier match
   let basePrice = (cityRateMatched && cityMatchedRate !== null) ? cityMatchedRate : (service.price || 0);
   let baseMrp = (cityRateMatched && cityMatchedMrp !== null)
     ? cityMatchedMrp

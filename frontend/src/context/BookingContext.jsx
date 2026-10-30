@@ -408,8 +408,45 @@ export function BookingProvider({ children }) {
           }
         }
 
+        // Service Variants match (first-class variants support)
+        let variantMatched = false;
+        if (Array.isArray(i.service.variants) && i.service.variants.length > 0) {
+          const varGroupKey = String(i.service.variantGroupKey || 'size').toLowerCase().trim();
+          const selectedVarKey = String(i.selections?.[varGroupKey] || Object.values(i.selections || {})[0] || '').toLowerCase().trim();
+          const matchedVar = i.service.variants.find(v => {
+            if (v.isActive === false) return false;
+            const vKey = String(v.key || '').toLowerCase().trim();
+            return vKey === selectedVarKey || (!selectedVarKey && v.isDefault);
+          }) || i.service.variants.find(v => v.isDefault) || i.service.variants[0];
+
+          if (matchedVar) {
+            variantMatched = true;
+            let varCityMatched = false;
+            if (Array.isArray(matchedVar.cityRates) && matchedVar.cityRates.length > 0 && citySlug) {
+              const vMatch = matchedVar.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === citySlug);
+              if (vMatch && typeof vMatch.rate === 'number' && vMatch.rate > 0) {
+                varCityMatched = true;
+                cityRateMatched = true;
+                p = vMatch.rate;
+                m = (typeof vMatch.mrp === 'number' && vMatch.mrp > 0) ? vMatch.mrp : Math.round(vMatch.rate * 1.25);
+              }
+            }
+            if (!varCityMatched) {
+              if (cityRateMatched && cityMatchedRate !== null && i.service.price && i.service.price > 0) {
+                const ratio = cityMatchedRate / i.service.price;
+                p = Math.round(matchedVar.price * ratio);
+                const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (i.service.mrp || i.service.price)) : ratio;
+                m = Math.round((matchedVar.mrp || matchedVar.price) * mrpRatio);
+              } else {
+                p = matchedVar.price;
+                m = matchedVar.mrp || matchedVar.price;
+              }
+            }
+          }
+        }
+
         // Matrix match
-        if (i.service.matrix && Array.isArray(i.service.matrix) && i.service.matrix.length > 0) {
+        if (!variantMatched && i.service.matrix && Array.isArray(i.service.matrix) && i.service.matrix.length > 0) {
           const match = i.service.matrix.find(row => {
             if (row.isActive === false) return false;
             const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
@@ -490,6 +527,7 @@ export function BookingProvider({ children }) {
         : 0;
 
       setQuote({
+        citySlug: citySlug || 'moradabad',
         items: enriched,
         totals: {
           subtotal,

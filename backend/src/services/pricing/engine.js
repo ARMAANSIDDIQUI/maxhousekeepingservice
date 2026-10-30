@@ -65,8 +65,49 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
     }
   }
 
-  // 1. Matrix match (e.g. size: '2-bhk')
-  if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
+  // 1. Service Variants match (first-class variants support)
+  const targetSlug = citySlug ? String(citySlug).toLowerCase().trim() : '';
+  let variantMatched = false;
+
+  if (Array.isArray(service.variants) && service.variants.length > 0) {
+    const varGroupKey = String(service.variantGroupKey || 'size').toLowerCase().trim();
+    const selectedVarKey = String(selections[varGroupKey] || Object.values(selections)[0] || '').toLowerCase().trim();
+    const matchedVar = service.variants.find(v => {
+      if (v.isActive === false) return false;
+      const vKey = String(v.key || '').toLowerCase().trim();
+      return vKey === selectedVarKey || (!selectedVarKey && v.isDefault);
+    }) || service.variants.find(v => v.isDefault) || service.variants[0];
+
+    if (matchedVar) {
+      variantMatched = true;
+      const varCityMatch = (targetSlug && Array.isArray(matchedVar.cityRates) && matchedVar.cityRates.length > 0)
+        ? matchedVar.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug && typeof cr.rate === 'number' && cr.rate > 0)
+        : null;
+
+      if (varCityMatch) {
+        cityRateMatched = true;
+        unitPrice = varCityMatch.rate;
+        const defaultVarMrpRatio = (matchedVar.mrp && matchedVar.price && matchedVar.mrp > matchedVar.price)
+          ? (matchedVar.mrp / matchedVar.price)
+          : 1.25;
+        unitMrp = (typeof varCityMatch.mrp === 'number' && varCityMatch.mrp > 0)
+          ? varCityMatch.mrp
+          : Math.round(varCityMatch.rate * defaultVarMrpRatio);
+      } else if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+        const ratio = cityMatchedRate / service.price;
+        unitPrice = Math.round(matchedVar.price * ratio);
+        const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+        unitMrp = Math.round((matchedVar.mrp || matchedVar.price) * mrpRatio);
+      } else {
+        unitPrice = matchedVar.price;
+        unitMrp = matchedVar.mrp || matchedVar.price;
+      }
+      if (matchedVar.duration) duration = matchedVar.duration;
+    }
+  }
+
+  // 2. Matrix match fallback (e.g. size: '2-bhk')
+  if (!variantMatched && service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
     for (const row of service.matrix) {
       if (!row.isActive && row.isActive !== undefined) continue;
       
@@ -82,7 +123,6 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
 
         if (isMatch) {
           matchedMatrixRow = row;
-          const targetSlug = citySlug ? String(citySlug).toLowerCase().trim() : '';
           const rowCityMatch = (targetSlug && Array.isArray(row.cityRates) && row.cityRates.length > 0)
             ? row.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug && typeof cr.rate === 'number' && cr.rate > 0)
             : null;
@@ -113,18 +153,18 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
     }
   }
 
-  // 2. Option Group Deltas & Multipliers
-  // If an option group was already matched and accounted for by the matrix row,
-  // its base tier price is already in row.price / row.mrp. We only apply deltas for
-  // groups that are NOT part of the matched matrix selection (e.g. add-ons or steppers).
+  // 3. Option Group Deltas & Multipliers
+  // If an option group was already matched and accounted for by variants/matrix,
+  // its base tier price is already in unitPrice. We only apply deltas for
+  // groups that are NOT part of the primary variant selection.
   const matchedMatrixKeys = matchedMatrixRow
     ? Object.keys(matchedMatrixRow.selection instanceof Map ? Object.fromEntries(matchedMatrixRow.selection) : (matchedMatrixRow.selection || {}))
-    : [];
+    : (variantMatched ? [String(service.variantGroupKey || 'size').toLowerCase().trim()] : []);
 
   if (service.optionGroups && Array.isArray(service.optionGroups)) {
     for (const group of service.optionGroups) {
       if (matchedMatrixKeys.includes(group.key)) {
-        continue; // Skip already factored matrix tier group
+        continue; // Skip already factored primary variant tier group
       }
 
       const selectedValue = selections[group.key];
@@ -133,11 +173,23 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
       if (group.type === 'single' || group.type === 'toggle') {
         const option = group.options?.find(opt => opt.key === selectedValue);
         if (option && option.isActive !== false) {
-          if (option.priceDelta) unitPrice += option.priceDelta;
-          if (option.mrpDelta) unitMrp += option.mrpDelta;
-          if (option.multiplier && option.multiplier > 0) {
-            unitPrice = Math.round(unitPrice * option.multiplier);
-            unitMrp = Math.round(unitMrp * option.multiplier);
+          let optCityMatched = false;
+          if (targetSlug && Array.isArray(option.cityRates) && option.cityRates.length > 0) {
+            const optMatch = option.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug && typeof cr.rate === 'number' && cr.rate > 0);
+            if (optMatch) {
+              optCityMatched = true;
+              cityRateMatched = true;
+              unitPrice = optMatch.rate;
+              unitMrp = (typeof optMatch.mrp === 'number' && optMatch.mrp > 0) ? optMatch.mrp : optMatch.rate;
+            }
+          }
+          if (!optCityMatched) {
+            if (option.priceDelta) unitPrice += option.priceDelta;
+            if (option.mrpDelta) unitMrp += option.mrpDelta;
+            if (option.multiplier && option.multiplier > 0) {
+              unitPrice = Math.round(unitPrice * option.multiplier);
+              unitMrp = Math.round(unitMrp * option.multiplier);
+            }
           }
         }
       } else if (group.type === 'multi' && Array.isArray(selectedValue)) {
@@ -332,6 +384,7 @@ export function calculateQuote(items = [], citySlug = null, coupon = null, billi
   const overallDiscountPct = mrpTotal > 0 ? Math.round((totalSavings / mrpTotal) * 100) : 0;
 
   return {
+    citySlug: isMoradabad ? 'moradabad' : String(citySlug).toLowerCase().trim(),
     items: calculatedItems,
     totals: {
       subtotal,

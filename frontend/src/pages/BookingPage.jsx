@@ -180,7 +180,47 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     baseMrp = cityMatchedMrp !== null ? cityMatchedMrp : (service.mrp && service.price ? Math.round(cityMatchedRate * (service.mrp / service.price)) : Math.round(cityMatchedRate * 1.25));
   }
 
-  if (service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
+  // Check first-class variants support
+  let variantMatched = false;
+  if (Array.isArray(service.variants) && service.variants.length > 0) {
+    const varGroupKey = String(service.variantGroupKey || groupKey || 'size').toLowerCase().trim();
+    const selectedVarKey = String(optKey || selections?.[varGroupKey] || Object.values(selections || {})[0] || '').toLowerCase().trim();
+    const matchedVar = service.variants.find(v => {
+      if (v.isActive === false) return false;
+      const vKey = String(v.key || '').toLowerCase().trim();
+      return vKey === selectedVarKey || (!selectedVarKey && v.isDefault);
+    }) || service.variants.find(v => v.isDefault) || service.variants[0];
+
+    if (matchedVar) {
+      variantMatched = true;
+      let varCityMatched = false;
+      if (Array.isArray(matchedVar.cityRates) && matchedVar.cityRates.length > 0 && targetSlug) {
+        const vMatch = matchedVar.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (vMatch && typeof vMatch.rate === 'number' && vMatch.rate > 0) {
+          varCityMatched = true;
+          cityRateMatched = true;
+          basePrice = vMatch.rate;
+          baseMrp = (typeof vMatch.mrp === 'number' && vMatch.mrp > 0)
+            ? vMatch.mrp
+            : (matchedVar.mrp && matchedVar.price ? Math.round(vMatch.rate * (matchedVar.mrp / matchedVar.price)) : Math.round(vMatch.rate * 1.25));
+        }
+      }
+      if (!varCityMatched) {
+        if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+          const ratio = cityMatchedRate / service.price;
+          basePrice = Math.round(matchedVar.price * ratio);
+          const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+          baseMrp = Math.round((matchedVar.mrp || matchedVar.price) * mrpRatio);
+        } else {
+          basePrice = matchedVar.price;
+          baseMrp = matchedVar.mrp || matchedVar.price;
+        }
+      }
+      if (matchedVar.duration) duration = matchedVar.duration;
+    }
+  }
+
+  if (!variantMatched && service.matrix && Array.isArray(service.matrix) && service.matrix.length > 0) {
     for (const row of service.matrix) {
       if (row.isActive === false) continue;
       const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
@@ -213,7 +253,7 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
         break;
       }
     }
-  } else {
+  } else if (!variantMatched) {
     const group = service.optionGroups?.find(g => g.key === groupKey);
     const opt = group?.options?.find(o => o.key === optKey);
     if (opt) {
@@ -1148,7 +1188,8 @@ export default function BookingPage() {
                     const currentVariantKey = item.selections?.[primaryOptionGroup?.key] || primaryOptionGroup?.options?.[0]?.key || '';
                     const currentPriceInfo = getServiceVariantPrice(svc, currentVariantKey, primaryOptionGroup?.key, currentCitySlug, item.selections);
                     
-                    const quoteItem = quote?.items?.[idx];
+                    const quoteMatchesCity = !quote?.citySlug || (quote.citySlug.toLowerCase() === currentCitySlug.toLowerCase());
+                    const quoteItem = quoteMatchesCity ? quote?.items?.[idx] : null;
                     const unitPrice = quoteItem?.unitPrice ?? currentPriceInfo.price ?? svc.price ?? 0;
                     const unitMrp = quoteItem?.unitMrp ?? currentPriceInfo.mrp ?? svc.mrp ?? unitPrice;
                     const itemTotal = quoteItem?.totalPrice ?? (unitPrice * (item.qty || 1));
@@ -2068,7 +2109,9 @@ export default function BookingPage() {
           </div>
 
           <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-            {filteredCatalog.map((s) => (
+            {filteredCatalog.map((s) => {
+              const startPriceInfo = getServiceVariantPrice(s, '', '', currentCitySlug, {});
+              return (
               <div
                 key={s._id}
                 className="p-3 rounded-xl bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between gap-3 transition-colors"
@@ -2078,11 +2121,11 @@ export default function BookingPage() {
                   <p className="text-xs text-[#6B8077]">{s.categoryName} · {s.duration || '1 hr'}</p>
                   <p className="text-xs font-bold text-[#10231D] mt-1 tnum">
                     {s.pricingType === 'unit'
-                      ? `₹${s.unitRateMoradabad || s.price} / ${s.pricingUnit === 'sq_ft' ? 'Sq. Ft.' : (s.unitLabel || 'unit')}`
-                      : `From ₹${s.price.toLocaleString('en-IN')}`}
-                    {s.mrp > s.price && s.pricingType !== 'unit' && (
+                      ? `₹${startPriceInfo.activeRate || s.price} / ${s.pricingUnit === 'sq_ft' ? 'Sq. Ft.' : (s.unitLabel || 'unit')}`
+                      : `From ₹${startPriceInfo.price.toLocaleString('en-IN')}`}
+                    {startPriceInfo.mrp > startPriceInfo.price && s.pricingType !== 'unit' && (
                       <span className="ml-1.5 text-[11px] text-[#6B8077] line-through">
-                        ₹{s.mrp.toLocaleString('en-IN')}
+                        ₹{startPriceInfo.mrp.toLocaleString('en-IN')}
                       </span>
                     )}
                   </p>
@@ -2106,7 +2149,8 @@ export default function BookingPage() {
                   Add
                 </button>
               </div>
-            ))}
+            );
+          })}
           </div>
         </Modal>
 

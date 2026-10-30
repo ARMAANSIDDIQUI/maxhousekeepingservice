@@ -41,6 +41,18 @@ const matrixRowSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true }
 }, { _id: false });
 
+const variantSchema = new mongoose.Schema({
+  key: { type: String, required: true },
+  label: { type: String, required: true },
+  price: { type: Number, required: true },
+  mrp: { type: Number, required: true },
+  duration: { type: String },
+  isDefault: { type: Boolean, default: false },
+  hasCitySpecificRates: { type: Boolean, default: false },
+  cityRates: [cityRateSubSchema],
+  isActive: { type: Boolean, default: true }
+}, { _id: false });
+
 const serviceSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, index: true },
@@ -90,6 +102,9 @@ const serviceSchema = new mongoose.Schema({
 
   optionGroups: [optionGroupSchema],
   matrix: [matrixRowSchema],
+  variantGroupKey: { type: String, default: 'size' },
+  variantGroupLabel: { type: String, default: 'Apartment / House Size' },
+  variants: [variantSchema],
 
   cityOverrides: [{
     city: { type: mongoose.Schema.Types.ObjectId, ref: 'City' },

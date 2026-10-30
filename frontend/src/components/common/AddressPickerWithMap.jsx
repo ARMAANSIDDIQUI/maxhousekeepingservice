@@ -1236,38 +1236,7 @@ export default function AddressPickerWithMap({
 
   return (
     <div ref={containerWrapperRef} className="space-y-4">
-      {/* 1. QUICK SAVED CITIES BAR (FROM MONGODB) */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
-            <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-            <span>Select Your City (Uttar Pradesh Priority):</span>
-          </label>
-          <span className="text-[11px] text-[#6B8077]">Tap to switch city</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {mongoCities.slice(0, 10).map((c) => {
-            const isSelected = String(cityText || '').toLowerCase() === String(c.name || '').toLowerCase();
-            return (
-              <button
-                key={c._id || c.slug || c.name}
-                type="button"
-                disabled={disabled}
-                onClick={() => handleSelectMongoCity(c)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
-                  isSelected
-                    ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D] shadow-xs'
-                    : 'bg-[#F4EFE6] text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
-                }`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 2. MAIN SEARCH BOX FOR AREA / LANDMARK / MOSQUE / STREET */}
+      {/* MAIN SEARCH BOX FOR AREA / LANDMARK / MOSQUE / STREET */}
       <div className="relative">
         <div className="flex items-center justify-between mb-1">
           <label className="block text-xs font-bold text-[#10231D] flex items-center gap-1.5">
