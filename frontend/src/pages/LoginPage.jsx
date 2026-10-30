@@ -62,7 +62,7 @@ export default function LoginPage() {
   const [forgotOtpSent, setForgotOtpSent] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Authenticating...');
+  const [loadingMessage, setLoadingMessage] = useState('Signing in...');
 
   const {
     user,
@@ -112,7 +112,7 @@ export default function LoginPage() {
       return;
     }
 
-    setLoadingMessage('Verifying credentials & signing in...');
+    setLoadingMessage('Signing you in...');
     setLoading(true);
     try {
       const res = await login(identifier.trim(), password);

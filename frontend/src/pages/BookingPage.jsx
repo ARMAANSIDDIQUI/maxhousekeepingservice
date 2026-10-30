@@ -383,7 +383,7 @@ export default function BookingPage() {
   const [inputCoupon, setInputCoupon] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Address Feature (Saved Address Dropdown vs Temporary Address Checkbox)
+  // Address Feature (Saved Address Selection vs New Address)
   const [isTemporaryAddress, setIsTemporaryAddress] = useState(false);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
   const [addressForm, setAddressForm] = useState({
@@ -393,9 +393,9 @@ export default function BookingPage() {
     placeId: '',
     coordinates: null,
     landmark: '',
-    cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : ''),
-    pincode: '',
-    tempText: '' // Used when checkbox is checked
+    cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
+    pincode: selectedCity?.pincodes?.[0] || '244001',
+    tempText: ''
   });
 
   // Payment Gateway Settings & Dynamic Selection (Default: Cash on Service)
@@ -517,7 +517,7 @@ export default function BookingPage() {
         coordinates: null,
         landmark: '',
         cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
-        pincode: '',
+        pincode: selectedCity?.pincodes?.[0] || '244001',
         tempText: ''
       });
     } else {
@@ -558,7 +558,7 @@ export default function BookingPage() {
         coordinates: null,
         landmark: '',
         cityText: selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
-        pincode: '',
+        pincode: selectedCity?.pincodes?.[0] || '244001',
         tempText: ''
       });
     } else {
@@ -587,23 +587,26 @@ export default function BookingPage() {
 
   // Execute Final Booking Record Creation in MongoDB
   const executeBookingCreation = async (paymentDetails = null) => {
-    if (!addressForm.line1.trim() || !addressForm.pincode.trim()) {
-      toast.error('Please enter complete street address and pincode.');
+    const resolvedLine1 = (addressForm.line1 || addressForm.houseOrFlat || addressForm.landmark || '').trim();
+    const resolvedPincode = (addressForm.pincode || selectedCity?.pincodes?.[0] || '244001').trim();
+
+    if (!resolvedLine1) {
+      toast.error('Please enter your area, street, or house address.');
       return;
     }
 
     const addressPayload = {
-      line1: addressForm.line1.trim(),
+      line1: resolvedLine1,
       houseOrFlat: addressForm.houseOrFlat ? addressForm.houseOrFlat.trim() : '',
-      formattedAddress: addressForm.formattedAddress || addressForm.line1.trim(),
+      formattedAddress: addressForm.formattedAddress || resolvedLine1,
       placeId: addressForm.placeId || '',
       coordinates: (addressForm.coordinates && typeof addressForm.coordinates.lat === 'number') ? {
         lat: addressForm.coordinates.lat,
         lng: addressForm.coordinates.lng
       } : undefined,
       landmark: addressForm.landmark?.trim() || '',
-      cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Western UP'),
-      pincode: addressForm.pincode.trim(),
+      cityText: addressForm.cityText?.trim() || selectedCity?.name || (cities.length > 0 ? (typeof cities[0] === 'string' ? cities[0] : cities[0].name) : 'Moradabad'),
+      pincode: resolvedPincode,
       isTemporary: Boolean(isTemporaryAddress)
     };
 
@@ -726,17 +729,18 @@ export default function BookingPage() {
     }
 
     // 4. Validate Street Address
-    const line1Trimmed = addressForm.line1?.trim() || '';
-    if (!line1Trimmed || line1Trimmed.length < 5) {
-      toast.error('Please enter complete street address (minimum 5 characters).');
-      setFieldErrors(prev => ({ ...prev, line1: 'Complete street address is required.' }));
+    const line1Trimmed = (addressForm.line1 || addressForm.houseOrFlat || addressForm.landmark || '').trim();
+    if (!line1Trimmed || line1Trimmed.length < 3) {
+      toast.error('Please enter your area, street, or house address.');
+      setFieldErrors(prev => ({ ...prev, line1: 'Please enter your address.' }));
       return;
     }
 
-    // 5. Validate 6-Digit Pincode
-    const pincodeDigits = addressForm.pincode ? String(addressForm.pincode).replace(/\D/g, '') : '';
+    // 5. Validate 6-Digit Pincode (auto-fill from city if missing)
+    const rawPin = addressForm.pincode || selectedCity?.pincodes?.[0] || '244001';
+    const pincodeDigits = String(rawPin).replace(/\D/g, '');
     if (pincodeDigits.length !== 6) {
-      toast.error('Please enter a valid 6-digit postal pincode.');
+      toast.error('Please enter a valid 6-digit pincode.');
       setFieldErrors(prev => ({ ...prev, pincode: 'Valid 6-digit pincode is required.' }));
       return;
     }
@@ -860,13 +864,13 @@ export default function BookingPage() {
         {/* Page Title */}
         <div className="mb-8">
           <div className="inline-block text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B] mb-1">
-            STEP-BY-STEP RESERVATION
+            EASY 3-STEP BOOKING
           </div>
           <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D]">
             Book Your Cleaning Service
           </h1>
           <p className="text-sm text-[#3D524A] mt-1">
-            Service Zone: <strong className="text-[#10231D]">{selectedCity?.name || 'Moradabad'}</strong> (Western UP)
+            City: <strong className="text-[#10231D]">{selectedCity?.name || 'Moradabad'}</strong> (Uttar Pradesh)
           </p>
         </div>
 
@@ -882,7 +886,7 @@ export default function BookingPage() {
                   Login Required to Place Booking
                 </h3>
                 <p className="text-xs text-[#3D524A] mt-0.5">
-                  Only logged-in customers can complete reservations. You can select services below and log in to confirm your booking.
+                  Please log in to confirm your booking. You can select your services below first.
                 </p>
               </div>
             </div>
@@ -965,7 +969,7 @@ export default function BookingPage() {
                 <LuCheck className="w-3 h-3 stroke-[3]" />
               </span>
               <span>
-                <strong>Moradabad Operational Hub:</strong> All 25 cleaning services (Full Home Deep Clean, Kitchen, Bathroom, Water Tank, Sofa, Carpet, Marble polishing) are active with zero outstation dispatch surcharge.
+                <strong>Moradabad Main Area:</strong> All 25+ cleaning services (Full Home, Kitchen, Bathroom, Water Tank, Sofa, Carpet, Floor Polishing) are available with no extra travel charge.
               </span>
             </div>
           ) : (
@@ -975,7 +979,7 @@ export default function BookingPage() {
                   <LuTruck className="w-3 h-3 stroke-[2.5]" />
                 </span>
                 <span>
-                  <strong>{selectedCity?.name} Service Zone:</strong> Specialized Sofa Dry Cleaning, Carpet Cleaning, Chair Dry Cleaning, Floor Scrubbing, and Swimming Pool Cleaning are available with doorstep mobile equipment vans. (Full home cleaning is available in Moradabad).
+                  <strong>{selectedCity?.name} Area:</strong> Sofa Cleaning, Carpet Cleaning, Chair Cleaning, Floor Scrubbing, and Swimming Pool Cleaning are available at your doorstep. (Full home cleaning is available in Moradabad).
                 </span>
               </div>
               <button
@@ -1308,7 +1312,7 @@ export default function BookingPage() {
               )}
             </div>
 
-            {/* STEP 2: ADDRESS (With Saved Dropdown & Temporary Checkbox) */}
+            {/* STEP 2: SIMPLE ADDRESS SELECTION OR NEW ADDRESS */}
             <div className="p-6 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
               <div className="flex items-center justify-between pb-4 border-b border-[#E2D9C8] mb-5">
                 <div className="flex items-center gap-2.5">
@@ -1316,13 +1320,13 @@ export default function BookingPage() {
                     2
                   </span>
                   <h2 className="font-display font-bold text-xl text-[#10231D]">
-                    Service Location & Address
+                    Your Address
                   </h2>
                 </div>
                 {user ? (
                   <Link to="/dashboard" className="text-xs font-bold text-[#10231D] underline hover:text-[#E9A23B] flex items-center gap-1">
                     <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-                    <span>My Address Book</span>
+                    <span>Saved Addresses</span>
                   </Link>
                 ) : (
                   <button
@@ -1341,7 +1345,7 @@ export default function BookingPage() {
                   <div className="flex items-center gap-2.5 text-[#3D524A]">
                     <LuLock className="w-4 h-4 text-[#10231D] shrink-0" />
                     <span>
-                      Please log in to enter your address or select from your saved addresses.
+                      Please log in to enter your address or pick a saved address.
                     </span>
                   </div>
                   <button
@@ -1354,108 +1358,130 @@ export default function BookingPage() {
                 </div>
               )}
 
-              {/* Saved Address Dropdown (If authenticated with addresses and NOT using temporary address) */}
-              {user && user.addresses && user.addresses.length > 0 && !isTemporaryAddress ? (
-                <div className="mb-4 p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-[#10231D]">
-                      Select from Your Saved Addresses:
-                    </label>
-                    {isSavedAddressSelected && (
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <LuCheck className="w-3 h-3 text-emerald-700" />
-                        <span>Address Selected & Locked</span>
-                      </span>
-                    )}
-                  </div>
-                  <CustomSelect
-                    value={selectedSavedAddressId}
-                    onChange={(val) => handleSavedAddressChange(val)}
-                    options={[
-                      ...user.addresses.map((a) => ({
-                        value: a._id,
-                        label: `${a.label || 'Home'}: ${a.line1}, ${a.city} (${a.pincode})${a.isDefault ? ' (Default)' : ''}`
-                      })),
-                      { value: 'new', label: '+ Enter a different address' }
-                    ]}
-                    placeholder="Choose from Saved Addresses..."
-                  />
-                </div>
-              ) : user && (!user.addresses || user.addresses.length === 0) && !isTemporaryAddress ? (
-                <div className="mb-4 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex items-center justify-between text-xs">
-                  <span className="text-[#6B8077] flex items-center gap-1.5">
-                    <LuInfo className="w-3.5 h-3.5 text-[#3D524A] shrink-0" />
-                    <span>No saved addresses yet. Enter your address below and it will be saved to your profile!</span>
-                  </span>
-                  <Link to="/dashboard" className="font-bold text-[#10231D] underline hover:text-[#E9A23B] shrink-0 ml-2">
-                    Manage in Dashboard
-                  </Link>
-                </div>
-              ) : null}
+              {/* Quick 1-Tap Saved Addresses (if logged in & has addresses) */}
+              {user && user.addresses && user.addresses.length > 0 && (
+                <div className="mb-5 space-y-2.5">
+                  <label className="block text-xs font-bold text-[#10231D]">
+                    Choose a Saved Address or Add New:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {user.addresses.map((a) => {
+                      const isPicked = !isTemporaryAddress && selectedSavedAddressId === a._id;
+                      return (
+                        <button
+                          key={a._id}
+                          type="button"
+                          onClick={() => {
+                            setIsTemporaryAddress(false);
+                            handleSavedAddressChange(a._id);
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start justify-between gap-2 ${
+                            isPicked
+                              ? 'bg-[#F4EFE6] border-[#10231D] ring-2 ring-[#E9A23B] shadow-xs'
+                              : 'bg-[#F4EFE6]/70 border-[#E2D9C8] hover:bg-[#F4EFE6]'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <span className="inline-block px-2 py-0.5 rounded bg-[#10231D] text-[#E9A23B] text-[10px] font-bold mb-1">
+                              {a.label || 'Home'}
+                            </span>
+                            <p className="text-xs font-bold text-[#10231D] truncate">{a.line1}</p>
+                            <p className="text-[11px] text-[#6B8077] truncate">
+                              {a.city} — {a.pincode}
+                            </p>
+                          </div>
+                          {isPicked && (
+                            <span className="w-5 h-5 rounded-full bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0">
+                              <LuCheck className="w-3 h-3" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
 
-              {/* Temporary Address Checkbox requested by user */}
-              <div className="mb-5 flex items-center gap-2.5 p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8]">
-                <input
-                  type="checkbox"
-                  id="tempAddressToggle"
-                  disabled={!user}
-                  checked={isTemporaryAddress}
-                  onChange={handleToggleTemporaryAddress}
-                  className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer disabled:opacity-50"
-                />
-                <label htmlFor="tempAddressToggle" className="text-xs font-bold text-[#10231D] cursor-pointer select-none">
-                  Use temporary address (Do not save to my profile address book)
-                </label>
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTemporaryAddress(false);
+                        handleSavedAddressChange('new');
+                      }}
+                      className={`p-3 rounded-xl border-2 border-dashed text-left transition-all cursor-pointer flex items-center gap-2 ${
+                        selectedSavedAddressId === 'new' || isTemporaryAddress
+                          ? 'bg-[#F4EFE6] border-[#10231D] text-[#10231D]'
+                          : 'border-[#D2C8B8] text-[#3D524A] hover:bg-[#F4EFE6]'
+                      }`}
+                    >
+                      <LuPlus className="w-4 h-4 text-[#E9A23B] shrink-0" />
+                      <div>
+                        <p className="text-xs font-bold text-[#10231D]">Enter New Address</p>
+                        <p className="text-[11px] text-[#6B8077]">Search area, landmark or map</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {isSavedAddressSelected ? (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-[#ECE5D8] border border-[#D2C8B8] flex items-center justify-between text-xs text-[#3D524A]">
+                  <div className="p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] flex items-center justify-between gap-3">
+                    <div className="space-y-1 text-xs text-[#10231D]">
                       <div className="flex items-center gap-2">
-                        <LuShieldCheck className="w-4 h-4 text-[#10231D] shrink-0" />
-                        <span>Address locked from saved profile.</span>
-                      </div>
-                      {addressForm.coordinates && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#10231D] text-[#25D366] text-[10px] font-mono font-bold flex items-center gap-1">
-                          <LuMapPin className="w-3 h-3 text-[#E9A23B]" />
-                          <span>Pinpoint Verified</span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                          Selected Address
                         </span>
-                      )}
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-1.5 text-xs text-[#10231D]">
-                      {addressForm.houseOrFlat && (
-                        <p className="font-bold text-sm text-[#10231D] flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded-md bg-[#E9A23B]/20 text-[#8C4F00] text-[11px] font-bold">Door</span>
-                          <span>{addressForm.houseOrFlat}</span>
-                        </p>
-                      )}
-                      <p className="font-medium text-[#3D524A]">{addressForm.line1}</p>
+                        {addressForm.houseOrFlat && (
+                          <span className="font-bold">{addressForm.houseOrFlat}</span>
+                        )}
+                      </div>
+                      <p className="font-bold text-sm text-[#10231D]">{addressForm.line1}</p>
                       {addressForm.landmark && (
-                        <p className="text-[11px] text-[#6B8077]">Landmark: {addressForm.landmark}</p>
+                        <p className="text-xs text-[#6B8077]">Near: {addressForm.landmark}</p>
                       )}
-                      <p className="text-[11px] font-semibold text-[#10231D]">
-                        {addressForm.cityText}, {addressForm.pincode}
+                      <p className="text-xs font-semibold text-[#3D524A]">
+                        {addressForm.cityText} — {addressForm.pincode}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSavedAddressChange('new')}
+                      className="px-3 py-1.5 rounded-lg bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] text-xs font-bold shrink-0 cursor-pointer"
+                    >
+                      Change
+                    </button>
                   </div>
                 ) : (
-                  <AddressPickerWithMap
-                    value={addressForm}
-                    onChange={(newFields) => {
-                      setAddressForm(prev => ({ ...prev, ...newFields }));
-                      if (newFields.cityText) {
-                        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === newFields.cityText?.toLowerCase());
-                        if (matchedCity && typeof matchedCity === 'object') {
-                          setSelectedCity(matchedCity);
+                  <>
+                    <AddressPickerWithMap
+                      value={addressForm}
+                      onChange={(newFields) => {
+                        setAddressForm(prev => ({ ...prev, ...newFields }));
+                        if (newFields.cityText) {
+                          const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === newFields.cityText?.toLowerCase());
+                          if (matchedCity && typeof matchedCity === 'object') {
+                            setSelectedCity(matchedCity);
+                          }
                         }
-                      }
-                    }}
-                    defaultCity={selectedCity?.name || 'Moradabad'}
-                    disabled={!user}
-                    error={fieldErrors.line1}
-                  />
+                      }}
+                      defaultCity={selectedCity?.name || 'Moradabad'}
+                      disabled={!user}
+                      error={fieldErrors.line1}
+                    />
+
+                    {user && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="checkbox"
+                          id="saveAddressNextTime"
+                          checked={!isTemporaryAddress}
+                          onChange={(e) => setIsTemporaryAddress(!e.target.checked)}
+                          className="w-4 h-4 rounded border-[#3D524A] text-[#E9A23B] focus:ring-[#E9A23B] cursor-pointer"
+                        />
+                        <label htmlFor="saveAddressNextTime" className="text-xs font-bold text-[#10231D] cursor-pointer select-none">
+                          Save this address for my future bookings
+                        </label>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1647,7 +1673,7 @@ export default function BookingPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="font-mono text-[10px] tracking-widest text-[#E9A23B] uppercase">
-                      JOB TICKET SUMMARY
+                      YOUR BOOKING SUMMARY
                     </span>
                     <h3 className="font-display font-black text-xl text-[#F4EFE6]">
                       Max Housekeeping
@@ -1741,14 +1767,14 @@ export default function BookingPage() {
                       <div className="flex justify-between text-[#10231D] font-bold text-xs">
                         <span className="flex items-center gap-1.5">
                           <LuTruck className="w-4 h-4 text-[#E9A23B]" />
-                          <span>Outstation Dispatch Surcharge:</span>
+                          <span>Outside City Travel Charge:</span>
                         </span>
                         <span className="tnum text-[#10231D] font-black">
                           +₹{quote.totals.outstationSurcharge.toLocaleString('en-IN')}
                         </span>
                       </div>
                       <p className="text-[10px] text-[#6B8077] pl-5.5">
-                        Automatically added on checkout for service in <strong>{selectedCity?.name || 'outstation'}</strong> (outside Moradabad).
+                        Added for travel to <strong>{selectedCity?.name || 'your city'}</strong> (outside Moradabad).
                       </p>
                     </div>
                   )}
@@ -1885,7 +1911,7 @@ export default function BookingPage() {
                     className="w-full py-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] disabled:opacity-50 text-[#10231D] font-black text-base shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isSubmitting ? (
-                      'Processing Reservation...'
+                      'Booking Now...'
                     ) : paymentChoice === 'online_before' && acceptOnlinePayments ? (
                       <>
                         <LuCreditCard className="w-5 h-5" />

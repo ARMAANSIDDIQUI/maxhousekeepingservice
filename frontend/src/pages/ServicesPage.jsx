@@ -234,13 +234,13 @@ export default function ServicesPage() {
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-8">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
-            CURATED PROFESSIONAL DIRECTORY
+            OUR CLEANING SERVICES
           </span>
           <h1 className="font-display font-black text-3xl sm:text-5xl text-[#10231D] tracking-tight mt-1 mb-3">
             All Cleaning Services
           </h1>
           <p className="text-sm text-[#3D524A]">
-            Transparent dual pricing with zero hidden charges. Industrial machine scrubbers and eco-certified chemicals.
+            Clear, honest prices with no hidden charges. Modern cleaning machines and safe, child-friendly products.
           </p>
         </div>
 

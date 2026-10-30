@@ -1,5 +1,32 @@
 import City from '../models/City.js';
-import { resolveLocation } from '../services/location/locationService.js';
+import { resolveLocation, searchAndPrioritizeAddresses } from '../services/location/locationService.js';
+
+/**
+ * Search and prioritize autocomplete addresses (MongoDB Cities -> Uttar Pradesh -> India)
+ * GET /api/v1/locations/autocomplete?q=...&lat=...&lng=...&city=...
+ */
+export async function autocompleteLocations(req, res, next) {
+  try {
+    const { q, lat, lng, city } = req.query;
+    const parsedLat = lat !== undefined && lat !== '' ? parseFloat(lat) : null;
+    const parsedLng = lng !== undefined && lng !== '' ? parseFloat(lng) : null;
+
+    const predictions = await searchAndPrioritizeAddresses({
+      query: q || '',
+      lat: !isNaN(parsedLat) ? parsedLat : null,
+      lng: !isNaN(parsedLng) ? parsedLng : null,
+      city: city || ''
+    });
+
+    res.status(200).json({
+      success: true,
+      count: predictions.length,
+      predictions
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Get all active serviceable cities
@@ -124,6 +151,7 @@ export async function getDrivingRoute(req, res, next) {
 
 export default {
   getCities,
+  autocompleteLocations,
   detectCoverage,
   getDrivingRoute
 };

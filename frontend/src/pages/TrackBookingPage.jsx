@@ -69,10 +69,10 @@ export default function TrackBookingPage() {
   };
 
   const steps = [
-    { key: 'pending', label: 'Reservation Received' },
-    { key: 'confirmed', label: 'Confirmed & Crew Assigned' },
-    { key: 'in_progress', label: 'Service In-Progress' },
-    { key: 'completed', label: 'Completed & Inspected' }
+    { key: 'pending', label: 'Booking Received' },
+    { key: 'confirmed', label: 'Confirmed & Team Assigned' },
+    { key: 'in_progress', label: 'Cleaning in Progress' },
+    { key: 'completed', label: 'Completed' }
   ];
 
   const currentStepIdx = booking ? steps.findIndex(s => s.key === booking.status) : -1;
@@ -166,14 +166,14 @@ export default function TrackBookingPage() {
                   <div className="flex items-center justify-center sm:justify-start gap-2">
                     <LuShieldCheck className="w-4 h-4 text-[#E9A23B]" />
                     <span className="text-[10px] font-mono uppercase tracking-widest text-[#E9A23B] font-bold">
-                      VISIT VERIFICATION OTP
+                      VISIT START CODE (OTP)
                     </span>
                   </div>
                   <h4 className="font-display font-black text-lg text-[#F4EFE6]">
-                    Share with Supervisor Upon Arrival
+                    Share with Team Leader When They Arrive
                   </h4>
                   <p className="text-xs text-[#A3B8B0] max-w-md">
-                    To authenticate our visiting supervisor and begin your cleaning safely, share this security code.
+                    Share this 4-digit code with our team leader at your door to start your cleaning service.
                   </p>
                 </div>
 

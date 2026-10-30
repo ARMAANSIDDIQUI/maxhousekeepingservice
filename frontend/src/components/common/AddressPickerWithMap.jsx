@@ -8,16 +8,26 @@ import {
   LuInfo,
   LuCircleAlert,
   LuCheck,
-  LuLoader,
-  LuLock
+  LuLoader
 } from 'react-icons/lu';
 import { loadGoogleMapsScript } from '../../utils/googleMapsLoader';
+import {
+  DEFAULT_MONGO_UP_CITIES,
+  expandIndianSearchQueries,
+  matchLocalUpAndMongoCandidates,
+  prioritizeIndianUpPredictions,
+  getDefaultPincodeForCity
+} from '../../utils/addressPriority';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
 
 /**
  * AddressPickerWithMap
- * Premium Address Auto-Complete with separate House/Flat detailing and Interactive Doorstep Pinpoint
- * Cost-optimized with Places Autocomplete Session Tokens, debouncing, and direct GPS geolocation.
- * City and Pincode are strictly auto-filled from map location and locked from manual editing.
+ * Simple, accurate address autofill + interactive map picker.
+ * Prioritizes:
+ *   1. Saved MongoDB Cities (Moradabad, Rampur, Amroha, Sambhal, Chandausi, Gajraula, Bijnor, Dhampur, etc.)
+ *   2. Uttar Pradesh locations
+ *   3. Other Indian locations
  */
 export default function AddressPickerWithMap({
   value = {},
@@ -29,18 +39,22 @@ export default function AddressPickerWithMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [isLoadingKey, setIsLoadingKey] = useState(true);
+  const [mongoCities, setMongoCities] = useState(DEFAULT_MONGO_UP_CITIES);
 
   // Address fields state
+  const initialCity = value.cityText || value.city || defaultCity || 'Moradabad';
+  const initialPincode = value.pincode || getDefaultPincodeForCity(initialCity, DEFAULT_MONGO_UP_CITIES) || '244001';
+
   const [houseOrFlat, setHouseOrFlat] = useState(value.houseOrFlat || '');
   const [streetQuery, setStreetQuery] = useState(value.line1 || value.formattedAddress || '');
   const [landmark, setLandmark] = useState(value.landmark || '');
-  const [cityText, setCityText] = useState(value.cityText || value.city || defaultCity);
+  const [cityText, setCityText] = useState(initialCity);
   const [stateText, setStateText] = useState(value.stateText || value.state || 'Uttar Pradesh');
-  const [pincode, setPincode] = useState(value.pincode || '');
+  const [pincode, setPincode] = useState(initialPincode);
   const [coordinates, setCoordinates] = useState(
     value.coordinates && typeof value.coordinates.lat === 'number'
       ? value.coordinates
-      : { lat: 28.8389, lng: 78.7768 } // Default Moradabad coordinates
+      : { lat: 28.8386, lng: 78.7733 } // Default Moradabad coordinates
   );
 
   // Autocomplete prediction state
@@ -51,6 +65,7 @@ export default function AddressPickerWithMap({
   const [refinementTip, setRefinementTip] = useState('');
 
   // Google Maps SDK references
+  const containerWrapperRef = useRef(null);
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerInstanceRef = useRef(null);
@@ -59,6 +74,37 @@ export default function AddressPickerWithMap({
   const geocoderRef = useRef(null);
   const sessionTokenRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  // Load saved serviceable cities from MongoDB backend
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_BASE_URL}/locations/cities`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && Array.isArray(data?.cities) && data.cities.length > 0) {
+          setMongoCities(data.cities);
+          if (!pincode) {
+            const defPin = getDefaultPincodeForCity(cityText, data.cities);
+            if (defPin) setPincode(defPin);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerWrapperRef.current && !containerWrapperRef.current.contains(e.target)) {
+        setShowPredictions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync internal state when prop value changes
   useEffect(() => {
@@ -93,22 +139,26 @@ export default function AddressPickerWithMap({
   // Dispatch change upwards
   const emitChange = useCallback((updatedFields) => {
     if (typeof onChange === 'function') {
+      const nextCity = updatedFields.cityText ?? updatedFields.city ?? cityText;
+      const fallbackPin = getDefaultPincodeForCity(nextCity, mongoCities) || '244001';
+      const nextPin = updatedFields.pincode || pincode || fallbackPin;
+
       const merged = {
         houseOrFlat,
         line1: streetQuery,
         formattedAddress: streetQuery,
         landmark,
-        cityText,
-        city: cityText,
+        cityText: nextCity,
+        city: nextCity,
         stateText,
         state: stateText,
-        pincode,
+        pincode: nextPin,
         coordinates,
         ...updatedFields
       };
       onChange(merged);
     }
-  }, [houseOrFlat, streetQuery, landmark, cityText, stateText, pincode, coordinates, onChange]);
+  }, [houseOrFlat, streetQuery, landmark, cityText, stateText, pincode, coordinates, mongoCities, onChange]);
 
   // Helper to extract city, state and pincode from array of Google geocode/places results
   const extractFromGeocodeResults = (results) => {
@@ -142,9 +192,9 @@ export default function AddressPickerWithMap({
   // Extract components from Google Place details
   const extractAddressComponents = (placeDetails, updateStreet = true) => {
     const components = placeDetails.address_components || [];
-    let detectedCity = '';
-    let detectedState = '';
-    let detectedPincode = '';
+    let detectedCity = placeDetails.city || '';
+    let detectedState = placeDetails.state || '';
+    let detectedPincode = placeDetails.pincode || '';
 
     for (const comp of components) {
       const types = comp.types || [];
@@ -159,22 +209,26 @@ export default function AddressPickerWithMap({
       }
     }
 
-    if (detectedCity) setCityText(detectedCity);
-    if (detectedState) setStateText(detectedState);
-    if (detectedPincode) setPincode(detectedPincode);
+    const finalCity = detectedCity || cityText || defaultCity;
+    const finalState = detectedState || stateText || 'Uttar Pradesh';
+    const finalPincode = detectedPincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode || '244001';
+
+    setCityText(finalCity);
+    setStateText(finalState);
+    setPincode(finalPincode);
 
     if (updateStreet && placeDetails.formatted_address) {
       setStreetQuery(placeDetails.formatted_address);
     }
 
     return {
-      city: detectedCity || cityText,
-      state: detectedState || stateText,
-      pincode: detectedPincode || pincode
+      city: finalCity,
+      state: finalState,
+      pincode: finalPincode
     };
   };
 
-  // Bounce marker briefly to visually confirm pin repositioning
+  // Bounce marker briefly to confirm pin position
   const triggerPinDropAnimation = () => {
     if (markerInstanceRef.current && window.google?.maps?.Animation) {
       markerInstanceRef.current.setAnimation(window.google.maps.Animation.BOUNCE);
@@ -182,7 +236,7 @@ export default function AddressPickerWithMap({
         try {
           markerInstanceRef.current?.setAnimation(null);
         } catch (_) {}
-      }, 1200);
+      }, 1000);
     }
   };
 
@@ -197,7 +251,6 @@ export default function AddressPickerWithMap({
         setMapLoaded(true);
         setIsLoadingKey(false);
 
-        // Initialize Places Autocomplete service & Session Token
         try {
           if (googleMaps.places?.AutocompleteService) {
             autocompleteServiceRef.current = new googleMaps.places.AutocompleteService();
@@ -225,7 +278,7 @@ export default function AddressPickerWithMap({
     };
   }, []);
 
-  // Initialize Map canvas once SDK is ready and container is mounted
+  // Initialize Map canvas once SDK is ready — keeping POI labels visible so mosques, temples & landmarks show!
   useEffect(() => {
     if (!mapLoaded || !mapContainerRef.current || mapInstanceRef.current) return;
 
@@ -233,7 +286,7 @@ export default function AddressPickerWithMap({
       const google = window.google;
       const initialPos = (coordinates && typeof coordinates.lat === 'number')
         ? coordinates
-        : { lat: 28.8389, lng: 78.7768 };
+        : { lat: 28.8386, lng: 78.7733 };
 
       const map = new google.maps.Map(mapContainerRef.current, {
         center: initialPos,
@@ -242,81 +295,44 @@ export default function AddressPickerWithMap({
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: true,
-        gestureHandling: 'cooperative',
-        styles: [
-          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] }
-        ]
+        gestureHandling: 'cooperative'
       });
 
-      // Draggable marker with custom styling
       const marker = new google.maps.Marker({
         position: initialPos,
         map: map,
         draggable: !disabled,
-        title: 'Your Doorstep Location (Drag marker to pinpoint exact gate)',
+        title: 'Drag marker to your exact house or gate',
         animation: google.maps.Animation.DROP
       });
 
-      // When customer drags marker to pinpoint exact gate/doorstep
-      marker.addListener('dragend', () => {
-        const newPos = marker.getPosition();
-        if (newPos) {
-          const newCoords = { lat: newPos.lat(), lng: newPos.lng() };
-          setCoordinates(newCoords);
-          setRefinementTip('Doorstep pinpoint updated! City and pincode locked from map.');
-
-          // Reverse geocode to update locality notes and auto-fill city/pincode
-          if (geocoderRef.current) {
-            geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
-              if (status === 'OK' && results && results.length > 0) {
-                const comps = extractFromGeocodeResults(results);
-                if (comps.city) setCityText(comps.city);
-                if (comps.state) setStateText(comps.state);
-                if (comps.pincode) setPincode(comps.pincode);
-
-                emitChange({
-                  coordinates: newCoords,
-                  cityText: comps.city || cityText,
-                  city: comps.city || cityText,
-                  stateText: comps.state || stateText,
-                  state: comps.state || stateText,
-                  pincode: comps.pincode || pincode,
-                  formattedAddress: results[0]?.formatted_address || streetQuery
-                });
-              } else {
-                emitChange({ coordinates: newCoords });
-              }
-            });
-          } else {
-            emitChange({ coordinates: newCoords });
-          }
-        }
-      });
-
-      // Map click also moves the pin
-      map.addListener('click', (e) => {
-        if (disabled) return;
-        const newCoords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-        marker.setPosition(newCoords);
+      const handleMapPinMove = (newCoords) => {
         setCoordinates(newCoords);
-        setRefinementTip('Doorstep pinpoint updated! City and pincode locked from map.');
+        setRefinementTip('Map pin updated!');
 
         if (geocoderRef.current) {
           geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
             if (status === 'OK' && results && results.length > 0) {
               const comps = extractFromGeocodeResults(results);
-              if (comps.city) setCityText(comps.city);
-              if (comps.state) setStateText(comps.state);
-              if (comps.pincode) setPincode(comps.pincode);
+              const nextCity = comps.city || cityText;
+              const nextState = comps.state || stateText;
+              const nextPin = comps.pincode || getDefaultPincodeForCity(nextCity, mongoCities) || pincode;
+
+              if (nextCity) setCityText(nextCity);
+              if (nextState) setStateText(nextState);
+              if (nextPin) setPincode(nextPin);
+              if (!streetQuery && results[0]?.formatted_address) {
+                setStreetQuery(results[0].formatted_address);
+              }
 
               emitChange({
                 coordinates: newCoords,
-                cityText: comps.city || cityText,
-                city: comps.city || cityText,
-                stateText: comps.state || stateText,
-                state: comps.state || stateText,
-                pincode: comps.pincode || pincode,
+                cityText: nextCity,
+                city: nextCity,
+                stateText: nextState,
+                state: nextState,
+                pincode: nextPin,
+                line1: streetQuery || results[0]?.formatted_address || '',
                 formattedAddress: results[0]?.formatted_address || streetQuery
               });
             } else {
@@ -326,6 +342,20 @@ export default function AddressPickerWithMap({
         } else {
           emitChange({ coordinates: newCoords });
         }
+      };
+
+      marker.addListener('dragend', () => {
+        const newPos = marker.getPosition();
+        if (newPos) {
+          handleMapPinMove({ lat: newPos.lat(), lng: newPos.lng() });
+        }
+      });
+
+      map.addListener('click', (e) => {
+        if (disabled) return;
+        const newCoords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+        marker.setPosition(newCoords);
+        handleMapPinMove(newCoords);
       });
 
       mapInstanceRef.current = map;
@@ -338,96 +368,134 @@ export default function AddressPickerWithMap({
     }
   }, [mapLoaded, disabled]);
 
-  // Pre-fill city & pincode from coordinates on initial load if not yet populated
-  useEffect(() => {
-    if (!mapLoaded || !geocoderRef.current) return;
-    if (coordinates && coordinates.lat && coordinates.lng && (!pincode || !cityText)) {
-      geocoderRef.current.geocode({ location: coordinates }, (results, status) => {
-        if (status === 'OK' && results && results.length > 0) {
-          const comps = extractFromGeocodeResults(results);
-          if (comps.city && !cityText) setCityText(comps.city);
-          if (comps.state && !stateText) setStateText(comps.state);
-          if (comps.pincode && !pincode) setPincode(comps.pincode);
+  // Multi-source search combining:
+  // 1. Local UP landmarks & MongoDB saved cities
+  // 2. Google Places AutocompleteService (with phonetic query support)
+  // 3. Google Places TextSearch (catches mosques, landmarks & local spellings like "molsiry masjid")
+  // 4. Backend /api/v1/locations/autocomplete (MongoDB cities + Nominatim India + Photon UP)
+  const runMultiEngineAddressSearch = async (rawQuery, refLat, refLng) => {
+    const queryVariants = expandIndianSearchQueries(rawQuery, cityText);
+    const primaryQuery = queryVariants[0] || rawQuery;
+    const localMatches = matchLocalUpAndMongoCandidates(rawQuery, mongoCities, cityText, { lat: refLat, lng: refLng });
 
-          emitChange({
-            cityText: comps.city || cityText,
-            city: comps.city || cityText,
-            stateText: comps.state || stateText,
-            state: comps.state || stateText,
-            pincode: comps.pincode || pincode
-          });
-        }
-      });
+    // Show instant local UP / MongoDB matches immediately while live APIs resolve
+    if (localMatches.length > 0) {
+      const initialRanked = prioritizeIndianUpPredictions(localMatches, mongoCities, cityText, { lat: refLat, lng: refLng });
+      setPredictions(initialRanked);
+      setShowPredictions(true);
     }
-  }, [mapLoaded]);
 
-  // Live geocoding API fallback over the network (zero static/seeded data)
-  const fetchLiveGeocodingApi = async (query, refLat, refLng) => {
-    try {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${refLat}&lon=${refLng}&limit=8`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          const mapped = data.features.map((f, idx) => {
-            const p = f.properties;
-            const [fLng, fLat] = f.geometry?.coordinates || [refLng, refLat];
+    const tasks = [];
 
-            // Haversine straight-line distance in meters from current coordinates
-            const dLat = (fLat - refLat) * (Math.PI / 180);
-            const dLon = (fLng - refLng) * (Math.PI / 180);
-            const a =
-              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(refLat * (Math.PI / 180)) *
-                Math.cos(fLat * (Math.PI / 180)) *
-                Math.sin(dLon / 2) *
-                Math.sin(dLon / 2);
-            const distKm = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
-            const distMeters = Math.round(distKm * 1000);
+    // Source A: Google Places AutocompleteService
+    if (autocompleteServiceRef.current && !disabled) {
+      tasks.push(
+        new Promise((resolve) => {
+          const request = {
+            input: primaryQuery,
+            componentRestrictions: { country: 'in' }
+          };
+          if (sessionTokenRef.current) {
+            request.sessionToken = sessionTokenRef.current;
+          }
+          if (window.google?.maps?.LatLng) {
+            try {
+              request.origin = new window.google.maps.LatLng(refLat, refLng);
+            } catch (_) {}
+          }
+          if (window.google?.maps?.Circle) {
+            try {
+              request.locationBias = new window.google.maps.Circle({
+                center: { lat: refLat, lng: refLng },
+                radius: 45000
+              });
+            } catch (_) {}
+          }
 
-            const mainText = p.name || p.street || query;
-            const parts = [p.street, p.district, p.city, p.state, p.country].filter(Boolean);
-            const secondaryText = parts.slice(0, 3).join(', ');
-
-            return {
-              place_id: `api_${idx}_${p.osm_id || idx}`,
-              description: `${mainText}${secondaryText ? ', ' + secondaryText : ''}`,
-              distance_meters: distMeters,
-              geometry: {
-                location: {
-                  lat: () => fLat,
-                  lng: () => fLng
-                }
-              },
-              address_components: [
-                { types: ['locality'], long_name: p.city || p.district || '' },
-                { types: ['administrative_area_level_1'], long_name: p.state || '' },
-                { types: ['postal_code'], long_name: p.postcode || '' }
-              ],
-              structured_formatting: {
-                main_text: mainText,
-                secondary_text: secondaryText || p.city || ''
-              }
-            };
+          autocompleteServiceRef.current.getPlacePredictions(request, (results, status) => {
+            const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
+            if (status === isOk && Array.isArray(results)) {
+              resolve(results);
+            } else {
+              resolve([]);
+            }
           });
-
-          mapped.sort((a, b) => a.distance_meters - b.distance_meters);
-          setPredictions(mapped.slice(0, 8));
-          setShowPredictions(true);
-          setIsSearching(false);
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn('[Live Geocoding API Error]:', err);
+        })
+      );
     }
+
+    // Source B: Google Places TextSearch (handles fuzzy landmark names like "molsiry masjid" -> Molsari Masjid)
+    if (placesServiceRef.current && !disabled) {
+      tasks.push(
+        new Promise((resolve) => {
+          const textQuery = queryVariants[queryVariants.length - 1] || `${primaryQuery}, ${cityText || 'Moradabad'}, Uttar Pradesh`;
+          const req = {
+            query: textQuery,
+            region: 'in'
+          };
+          if (window.google?.maps?.LatLng) {
+            try {
+              req.location = new window.google.maps.LatLng(refLat, refLng);
+              req.radius = 35000;
+            } catch (_) {}
+          }
+
+          placesServiceRef.current.textSearch(req, (results, status) => {
+            const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
+            if (status === isOk && Array.isArray(results)) {
+              const mapped = results.slice(0, 6).map((r) => {
+                const lat = typeof r.geometry?.location?.lat === 'function' ? r.geometry.location.lat() : r.geometry?.location?.lat;
+                const lng = typeof r.geometry?.location?.lng === 'function' ? r.geometry.location.lng() : r.geometry?.location?.lng;
+                const pinMatch = (r.formatted_address || '').match(/\b([1-9][0-9]{5})\b/);
+                return {
+                  place_id: r.place_id,
+                  description: r.formatted_address && !r.formatted_address.toLowerCase().startsWith((r.name || '').toLowerCase())
+                    ? `${r.name}, ${r.formatted_address}`
+                    : (r.formatted_address || r.name),
+                  structured_formatting: {
+                    main_text: r.name || (r.formatted_address || '').split(',')[0],
+                    secondary_text: r.formatted_address || `${cityText}, Uttar Pradesh`
+                  },
+                  lat,
+                  lng,
+                  pincode: pinMatch ? pinMatch[1] : '',
+                  geometry: r.geometry,
+                  source: 'google_text_search'
+                };
+              });
+              resolve(mapped);
+            } else {
+              resolve([]);
+            }
+          });
+        })
+      );
+    }
+
+    // Source C: Backend Autocomplete API (MongoDB Saved Cities + Nominatim India + Photon UP)
+    tasks.push(
+      fetch(
+        `${API_BASE_URL}/locations/autocomplete?q=${encodeURIComponent(rawQuery)}&lat=${refLat}&lng=${refLng}&city=${encodeURIComponent(cityText || '')}`
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => (Array.isArray(data?.predictions) ? data.predictions : []))
+        .catch(() => [])
+    );
+
+    const settled = await Promise.all(tasks);
+    const combined = [...localMatches, ...settled.flat()];
+
+    const ranked = prioritizeIndianUpPredictions(combined, mongoCities, cityText, {
+      lat: refLat,
+      lng: refLng
+    });
 
     setIsSearching(false);
-    setPredictions([]);
-    setShowPredictions(false);
+    setPredictions(ranked);
+    setShowPredictions(ranked.length > 0);
   };
 
-  // Debounced search dynamically fetched via live APIs (Google Places API + Live Geocoding API)
+  // Handle typing in the main address / area / landmark search box
   const handleStreetInputChange = (e) => {
     const query = e.target.value;
     setStreetQuery(query);
@@ -441,70 +509,22 @@ export default function AddressPickerWithMap({
       return;
     }
 
-    debounceTimerRef.current = setTimeout(async () => {
+    // Instant local check before debounce timer completes
+    const refLat = coordinates?.lat || 28.8386;
+    const refLng = coordinates?.lng || 78.7733;
+    const instantLocal = matchLocalUpAndMongoCandidates(query, mongoCities, cityText, { lat: refLat, lng: refLng });
+    if (instantLocal.length > 0) {
+      setPredictions(prioritizeIndianUpPredictions(instantLocal, mongoCities, cityText, { lat: refLat, lng: refLng }));
+      setShowPredictions(true);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
       setIsSearching(true);
-
-      const refLat = coordinates?.lat || 28.8389;
-      const refLng = coordinates?.lng || 78.7768;
-
-      // 1. Try Google Places Autocomplete API if initialized
-      if (autocompleteServiceRef.current && !disabled) {
-        const request = {
-          input: query,
-          componentRestrictions: { country: 'in' }
-        };
-
-        if (sessionTokenRef.current) {
-          request.sessionToken = sessionTokenRef.current;
-        }
-
-        if (window.google?.maps?.LatLng) {
-          try {
-            request.origin = new window.google.maps.LatLng(refLat, refLng);
-          } catch (_) {}
-        }
-
-        if (window.google?.maps?.Circle) {
-          try {
-            request.locationBias = new window.google.maps.Circle({
-              center: { lat: refLat, lng: refLng },
-              radius: 40000
-            });
-          } catch (_) {}
-        }
-
-        autocompleteServiceRef.current.getPlacePredictions(
-          request,
-          async (results, status) => {
-            const isOk = window.google?.maps?.places?.PlacesServiceStatus?.OK;
-
-            if (status === isOk && results && results.length > 0) {
-              setIsSearching(false);
-              const sorted = [...results].sort((a, b) => {
-                if (a.distance_meters != null && b.distance_meters != null) {
-                  return a.distance_meters - b.distance_meters;
-                }
-                return 0;
-              });
-              setPredictions(sorted.slice(0, 8));
-              setShowPredictions(true);
-              return;
-            }
-
-            // 2. If Google Places returned REQUEST_DENIED or ZERO_RESULTS, fetch live from online API
-            console.warn('[Google Places API status]:', status, '- querying live geocoding API over network');
-            await fetchLiveGeocodingApi(query, refLat, refLng);
-          }
-        );
-        return;
-      }
-
-      // If Google AutocompleteService is not available, query live geocoding API directly
-      await fetchLiveGeocodingApi(query, refLat, refLng);
-    }, 300);
+      runMultiEngineAddressSearch(query, refLat, refLng);
+    }, 220);
   };
 
-  // Refine pinpoint directly using search text via Google Geocoder
+  // Search and move map pin when user clicks "Find on Map" or presses Enter
   const handleRefineLocationFromSearch = (searchText = streetQuery) => {
     const query = (searchText || '').trim();
     if (!query) return;
@@ -512,11 +532,10 @@ export default function AddressPickerWithMap({
     setShowPredictions(false);
     setIsSearching(true);
 
-    if (geocoderRef.current) {
-      const fullSearchAddress = cityText && !query.toLowerCase().includes(cityText.toLowerCase())
-        ? `${query}, ${cityText}`
-        : query;
+    const expanded = expandIndianSearchQueries(query, cityText);
+    const fullSearchAddress = expanded[expanded.length - 1] || query;
 
+    if (geocoderRef.current) {
       geocoderRef.current.geocode(
         {
           address: fullSearchAddress,
@@ -531,10 +550,10 @@ export default function AddressPickerWithMap({
               const newCoords = { lat: loc.lat(), lng: loc.lng() };
               const comps = extractFromGeocodeResults(results);
               applyLocationCoordinates(newCoords, {
-                line1: best.formatted_address || query,
+                line1: query,
                 city: comps.city || cityText,
                 state: comps.state || stateText,
-                pincode: comps.pincode || pincode
+                pincode: comps.pincode || getDefaultPincodeForCity(comps.city || cityText, mongoCities) || pincode
               });
             }
           }
@@ -545,7 +564,7 @@ export default function AddressPickerWithMap({
     }
   };
 
-  // Helper to reposition map, bounce pin, update coords and auto-fill city/pincode
+  // Move map, bounce pin, and update city/pincode
   const applyLocationCoordinates = (newCoords, meta = {}) => {
     setCoordinates(newCoords);
 
@@ -559,17 +578,17 @@ export default function AddressPickerWithMap({
       triggerPinDropAnimation();
     }
 
-    const newCity = meta.city || cityText;
-    const newState = meta.state || stateText;
-    const newPincode = meta.pincode || pincode;
+    const newCity = meta.city || cityText || defaultCity;
+    const newState = meta.state || stateText || 'Uttar Pradesh';
+    const newPincode = meta.pincode || getDefaultPincodeForCity(newCity, mongoCities) || pincode || '244001';
     const newLine1 = meta.line1 || streetQuery;
 
-    if (newCity) setCityText(newCity);
-    if (newState) setStateText(newState);
-    if (newPincode) setPincode(newPincode);
+    setCityText(newCity);
+    setStateText(newState);
+    setPincode(newPincode);
     if (newLine1) setStreetQuery(newLine1);
 
-    setRefinementTip(`Pinpoint refined to ${newCity} (${newPincode})! Drag marker on map to adjust exact gate.`);
+    setRefinementTip(`Location set in ${newCity} (${newPincode}).`);
 
     emitChange({
       coordinates: newCoords,
@@ -583,10 +602,25 @@ export default function AddressPickerWithMap({
     });
   };
 
-  // When user selects a prediction from the dropdown
+  // When user picks a recommendation from the dropdown
   const handleSelectPrediction = (prediction) => {
     setShowPredictions(false);
-    setStreetQuery(prediction.description);
+    const chosenText = prediction.description || prediction.structured_formatting?.main_text || '';
+    setStreetQuery(chosenText);
+
+    // If prediction already has lat/lng (from local UP landmark, backend autocomplete, Photon, Nominatim, or Google TextSearch)
+    if (typeof prediction.lat === 'number' && typeof prediction.lng === 'number') {
+      const newCoords = { lat: prediction.lat, lng: prediction.lng };
+      const resolvedCity = prediction.city || prediction.mongoCityName || cityText;
+      const resolvedPin = prediction.pincode || getDefaultPincodeForCity(resolvedCity, mongoCities) || pincode;
+      applyLocationCoordinates(newCoords, {
+        line1: chosenText,
+        city: resolvedCity,
+        state: prediction.state || 'Uttar Pradesh',
+        pincode: resolvedPin
+      });
+      return;
+    }
 
     if (prediction.geometry?.location) {
       const lat = typeof prediction.geometry.location.lat === 'function'
@@ -598,7 +632,7 @@ export default function AddressPickerWithMap({
       const newCoords = { lat, lng };
       const comps = extractAddressComponents(prediction, true);
       applyLocationCoordinates(newCoords, {
-        line1: prediction.description,
+        line1: chosenText,
         city: comps.city,
         state: comps.state,
         pincode: comps.pincode
@@ -607,7 +641,7 @@ export default function AddressPickerWithMap({
     }
 
     if (!placesServiceRef.current || !prediction.place_id) {
-      handleRefineLocationFromSearch(prediction.description);
+      handleRefineLocationFromSearch(chosenText);
       return;
     }
 
@@ -615,7 +649,7 @@ export default function AddressPickerWithMap({
     placesServiceRef.current.getDetails(
       {
         placeId: prediction.place_id,
-        fields: ['geometry', 'formatted_address', 'address_components', 'place_id'],
+        fields: ['name', 'geometry', 'formatted_address', 'address_components', 'place_id'],
         sessionToken: sessionTokenRef.current
       },
       (place, status) => {
@@ -629,36 +663,75 @@ export default function AddressPickerWithMap({
           const lng = place.geometry.location.lng();
           const newCoords = { lat, lng };
 
-          const comps = extractAddressComponents(place, true);
+          const displayAddr = chosenText || place.formatted_address;
+          const comps = extractAddressComponents(place, false);
+          setStreetQuery(displayAddr);
 
-          // If place details had no pincode, geocoder retrieves postal code for this lat/lng
           if (!comps.pincode && geocoderRef.current) {
             geocoderRef.current.geocode({ location: newCoords }, (geoResults, geoStatus) => {
               const geoComps = (geoStatus === 'OK' && geoResults) ? extractFromGeocodeResults(geoResults) : {};
+              const finalCity = geoComps.city || comps.city || cityText;
+              const finalPin = geoComps.pincode || comps.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
               applyLocationCoordinates(newCoords, {
-                line1: place.formatted_address || prediction.description,
-                city: geoComps.city || comps.city,
-                state: geoComps.state || comps.state,
-                pincode: geoComps.pincode || comps.pincode
+                line1: displayAddr,
+                city: finalCity,
+                state: geoComps.state || comps.state || 'Uttar Pradesh',
+                pincode: finalPin
               });
             });
           } else {
             applyLocationCoordinates(newCoords, {
-              line1: place.formatted_address || prediction.description,
+              line1: displayAddr,
               city: comps.city,
               state: comps.state,
               pincode: comps.pincode
             });
           }
+        } else {
+          handleRefineLocationFromSearch(chosenText);
         }
       }
     );
   };
 
-  // "Use My Current Location" via Browser Geolocation (Free device GPS)
+  // Quick-select one of our saved MongoDB cities
+  const handleSelectMongoCity = (cityObj) => {
+    if (disabled || !cityObj) return;
+    const cName = cityObj.name;
+    const cState = cityObj.state || 'Uttar Pradesh';
+    const cPin = cityObj.pincodes?.[0] || getDefaultPincodeForCity(cName, mongoCities) || pincode;
+    const [cLng, cLat] = cityObj.location?.coordinates?.length === 2
+      ? cityObj.location.coordinates
+      : [78.7733, 28.8386];
+
+    setCityText(cName);
+    setStateText(cState);
+    if (cPin) setPincode(cPin);
+
+    const newCoords = { lat: cLat, lng: cLng };
+    setCoordinates(newCoords);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo(newCoords);
+      mapInstanceRef.current.setZoom(14);
+    }
+    if (markerInstanceRef.current) {
+      markerInstanceRef.current.setPosition(newCoords);
+    }
+
+    emitChange({
+      cityText: cName,
+      city: cName,
+      stateText: cState,
+      state: cState,
+      pincode: cPin,
+      coordinates: newCoords
+    });
+  };
+
+  // Use Current Phone/Browser Location
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      alert('Location is not supported by your browser.');
       return;
     }
 
@@ -671,17 +744,18 @@ export default function AddressPickerWithMap({
 
         setIsLocatingUser(false);
 
-        // Reverse geocode to get street name & auto-fill city/pincode
         if (geocoderRef.current) {
           geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
             if (status === 'OK' && results && results[0]) {
               const bestResult = results[0];
               const comps = extractFromGeocodeResults(results);
+              const nextCity = comps.city || cityText;
+              const nextPin = comps.pincode || getDefaultPincodeForCity(nextCity, mongoCities) || pincode;
               applyLocationCoordinates(newCoords, {
                 line1: bestResult.formatted_address,
-                city: comps.city || cityText,
+                city: nextCity,
                 state: comps.state || stateText,
-                pincode: comps.pincode || pincode
+                pincode: nextPin
               });
             } else {
               applyLocationCoordinates(newCoords, { line1: streetQuery });
@@ -694,71 +768,73 @@ export default function AddressPickerWithMap({
       (err) => {
         setIsLocatingUser(false);
         console.warn('Geolocation error:', err.message);
-        alert('Could not retrieve your location. Please ensure location permissions are allowed in your browser.');
+        alert('Could not find your current location. Please allow location access or type your area above.');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
   return (
-    <div className="space-y-4">
-      {/* 1. SEPARATE DETAILED ADDRESS INPUT: House / Flat / Floor / Building */}
+    <div ref={containerWrapperRef} className="space-y-4">
+      {/* 1. QUICK SAVED CITIES BAR (FROM MONGODB) */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="block text-xs font-bold text-[#10231D] flex items-center gap-1.5">
-            <LuBuilding2 className="w-4 h-4 text-[#E9A23B]" />
-            <span>Flat / House No. / Floor / Building / Society:</span>
-            <span className="text-[#C2512D]">*</span>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-bold text-[#10231D] flex items-center gap-1.5">
+            <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
+            <span>Select Your City (Uttar Pradesh Priority):</span>
           </label>
+          <span className="text-[11px] text-[#6B8077]">Tap to switch city</span>
         </div>
-        <input
-          type="text"
-          placeholder="e.g. Flat 402, Tower B, 4th Floor, Palm Greens Society"
-          value={houseOrFlat}
-          disabled={disabled}
-          onChange={(e) => {
-            setHouseOrFlat(e.target.value);
-            emitChange({ houseOrFlat: e.target.value });
-          }}
-          className="w-full p-3 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-sm text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none transition-all placeholder:text-[#6B8077]/60"
-          required
-        />
-        <p className="text-[11px] text-[#6B8077] mt-1 flex items-center gap-1">
-          <LuInfo className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
-          <span>Enter door/unit details above. Search street or area below to refine your pinpoint.</span>
-        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {mongoCities.slice(0, 10).map((c) => {
+            const isSelected = String(cityText || '').toLowerCase() === String(c.name || '').toLowerCase();
+            return (
+              <button
+                key={c._id || c.slug || c.name}
+                type="button"
+                disabled={disabled}
+                onClick={() => handleSelectMongoCity(c)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                  isSelected
+                    ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D] shadow-xs'
+                    : 'bg-[#F4EFE6] text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 2. SEARCH STREET / AREA / LANDMARK TO REFINE PINPOINT */}
+      {/* 2. MAIN SEARCH BOX FOR AREA / LANDMARK / MOSQUE / STREET */}
       <div className="relative">
         <div className="flex items-center justify-between mb-1">
           <label className="block text-xs font-bold text-[#10231D] flex items-center gap-1.5">
             <LuSearch className="w-4 h-4 text-[#E9A23B]" />
-            <span>Search Street / Area / Landmark:</span>
+            <span>Search Area, Street, Mosque or Landmark:</span>
             <span className="text-[#C2512D]">*</span>
           </label>
-          {mapLoaded && (
-            <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              disabled={disabled || isLocatingUser}
-              className="text-[11px] font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1 transition-colors bg-[#ECE5D8] hover:bg-[#E2D9C8] px-2 py-0.5 rounded-lg border border-[#D2C8B8] cursor-pointer"
-            >
-              {isLocatingUser ? (
-                <LuLoader className="w-3 h-3 animate-spin text-[#E9A23B]" />
-              ) : (
-                <LuNavigation className="w-3 h-3 text-[#E9A23B]" />
-              )}
-              <span>Locate Me (GPS)</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={disabled || isLocatingUser}
+            className="text-[11px] font-bold text-[#10231D] hover:text-[#E9A23B] flex items-center gap-1 transition-colors bg-[#ECE5D8] hover:bg-[#E2D9C8] px-2.5 py-1 rounded-lg border border-[#D2C8B8] cursor-pointer"
+          >
+            {isLocatingUser ? (
+              <LuLoader className="w-3 h-3 animate-spin text-[#E9A23B]" />
+            ) : (
+              <LuNavigation className="w-3 h-3 text-[#E9A23B]" />
+            )}
+            <span>Use Current Location</span>
+          </button>
         </div>
 
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Type street, road, society or landmark (e.g. Wave Mall, Kanth Road, Civil Lines)..."
+              placeholder={`Type area, mosque, colony or road in ${cityText || 'Uttar Pradesh'} (e.g. Molsari Masjid, Civil Lines)...`}
               value={streetQuery}
               disabled={disabled}
               onChange={handleStreetInputChange}
@@ -799,43 +875,55 @@ export default function AddressPickerWithMap({
             }}
             disabled={disabled || !streetQuery.trim()}
             className="px-3.5 py-3 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-xs disabled:opacity-50 cursor-pointer"
-            title="Refine map pinpoint to this location"
+            title="Show this place on the map"
           >
             <LuSearch className="w-3.5 h-3.5 text-[#E9A23B]" />
-            <span className="hidden sm:inline">Refine Pin</span>
+            <span className="hidden sm:inline">Find on Map</span>
           </button>
         </div>
 
-        {/* Autocomplete Predictions Dropdown */}
+        {/* Autocomplete Recommendations Dropdown */}
         {showPredictions && predictions.length > 0 && !disabled && (
-          <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#E2D9C8] rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
+          <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-[#E2D9C8] rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto">
             <div className="px-3 py-1.5 bg-[#F4EFE6] border-b border-[#E2D9C8] text-[10px] font-bold text-[#6B8077] flex items-center justify-between">
-              <span>SUGGESTED AREAS & LANDMARKS</span>
-              <span>Nearest locations shown first</span>
+              <span>RECOMMENDED PLACES ({cityText?.toUpperCase() || 'UTTAR PRADESH'} FIRST)</span>
+              <span>Tap to select</span>
             </div>
-            {predictions.map((p) => (
+            {predictions.map((p, idx) => (
               <button
-                key={p.place_id || p.description}
+                key={p.place_id || `${p.description}_${idx}`}
                 type="button"
                 onClick={() => handleSelectPrediction(p)}
                 className="w-full px-4 py-2.5 text-left hover:bg-[#F4EFE6] transition-colors border-b border-[#E2D9C8]/40 last:border-b-0 flex items-start gap-2.5 cursor-pointer"
               >
                 <LuMapPin className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs font-bold text-[#10231D] truncate">
                       {p.structured_formatting?.main_text || p.description}
                     </p>
-                    {p.distance_meters != null && (
-                      <span className="text-[10px] font-semibold text-[#6B8077] bg-[#ECE5D8] px-1.5 py-0.5 rounded shrink-0">
-                        {p.distance_meters < 1000
-                          ? `${Math.round(p.distance_meters)}m away`
-                          : `${(p.distance_meters / 1000).toFixed(1)} km away`}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {p.isMongoCity && (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          {p.mongoCityName || p.city || 'Service City'}
+                        </span>
+                      )}
+                      {!p.isMongoCity && p.isUttarPradesh && (
+                        <span className="text-[10px] font-semibold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                          UP
+                        </span>
+                      )}
+                      {p.distance_meters != null && (
+                        <span className="text-[10px] font-semibold text-[#6B8077] bg-[#ECE5D8] px-1.5 py-0.5 rounded">
+                          {p.distance_meters < 1000
+                            ? `${Math.round(p.distance_meters)}m`
+                            : `${(p.distance_meters / 1000).toFixed(1)} km`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {p.structured_formatting?.secondary_text && (
-                    <p className="text-[11px] text-[#6B8077] truncate">
+                    <p className="text-[11px] text-[#6B8077] truncate mt-0.5">
                       {p.structured_formatting.secondary_text}
                     </p>
                   )}
@@ -846,22 +934,110 @@ export default function AddressPickerWithMap({
         )}
       </div>
 
-      {/* 3. INTERACTIVE PINPOINT MAP */}
+      {/* 3. EASY HOUSE / FLAT & LANDMARK INPUTS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-[#10231D] mb-1 flex items-center gap-1.5">
+            <LuBuilding2 className="w-3.5 h-3.5 text-[#E9A23B]" />
+            <span>House / Flat No. / Building (Optional):</span>
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. House 14, 2nd Floor, Sunshine Colony"
+            value={houseOrFlat}
+            disabled={disabled}
+            onChange={(e) => {
+              setHouseOrFlat(e.target.value);
+              emitChange({ houseOrFlat: e.target.value });
+            }}
+            className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none transition-all"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-[#10231D] mb-1">
+            Nearby Landmark (Optional):
+          </label>
+          <input
+            type="text"
+            value={landmark}
+            disabled={disabled}
+            onChange={(e) => {
+              setLandmark(e.target.value);
+              emitChange({ landmark: e.target.value });
+            }}
+            placeholder="e.g. Near Molsari Masjid, Opp Park"
+            className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none transition-all"
+          />
+        </div>
+      </div>
+
+      {/* 4. EDITABLE CITY & PINCODE ROW (AUTO-FILLED BUT UNLOCKED FOR EASY SAVING) */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-bold text-[#10231D]">
+              City <span className="text-[#C2512D]">*</span>
+            </label>
+            <span className="text-[10px] font-semibold text-emerald-700">Auto-filled (Editable)</span>
+          </div>
+          <input
+            type="text"
+            value={cityText || ''}
+            disabled={disabled}
+            onChange={(e) => {
+              const nextC = e.target.value;
+              setCityText(nextC);
+              const defPin = getDefaultPincodeForCity(nextC, mongoCities);
+              if (defPin) setPincode(defPin);
+              emitChange({
+                cityText: nextC,
+                city: nextC,
+                ...(defPin ? { pincode: defPin } : {})
+              });
+            }}
+            placeholder="e.g. Moradabad"
+            className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-semibold text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none"
+            required
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-bold text-[#10231D]">
+              Pincode <span className="text-[#C2512D]">*</span>
+            </label>
+            <span className="text-[10px] font-semibold text-emerald-700">Auto-filled (Editable)</span>
+          </div>
+          <input
+            type="text"
+            maxLength={6}
+            value={pincode || ''}
+            disabled={disabled}
+            onChange={(e) => {
+              const cleanPin = e.target.value.replace(/\D/g, '').slice(0, 6);
+              setPincode(cleanPin);
+              emitChange({ pincode: cleanPin });
+            }}
+            placeholder="e.g. 244001"
+            className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none"
+            required
+          />
+        </div>
+      </div>
+
+      {/* 5. INTERACTIVE MAP */}
       {mapLoaded ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-[#10231D] flex items-center gap-1.5">
               <LuCompass className="w-4 h-4 text-[#E9A23B]" />
-              <span>Doorstep Map Pinpoint</span>
-            </span>
-            <span className="text-[11px] text-[#6B8077]">
-              Drag marker or tap map to adjust exact gate
+              <span>Map Location (Optional — Drag pin if needed)</span>
             </span>
           </div>
 
-          {/* Real-time refinement feedback banner */}
           {refinementTip && (
-            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between gap-2">
+            <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 font-medium">
                 <LuCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span>{refinementTip}</span>
@@ -871,152 +1047,49 @@ export default function AddressPickerWithMap({
                 onClick={() => setRefinementTip('')}
                 className="text-[10px] text-emerald-700 underline font-bold cursor-pointer"
               >
-                Dismiss
+                OK
               </button>
             </div>
           )}
 
-          <div className="relative rounded-3xl overflow-hidden border-2 border-[#10231D]/15 shadow-md group">
+          <div className="relative rounded-2xl overflow-hidden border border-[#10231D]/15 shadow-sm">
             <div
               ref={mapContainerRef}
-              className="w-full h-72 sm:h-96 md:h-[440px] bg-[#ECE5D8] transition-all"
-              style={{ minHeight: '300px' }}
+              className="w-full h-60 sm:h-72 bg-[#ECE5D8] transition-all"
+              style={{ minHeight: '240px' }}
             />
-            {/* Floating Top Controls */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
-              <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-3 py-1.5 rounded-xl text-xs font-bold border border-white/10 shadow-md flex items-center gap-1.5 pointer-events-auto">
+            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none z-10">
+              <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 pointer-events-auto">
                 <LuMapPin className="w-3.5 h-3.5 text-[#E9A23B]" />
-                <span>Move pin to exact gate / door</span>
+                <span>Tap map or drag pin to your house</span>
               </div>
               <button
                 type="button"
                 onClick={handleUseCurrentLocation}
                 disabled={isLocatingUser}
-                className="px-3.5 py-1.5 rounded-xl bg-white/95 hover:bg-white text-[#10231D] text-xs font-bold shadow-md border border-[#D2C8B8] flex items-center gap-1.5 cursor-pointer pointer-events-auto transition-transform active:scale-95 disabled:opacity-60"
-                title="Locate me via device GPS"
+                className="px-3 py-1 rounded-lg bg-white/95 hover:bg-white text-[#10231D] text-[11px] font-bold shadow-sm border border-[#D2C8B8] flex items-center gap-1 cursor-pointer pointer-events-auto"
               >
                 {isLocatingUser ? (
-                  <LuLoader className="w-3.5 h-3.5 animate-spin text-[#E9A23B]" />
+                  <LuLoader className="w-3 h-3 animate-spin text-[#E9A23B]" />
                 ) : (
-                  <LuNavigation className="w-3.5 h-3.5 text-emerald-600" />
+                  <LuNavigation className="w-3 h-3 text-emerald-600" />
                 )}
-                <span>{isLocatingUser ? 'Locating...' : 'Use My GPS'}</span>
+                <span>{isLocatingUser ? 'Finding...' : 'Current Location'}</span>
               </button>
             </div>
-            <div className="absolute bottom-3 left-3 right-3 pointer-events-none z-10">
-              <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-3 py-1.5 rounded-xl text-[11px] flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse" />
-                  <span>Pin: {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}</span>
-                </span>
-                <span className="text-[#E9A23B] font-bold">Doorstep Verified</span>
-              </div>
-            </div>
           </div>
-
-          <p className="text-[11px] text-[#6B8077] flex items-center gap-1.5">
-            <LuInfo className="w-3.5 h-3.5 text-[#E9A23B] shrink-0" />
-            <span>Search above to position pin near your colony, then drag marker for exact gate/doorstep accuracy.</span>
-          </p>
         </div>
       ) : isLoadingKey ? (
-        <div className="p-4 rounded-xl bg-[#ECE5D8]/50 border border-[#D2C8B8] flex items-center gap-2 text-xs text-[#6B8077]">
+        <div className="p-3 rounded-xl bg-[#ECE5D8]/50 border border-[#D2C8B8] flex items-center gap-2 text-xs text-[#6B8077]">
           <LuLoader className="w-4 h-4 animate-spin text-[#E9A23B]" />
-          <span>Connecting to map services...</span>
+          <span>Loading map...</span>
         </div>
       ) : (
-        <div className="p-3 rounded-xl bg-[#F9ECE8] border border-[#C2512D]/30 text-xs text-[#3D524A] flex items-center gap-2">
-          <LuCircleAlert className="w-4 h-4 text-[#C2512D] shrink-0" />
-          <span>Interactive map unavailable: {mapError || 'Using local verified address directory.'}</span>
+        <div className="p-3 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-xs text-[#3D524A] flex items-center gap-2">
+          <LuInfo className="w-4 h-4 text-[#E9A23B] shrink-0" />
+          <span>Search and select your area above — your address will be saved automatically.</span>
         </div>
       )}
-
-      {/* 4. CITY, LANDMARK & PINCODE COMPACT ROW - CITY & PINCODE LOCKED TO MAP LOCATION */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* CITY: LOCKED / AUTO-FILLED FROM LOCATION */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-[#10231D] flex items-center gap-1">
-              <LuLock className="w-3 h-3 text-[#6B8077]" />
-              <span>City:</span>
-              <span className="text-[#C2512D]">*</span>
-            </label>
-            <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
-              Auto-Filled
-            </span>
-          </div>
-          <div className="relative">
-            <input
-              type="text"
-              value={cityText || ''}
-              readOnly
-              tabIndex={-1}
-              aria-readonly="true"
-              placeholder="Auto-detected from map"
-              className="w-full p-2.5 pl-8 rounded-xl border border-[#D2C8B8] bg-[#ECE5D8]/80 text-xs font-semibold text-[#10231D] cursor-not-allowed select-none focus:outline-none"
-              required
-            />
-            <LuLock className="w-3.5 h-3.5 text-[#6B8077] absolute left-2.5 top-3" />
-          </div>
-          <p className="text-[10px] text-[#6B8077] mt-0.5">
-            Auto-detected from map pin.
-          </p>
-        </div>
-
-        {/* LANDMARK: OPTIONAL CUSTOM ENTRY FOR CREW GUIDANCE */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-[#10231D]">
-              Landmark (Optional):
-            </label>
-            <span className="text-[10px] text-[#6B8077]">Helpful guide</span>
-          </div>
-          <input
-            type="text"
-            value={landmark}
-            disabled={disabled}
-            onChange={(e) => {
-              setLandmark(e.target.value);
-              emitChange({ landmark: e.target.value });
-            }}
-            placeholder="e.g. Near Water Tank, Opp Gate 2"
-            className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs text-[#10231D] focus:border-[#E9A23B] focus:bg-white focus:outline-none"
-          />
-          <p className="text-[10px] text-[#6B8077] mt-0.5">
-            Helpful guide for crew arrival.
-          </p>
-        </div>
-
-        {/* PINCODE: LOCKED / AUTO-FILLED FROM LOCATION */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-[#10231D] flex items-center gap-1">
-              <LuLock className="w-3 h-3 text-[#6B8077]" />
-              <span>Pincode:</span>
-              <span className="text-[#C2512D]">*</span>
-            </label>
-            <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded">
-              Auto-Filled
-            </span>
-          </div>
-          <div className="relative">
-            <input
-              type="text"
-              value={pincode || ''}
-              readOnly
-              tabIndex={-1}
-              aria-readonly="true"
-              placeholder="Auto-detected from map"
-              className="w-full p-2.5 pl-8 rounded-xl border border-[#D2C8B8] bg-[#ECE5D8]/80 text-xs font-mono font-bold text-[#10231D] cursor-not-allowed select-none focus:outline-none"
-              required
-            />
-            <LuLock className="w-3.5 h-3.5 text-[#6B8077] absolute left-2.5 top-3" />
-          </div>
-          <p className="text-[10px] text-[#6B8077] mt-0.5">
-            Auto-detected from map pin.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

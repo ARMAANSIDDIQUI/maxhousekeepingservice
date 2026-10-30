@@ -365,7 +365,7 @@ export default function HomePage() {
                       }}
                       className="w-full py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] active:scale-[0.98] text-[#181511] font-black text-xs transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                     >
-                      <span>Add to Ticket</span>
+                      <span>Add to Booking</span>
                       <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </div>
@@ -387,10 +387,10 @@ export default function HomePage() {
                 Customer Stories
               </span>
               <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight">
-                Verified Customer Experiences
+                What Our Customers Say
               </h2>
               <p className="text-sm text-[#3D524A] mt-2">
-                Real feedback from verified homeowners and facility managers across Western Uttar Pradesh.
+                Real reviews from happy families and offices across Uttar Pradesh.
               </p>
             </div>
 
@@ -480,10 +480,10 @@ export default function HomePage() {
                 <span>Follow Our Journey · @maxhousekeepingservice</span>
               </div>
               <h2 className="font-display font-extrabold text-3xl sm:text-4xl text-[#F4EFE6] tracking-tight">
-                Real Homes. Dramatic Transformations.
+                Real Homes. Amazing Before & After Results.
               </h2>
               <p className="text-[#A3B8B0] text-sm sm:text-base mt-2 max-w-xl">
-                Watch our verified supervisors and mechanized crews in action. We post daily deep-cleaning reels, sofa extraction videos, and spotless home reveals across Western UP.
+                Watch our trained cleaning teams in action. We post daily cleaning videos, sofa wash results, and spotless home makeovers across Uttar Pradesh.
               </p>
             </div>
 

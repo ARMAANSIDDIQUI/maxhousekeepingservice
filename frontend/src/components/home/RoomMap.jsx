@@ -90,7 +90,7 @@ export default function RoomMap({ services = [] }) {
             Explore Services by Room
           </h2>
           <p className="text-sm text-[#3D524A] mt-2">
-            Click or hover over any area of the architectural floor plan to view specialized equipment and starting prices.
+            Tap or hover on any room below to see what we clean and starting prices.
           </p>
         </div>
 

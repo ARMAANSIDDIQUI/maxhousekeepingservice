@@ -32,20 +32,20 @@ export default function AboutPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#DDEBE4] text-[#10231D] text-xs font-bold mb-4">
               <LuAward className="w-4 h-4 text-[#E9A23B]" />
-              <span>WESTERN UP'S TRUSTED CLEANING CORPS</span>
+              <span>UTTAR PRADESH'S TRUSTED CLEANING TEAM</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-display font-black tracking-tight text-[#10231D] leading-tight mb-6">
-              Restoring Calm & Precision to Every Living Space.
+              Making Every Home & Office Clean, Fresh & Healthy.
             </h1>
             <p className="text-base md:text-lg text-[#3D524A] leading-relaxed mb-6 font-sans">
-              Founded in Moradabad, Max Housekeeping Service was established with a singular, uncompromising vision: to bring hotel-grade housekeeping standards, background-verified personnel, and certified eco-safe chemistry to homes and commercial spaces across Western Uttar Pradesh.
+              Started in Moradabad, Max Housekeeping Service was built with a simple goal: to bring hotel-like cleanliness, trusted and verified staff, and safe, child-friendly cleaning products to homes and offices across Uttar Pradesh.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
                 to="/book"
                 className="px-6 py-3.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-sm tracking-wide transition-all shadow-md"
               >
-                Book Inspection / Service
+                Book a Cleaning Service
               </Link>
               <a
                 href={`tel:${(settings?.phone || '+919897766002').replace(/[^0-9+]/g, '')}`}
@@ -103,10 +103,10 @@ export default function AboutPage() {
                 <LuShieldCheck className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-display font-bold text-[#10231D] mb-2">
-                100% Background Verified Pros
+                100% Verified & Trusted Staff
               </h3>
               <p className="text-xs text-[#3D524A] leading-relaxed">
-                Every team member undergoes identity validation, police verification, and thorough practical training before entering a client's residence.
+                Every team member has their ID checked, police verification completed, and full hands-on training before visiting your home.
               </p>
             </div>
 
@@ -115,10 +115,10 @@ export default function AboutPage() {
                 <LuSparkles className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-display font-bold text-[#10231D] mb-2">
-                Hospital-Grade Eco Chemistry
+                Safe & Child-Friendly Products
               </h3>
               <p className="text-xs text-[#3D524A] leading-relaxed">
-                Taski Diversey & 3M certified cleaning formulations that destroy 99.9% of bacteria and hard-water scale while remaining safe for children and pets.
+                We use trusted Taski & 3M cleaning liquids that remove 99.9% of germs and hard-water stains while staying completely safe for kids and pets.
               </p>
             </div>
 
@@ -127,10 +127,10 @@ export default function AboutPage() {
                 <LuUsers className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-display font-bold text-[#10231D] mb-2">
-                Transparent Dual-Pricing
+                Clear & Honest Pricing
               </h3>
               <p className="text-xs text-[#3D524A] leading-relaxed">
-                Clear MRP versus discounted offered rates on every single service variant. No hidden surcharge or surprise checkout add-ons.
+                See the exact price and discount upfront for every service. No hidden charges or surprise fees.
               </p>
             </div>
           </div>
@@ -142,13 +142,13 @@ export default function AboutPage() {
             <div className="relative z-10 max-w-2xl">
               <div className="flex items-center gap-2 text-xs font-mono text-[#E9A23B] uppercase tracking-widest mb-3">
                 <LuMapPin className="w-4 h-4" />
-                <span>Regional Operational Coverage</span>
+                <span>Cities We Serve</span>
               </div>
               <h2 className="text-3xl md:text-4xl font-display font-black mb-4">
-                Serving Moradabad and 8 Surrounding Districts
+                Serving Moradabad and Nearby Cities in UP
               </h2>
               <p className="text-sm text-[#DDEBE4]/80 leading-relaxed mb-6 font-sans">
-                Our rapid mobile squads operate across Moradabad, Rampur, Amroha, Sambhal, Chandausi, Noorpur, Dhampur, Bijnor, and Kanth with same-day and scheduled dispatch availability.
+                Our cleaning teams travel across Moradabad, Rampur, Amroha, Sambhal, Chandausi, Gajraula, Noorpur, Dhampur, and Bijnor with same-day and scheduled bookings.
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                 {displayCities.map((city) => (

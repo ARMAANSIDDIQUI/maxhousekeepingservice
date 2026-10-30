@@ -84,10 +84,10 @@ export default function ContactPage() {
         {/* Header */}
         <div className="max-w-2xl mb-12">
           <h1 className="text-4xl md:text-5xl font-display font-black text-[#10231D] mb-4">
-            Connect With Our Field Operations Team
+            Contact Our Support Team
           </h1>
           <p className="text-base text-[#3D524A] font-sans">
-            Have questions about an upcoming deep clean, commercial RFP, or need custom floor plan estimation? Reach our dispatch desk directly.
+            Have questions about home cleaning, office cleaning, or want a price quote? Call, WhatsApp, or message us below.
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export default function ContactPage() {
             <div className="p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] space-y-6">
               <div>
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Customer Hotline
+                  Phone Number
                 </span>
                 <a
                   href={`tel:${(settings.phone || '').replace(/[^0-9+]/g, '')}`}
@@ -118,7 +118,7 @@ export default function ContactPage() {
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  WhatsApp Direct Dispatch
+                  WhatsApp Support
                 </span>
                 <a
                   href={`https://wa.me/${(settings.whatsappNumber || '9897766002').replace(/[^0-9]/g, '')}?text=Hello%20Max%20Housekeeping%20Team%2C%20I%20need%20assistance%20with%20cleaning%20services`}
@@ -133,7 +133,7 @@ export default function ContactPage() {
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Official Instagram Channel
+                  Instagram Page
                 </span>
                 <a
                   href="https://www.instagram.com/maxhousekeepingservice/"
@@ -145,13 +145,13 @@ export default function ContactPage() {
                   <span>Follow @maxhousekeepingservice</span>
                 </a>
                 <p className="text-[11px] text-[#DDEBE4]/70 mt-1.5 leading-relaxed">
-                  Watch live cleaning transformation reels, before & after video proofs, and direct message us for instant estimates.
+                  Watch our real cleaning videos, before & after photos, and message us anytime.
                 </p>
               </div>
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Email Desk
+                  Email Address
                 </span>
                 <a
                   href={`mailto:${settings.email}`}
@@ -164,7 +164,7 @@ export default function ContactPage() {
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Operating Hours
+                  Working Hours
                 </span>
                 <div className="flex items-center gap-2 text-sm text-[#DDEBE4]">
                   <LuClock className="w-4 h-4 text-[#E9A23B]" />
@@ -174,7 +174,7 @@ export default function ContactPage() {
 
               <div className="pt-4 border-t border-[#E2D9C8]/10">
                 <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Operational Headquarters
+                  Main Office Address
                 </span>
                 <div className="flex items-start gap-2 text-sm text-[#DDEBE4]">
                   <LuMapPin className="w-4 h-4 text-[#E9A23B] mt-0.5 shrink-0" />
@@ -187,9 +187,9 @@ export default function ContactPage() {
             <div className="p-6 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center gap-4">
               <LuShieldCheck className="w-8 h-8 text-[#10231D] shrink-0" />
               <div>
-                <h4 className="text-sm font-bold text-[#10231D]">Immediate Response Guarantee</h4>
+                <h4 className="text-sm font-bold text-[#10231D]">Quick Reply Within 15 Minutes</h4>
                 <p className="text-xs text-[#3D524A] mt-0.5">
-                  All digital inquiries and booking messages are acknowledged by a duty supervisor within 15 minutes.
+                  Our team replies to all messages and callbacks within 15 minutes during working hours.
                 </p>
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function ContactPage() {
             <div className="p-8 md:p-10 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
               <h2 className="text-2xl font-display font-bold text-[#10231D] mb-6 flex items-center gap-2">
                 <LuMessageSquare className="w-5 h-5 text-[#E9A23B]" />
-                <span>Send An Inquiry</span>
+                <span>Send Us a Message</span>
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -277,7 +277,7 @@ export default function ContactPage() {
                   className="w-full py-4 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-display font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60"
                 >
                   <LuSend className="w-4 h-4 text-[#E9A23B]" />
-                  <span>{submitting ? 'Transmitting Inquiries...' : 'Send Message'}</span>
+                  <span>{submitting ? 'Sending Message...' : 'Send Message'}</span>
                 </button>
               </form>
             </div>

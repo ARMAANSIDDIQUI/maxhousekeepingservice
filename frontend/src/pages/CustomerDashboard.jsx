@@ -237,7 +237,7 @@ export default function CustomerDashboard() {
         setBookings(res.bookings);
       }
     } catch {
-      toast.error('Failed to load your reservations.');
+      toast.error('Could not load your bookings.');
     } finally {
       setLoading(false);
     }
@@ -302,13 +302,13 @@ export default function CustomerDashboard() {
       line1: '',
       formattedAddress: '',
       placeId: '',
-      coordinates: null,
+      coordinates: { lat: 28.8386, lng: 78.7733 },
       landmark: '',
       city: 'Moradabad',
       cityText: 'Moradabad',
       state: 'Uttar Pradesh',
       stateText: 'Uttar Pradesh',
-      pincode: '',
+      pincode: '244001',
       isDefault: (!user?.addresses || user.addresses.length === 0)
     });
     setIsAddAddressModalOpen(true);
@@ -316,13 +316,26 @@ export default function CustomerDashboard() {
 
   const handleCreateAddress = async (e) => {
     e.preventDefault();
-    if (!newAddressForm.line1?.trim() || !newAddressForm.city?.trim() || !newAddressForm.pincode?.trim()) {
-      toast.error('Street address, city, and pincode are required.');
+    const resolvedLine1 = (newAddressForm.line1 || newAddressForm.houseOrFlat || newAddressForm.landmark || '').trim();
+    const resolvedCity = (newAddressForm.city || newAddressForm.cityText || 'Moradabad').trim();
+    const resolvedPincode = (newAddressForm.pincode || '244001').trim();
+
+    if (!resolvedLine1) {
+      toast.error('Please enter your area, street, or house address.');
       return;
     }
     setAddressSubmitting(true);
     try {
-      const res = await addAddress(newAddressForm);
+      const payload = {
+        ...newAddressForm,
+        label: (newAddressForm.label || 'Home').trim(),
+        line1: resolvedLine1,
+        formattedAddress: resolvedLine1,
+        city: resolvedCity,
+        cityText: resolvedCity,
+        pincode: resolvedPincode
+      };
+      const res = await addAddress(payload);
       if (res && res.success) {
         setIsAddAddressModalOpen(false);
       }
@@ -370,13 +383,26 @@ export default function CustomerDashboard() {
 
   const handleUpdateAddressSubmit = async (e) => {
     e.preventDefault();
-    if (!editAddressForm.line1.trim() || !editAddressForm.city.trim() || !editAddressForm.pincode.trim()) {
-      toast.error('Street address, city, and pincode are required.');
+    const resolvedLine1 = (editAddressForm.line1 || editAddressForm.houseOrFlat || editAddressForm.landmark || '').trim();
+    const resolvedCity = (editAddressForm.city || editAddressForm.cityText || 'Moradabad').trim();
+    const resolvedPincode = (editAddressForm.pincode || '244001').trim();
+
+    if (!resolvedLine1) {
+      toast.error('Please enter your area, street, or house address.');
       return;
     }
     setEditingAddressSubmitting(true);
     try {
-      const res = await updateAddress(editingAddress._id, editAddressForm);
+      const payload = {
+        ...editAddressForm,
+        label: (editAddressForm.label || 'Home').trim(),
+        line1: resolvedLine1,
+        formattedAddress: resolvedLine1,
+        city: resolvedCity,
+        cityText: resolvedCity,
+        pincode: resolvedPincode
+      };
+      const res = await updateAddress(editingAddress._id, payload);
       if (res && res.success) {
         setEditingAddress(null);
       }
@@ -762,10 +788,10 @@ export default function CustomerDashboard() {
                 {activeTab === 'bookings'
                   ? 'My Cleaning Bookings'
                   : activeTab === 'addresses'
-                  ? 'Saved Service Addresses'
+                  ? 'My Saved Addresses'
                   : activeTab === 'profile'
                   ? 'My Profile & Details'
-                  : 'Account & Security'}
+                  : 'Account & Password'}
               </h1>
               <p className="text-xs text-[#6B8077] mt-0.5">
                 Welcome back, {user?.name || 'Customer'}. {user?.phone ? `• +91 ${user.phone}` : '• No mobile number added'}
@@ -857,13 +883,13 @@ export default function CustomerDashboard() {
           <div>
             {loading ? (
               <div className="py-20 text-center font-mono text-xs text-[#6B8077]">
-                LOADING YOUR RESERVATIONS...
+                LOADING YOUR BOOKINGS...
               </div>
             ) : bookings.length === 0 ? (
               <div className="py-16 text-center bg-[#ECE5D8] rounded-3xl border border-[#E2D9C8] p-8">
                 <h3 className="font-display font-bold text-xl text-[#10231D] mb-2">No Bookings Yet</h3>
                 <p className="text-xs text-[#6B8077] max-w-md mx-auto mb-6">
-                  You haven't placed any cleaning reservations yet. Choose from our 37+ specialized home and commercial packages.
+                  You haven't booked any cleaning services yet. Choose from our 37+ home and office cleaning services.
                 </p>
                 <Link
                   to="/services"
@@ -1296,17 +1322,17 @@ export default function CustomerDashboard() {
       )}
 
         {/* ========================================================
-            TAB 2: SAVED SERVICE ADDRESSES
+            TAB 2: SAVED ADDRESSES
         ======================================================== */}
         {activeTab === 'addresses' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8]">
               <div>
                 <h3 className="font-display font-bold text-xl text-[#10231D]">
-                  Saved Service Addresses
+                  My Saved Addresses
                 </h3>
                 <p className="text-xs text-[#6B8077] mt-1">
-                  Manage your home, apartment, and office locations for fast 1-click booking checkout.
+                  Save your home or work address for quick 1-click booking.
                 </p>
               </div>
               <button
@@ -1328,7 +1354,7 @@ export default function CustomerDashboard() {
                   No Saved Addresses Yet
                 </h4>
                 <p className="text-xs text-[#6B8077] max-w-md mx-auto mb-5">
-                  Save your home, villa, or office location to quickly auto-fill checkout next time you book a deep cleaning or housekeeping service.
+                  Add your home or office address once so you don't have to type it again next time you book.
                 </p>
                 <button
                   type="button"
@@ -1336,7 +1362,7 @@ export default function CustomerDashboard() {
                   className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold shadow-sm transition-transform active:scale-95 cursor-pointer inline-flex items-center gap-2"
                 >
                   <LuPlus className="w-4 h-4" />
-                  <span>Add First Address</span>
+                  <span>Add Address</span>
                 </button>
               </div>
             ) : (
@@ -1367,7 +1393,7 @@ export default function CustomerDashboard() {
                       {/* Address Text */}
                       {addr.houseOrFlat && (
                         <p className="text-xs font-bold text-[#8C4F00] bg-[#E9A23B]/20 px-2 py-0.5 rounded-md w-fit mb-1.5 border border-[#E9A23B]/40">
-                          Unit: {addr.houseOrFlat}
+                          {addr.houseOrFlat}
                         </p>
                       )}
                       <p className="font-bold text-sm text-[#10231D] leading-snug">
@@ -1375,21 +1401,12 @@ export default function CustomerDashboard() {
                       </p>
                       {addr.landmark && (
                         <p className="text-xs text-[#6B8077] mt-1">
-                          Landmark: {addr.landmark}
+                          Near: {addr.landmark}
                         </p>
                       )}
                       <p className="text-xs font-semibold text-[#10231D] mt-2">
-                        {addr.city}, {addr.state || 'Uttar Pradesh'}
+                        {addr.city}, {addr.state || 'Uttar Pradesh'} — <span className="font-mono">{addr.pincode}</span>
                       </p>
-                      <p className="text-xs font-mono text-[#6B8077] mt-0.5">
-                        Pincode: <span className="font-bold text-[#10231D]">{addr.pincode}</span>
-                      </p>
-                      {addr.coordinates && typeof addr.coordinates.lat === 'number' && (
-                        <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10231D] text-[#25D366] text-[10px] font-mono font-bold">
-                          <LuMapPin className="w-3 h-3 text-[#E9A23B]" />
-                          <span>Pin: {addr.coordinates.lat.toFixed(4)}, {addr.coordinates.lng.toFixed(4)}</span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Actions */}
@@ -1400,10 +1417,10 @@ export default function CustomerDashboard() {
                           onClick={() => handleSetDefaultAddress(addr._id)}
                           className="text-[11px] font-bold text-[#10231D] hover:text-[#E9A23B] transition-colors cursor-pointer"
                         >
-                          Set as Default
+                          Make Default
                         </button>
                       ) : (
-                        <span className="text-[11px] text-[#6B8077] italic font-medium">Primary location</span>
+                        <span className="text-[11px] text-[#6B8077] font-medium">Default address</span>
                       )}
 
                       <div className="flex items-center gap-1.5">
@@ -2142,14 +2159,14 @@ export default function CustomerDashboard() {
         )}
 
         {/* ========================================================
-            MODAL 3: COMMUNICATE WITH ADMIN CHAT THREAD MODAL
+            MODAL 3: CHAT WITH SUPPORT MODAL
         ======================================================== */}
         {messagingBooking && (
           <Modal
             isOpen={true}
             onClose={() => setMessagingBooking(null)}
-            title={`Live Communication: ${messagingBooking.bookingCode}`}
-            subtitle="Chat directly with Max Housekeeping dispatch administrators"
+            title={`Chat with Support: ${messagingBooking.bookingCode}`}
+            subtitle="Send a message directly to our support team"
             maxWidth="max-w-lg"
           >
             <div className="flex flex-col h-96">
@@ -2220,43 +2237,35 @@ export default function CustomerDashboard() {
           <Modal
             isOpen={true}
             onClose={() => setIsAddAddressModalOpen(false)}
-            title="Add New Service Address"
-            subtitle="Save an address to your profile for faster checkout"
+            title="Add New Address"
+            subtitle="Search your area or landmark and save it in 1 click"
             maxWidth="max-w-xl"
           >
             <form onSubmit={handleCreateAddress} className="space-y-4">
-              {/* Address Label Presets */}
+              {/* Simple 1-Click Address Label Buttons */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1.5">
-                  Address Label:
+                  Save Address As:
                 </label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {['Home', 'Office', 'Apartment', 'Villa'].map((lbl) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {['Home', 'Office', 'Shop', 'Other'].map((lbl) => (
                     <button
                       key={lbl}
                       type="button"
                       onClick={() => setNewAddressForm({ ...newAddressForm, label: lbl })}
-                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         newAddressForm.label === lbl
-                          ? 'bg-[#10231D] text-[#E9A23B] shadow-xs'
-                          : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+                          ? 'bg-[#10231D] text-[#E9A23B] border-[#10231D] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#10231D] border-[#E2D9C8] hover:bg-[#E2D9C8]'
                       }`}
                     >
                       {lbl}
                     </button>
                   ))}
                 </div>
-                <input
-                  type="text"
-                  placeholder="Or custom label (e.g. Parents Home, Farmhouse)"
-                  value={newAddressForm.label}
-                  onChange={(e) => setNewAddressForm({ ...newAddressForm, label: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
               </div>
 
-              {/* Interactive Google Autocomplete & Doorstep Pinpoint */}
+              {/* Address Search & Map */}
               <AddressPickerWithMap
                 value={newAddressForm}
                 onChange={(newFields) => setNewAddressForm(prev => ({ ...prev, ...newFields }))}
@@ -2273,7 +2282,7 @@ export default function CustomerDashboard() {
                   className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="addrDefaultToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
-                  Set as my primary default address
+                  Use this as my default address
                 </label>
               </div>
 
@@ -2289,7 +2298,7 @@ export default function CustomerDashboard() {
                 <button
                   type="submit"
                   disabled={addressSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
                 >
                   {addressSubmitting ? 'Saving...' : 'Save Address'}
                 </button>
@@ -2305,43 +2314,35 @@ export default function CustomerDashboard() {
           <Modal
             isOpen={true}
             onClose={() => setEditingAddress(null)}
-            title="Edit Saved Address"
-            subtitle={`Update address details for "${editingAddress.label || 'Saved Location'}"`}
+            title="Edit Address"
+            subtitle={`Update details for "${editingAddress.label || 'Home'}"`}
             maxWidth="max-w-xl"
           >
             <form onSubmit={handleUpdateAddressSubmit} className="space-y-4">
-              {/* Address Label Presets */}
+              {/* Simple 1-Click Address Label Buttons */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1.5">
-                  Address Label:
+                  Save Address As:
                 </label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {['Home', 'Office', 'Apartment', 'Villa'].map((lbl) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {['Home', 'Office', 'Shop', 'Other'].map((lbl) => (
                     <button
                       key={lbl}
                       type="button"
                       onClick={() => setEditAddressForm({ ...editAddressForm, label: lbl })}
-                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         editAddressForm.label === lbl
-                          ? 'bg-[#10231D] text-[#E9A23B] shadow-xs'
-                          : 'bg-[#ECE5D8] text-[#10231D] hover:bg-[#E2D9C8]'
+                          ? 'bg-[#10231D] text-[#E9A23B] border-[#10231D] shadow-xs'
+                          : 'bg-[#ECE5D8] text-[#10231D] border-[#E2D9C8] hover:bg-[#E2D9C8]'
                       }`}
                     >
                       {lbl}
                     </button>
                   ))}
                 </div>
-                <input
-                  type="text"
-                  placeholder="Custom label (e.g. Home, Office, Villa)"
-                  value={editAddressForm.label}
-                  onChange={(e) => setEditAddressForm({ ...editAddressForm, label: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  required
-                />
               </div>
 
-              {/* Interactive Google Autocomplete & Doorstep Pinpoint */}
+              {/* Address Search & Map */}
               <AddressPickerWithMap
                 value={editAddressForm}
                 onChange={(newFields) => setEditAddressForm(prev => ({ ...prev, ...newFields }))}
@@ -2358,7 +2359,7 @@ export default function CustomerDashboard() {
                   className="rounded text-[#E9A23B] focus:ring-[#E9A23B] w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="editAddrDefaultToggle" className="text-xs font-bold text-[#10231D] cursor-pointer">
-                  Set as my primary default address
+                  Use this as my default address
                 </label>
               </div>
 
@@ -2374,9 +2375,9 @@ export default function CustomerDashboard() {
                 <button
                   type="submit"
                   disabled={editingAddressSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  {editingAddressSubmitting ? 'Updating...' : 'Update Address'}
+                  {editingAddressSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
