@@ -31,7 +31,8 @@ export default function AddressPickerWithMap({
   onChange,
   defaultCity = 'Moradabad',
   disabled = false,
-  error = null
+  error = null,
+  mapHeight = 'h-80 sm:h-96 md:h-[450px]'
 }) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
@@ -1485,8 +1486,8 @@ export default function AddressPickerWithMap({
           <div className="relative rounded-2xl overflow-hidden border border-[#10231D]/15 shadow-sm">
             <div
               ref={mapContainerRef}
-              className="w-full h-60 sm:h-72 bg-[#ECE5D8] transition-all"
-              style={{ minHeight: '240px' }}
+              className={`w-full ${mapHeight} bg-[#ECE5D8] transition-all`}
+              style={{ minHeight: '360px' }}
             />
             <div className="absolute top-2.5 left-2.5 right-14 flex items-center justify-between gap-2 pointer-events-none z-10">
               <div className="bg-[#10231D]/90 backdrop-blur-md text-[#F4EFE6] px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 pointer-events-auto">
