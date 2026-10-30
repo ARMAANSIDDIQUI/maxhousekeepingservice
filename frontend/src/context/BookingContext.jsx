@@ -524,6 +524,34 @@ export function BookingProvider({ children }) {
     settings?.platformChargeLabel
   ]);
 
+  // Re-sync all cart items with live database catalog whenever selectedCity changes
+  useEffect(() => {
+    async function syncCartItemsWithFreshCatalog() {
+      if (!items || items.length === 0) return;
+      try {
+        const res = await apiRequest('/services');
+        if (res && res.success !== false && Array.isArray(res.services) && res.services.length > 0) {
+          setItems(prevItems => {
+            if (!prevItems || prevItems.length === 0) return prevItems;
+            let changed = false;
+            const updated = prevItems.map(it => {
+              const fresh = res.services.find(s => s._id === (it.service?._id || it.serviceId) || s.slug === it.service?.slug);
+              if (fresh) {
+                changed = true;
+                return { ...it, service: fresh };
+              }
+              return it;
+            });
+            return changed ? updated : prevItems;
+          });
+        }
+      } catch (err) {
+        console.warn('Cart catalog sync notice:', err);
+      }
+    }
+    syncCartItemsWithFreshCatalog();
+  }, [selectedCity?.slug]);
+
   // Recalculate quote whenever items or dynamic billing settings change
   useEffect(() => {
     refreshQuote(items, selectedCity?.slug, couponCode);

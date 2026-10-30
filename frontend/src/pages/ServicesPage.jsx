@@ -50,14 +50,27 @@ export default function ServicesPage() {
     fetchCities();
   }, [contextCities]);
 
-  // Read city from searchParams or selectedCity or default 'all'
-  const urlCity = searchParams.get('city');
-  const activeCitySlug = (urlCity || selectedCity?.slug || 'all').toLowerCase();
+  // Active city priority: selectedCity from context > URL search param > 'moradabad'
+  const activeCitySlug = (selectedCity?.slug || searchParams.get('city') || 'all').toLowerCase();
+
+  // Keep URL searchParams synchronized when selectedCity changes
+  useEffect(() => {
+    if (selectedCity?.slug) {
+      const currentParam = searchParams.get('city');
+      if (currentParam !== selectedCity.slug) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('city', selectedCity.slug);
+        setSearchParams(nextParams, { replace: true });
+      }
+    }
+  }, [selectedCity?.slug]);
 
   const handleCityChange = (citySlug) => {
     const nextParams = new URLSearchParams(searchParams);
     if (!citySlug || citySlug === 'all') {
       nextParams.delete('city');
+      const mbd = citiesList.find(c => (c.slug || '').toLowerCase() === 'moradabad') || citiesList[0];
+      if (mbd) setSelectedCity(mbd);
     } else {
       nextParams.set('city', citySlug);
       const matched = citiesList.find(c => (c.slug || c.name.toLowerCase()).trim() === citySlug);
@@ -68,6 +81,7 @@ export default function ServicesPage() {
     setSearchParams(nextParams);
   };
 
+  // Re-fetch / re-render whenever selectedCategory OR selectedCity / activeCitySlug changes
   useEffect(() => {
     async function loadData() {
       try {
@@ -96,7 +110,7 @@ export default function ServicesPage() {
       }
     }
     loadData();
-  }, [selectedCategory]);
+  }, [selectedCategory, activeCitySlug, selectedCity?.slug]);
 
   // Check if a service is available in the currently selected city
   const isAvailableInCity = (s, citySlug) => {

@@ -557,7 +557,7 @@ export default function BookingPage() {
 
   const { slug } = useParams();
 
-  // Load all services for the "Add a service" selector
+  // Load all services for the "Add a service" selector & refetch/re-render on city change
   useEffect(() => {
     async function loadCatalog() {
       try {
@@ -576,7 +576,7 @@ export default function BookingPage() {
       }
     }
     loadCatalog();
-  }, [slug]);
+  }, [slug, selectedCity?.slug]);
 
   // Helper to determine if address inputs are locked to saved address
   const isSavedAddressSelected = !isTemporaryAddress && Boolean(user) && Boolean(selectedSavedAddressId) && selectedSavedAddressId !== 'new';

@@ -461,26 +461,19 @@ export default function ServiceDetailPage() {
           </div>
         )}
 
-        {/* YouTube Showcase Stream */}
+        {/* YouTube Video Walkthrough */}
         {youtubeEmbedUrl && (
           <div className="p-6 sm:p-8 rounded-3xl bg-[#0F1E19] text-[#F4EFE6] border-2 border-red-500/40 shadow-xl mb-14">
-            <div className="text-center max-w-xl mx-auto mb-6">
-              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-red-400 flex items-center justify-center gap-1.5">
-                <FaYoutube className="w-4 h-4 text-red-500 animate-pulse" />
-                <span>OFFICIAL STREAM • YOUTUBE SHOWCASE STREAM</span>
-              </span>
-              <h3 className="font-display font-black text-2xl sm:text-3xl text-[#F4EFE6] mt-1.5">
-                YouTube Showcase Stream
-              </h3>
-              <p className="text-xs text-[#A3B8B0] mt-1">
-                Watch our official YouTube demonstration stream and detailed video breakdown for {service.title}.
+            <div className="text-center max-w-xl mx-auto mb-4">
+              <p className="text-xs text-[#A3B8B0]">
+                Watch our video demonstration and detailed cleaning process for {service.title}.
               </p>
             </div>
 
             <div className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden border-2 border-red-900/50 shadow-2xl bg-black">
               <iframe
                 src={youtubeEmbedUrl}
-                title={`${service.title} YouTube Showcase Stream`}
+                title={`${service.title} Video`}
                 className="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
