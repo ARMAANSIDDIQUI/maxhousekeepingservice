@@ -74,6 +74,7 @@ export default function AddressPickerWithMap({
   const geocoderRef = useRef(null);
   const sessionTokenRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const reverseGeocodeRef = useRef(null);
 
   // Load saved serviceable cities from MongoDB backend
   useEffect(() => {
@@ -306,48 +307,10 @@ export default function AddressPickerWithMap({
         animation: google.maps.Animation.DROP
       });
 
-      const handleMapPinMove = (newCoords) => {
-        setCoordinates(newCoords);
-        setRefinementTip('Map pin updated!');
-
-        if (geocoderRef.current) {
-          geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
-            if (status === 'OK' && results && results.length > 0) {
-              const comps = extractFromGeocodeResults(results);
-              const nextCity = comps.city || cityText;
-              const nextState = comps.state || stateText;
-              const nextPin = comps.pincode || getDefaultPincodeForCity(nextCity, mongoCities) || pincode;
-
-              if (nextCity) setCityText(nextCity);
-              if (nextState) setStateText(nextState);
-              if (nextPin) setPincode(nextPin);
-              if (!streetQuery && results[0]?.formatted_address) {
-                setStreetQuery(results[0].formatted_address);
-              }
-
-              emitChange({
-                coordinates: newCoords,
-                cityText: nextCity,
-                city: nextCity,
-                stateText: nextState,
-                state: nextState,
-                pincode: nextPin,
-                line1: streetQuery || results[0]?.formatted_address || '',
-                formattedAddress: results[0]?.formatted_address || streetQuery
-              });
-            } else {
-              emitChange({ coordinates: newCoords });
-            }
-          });
-        } else {
-          emitChange({ coordinates: newCoords });
-        }
-      };
-
       marker.addListener('dragend', () => {
         const newPos = marker.getPosition();
-        if (newPos) {
-          handleMapPinMove({ lat: newPos.lat(), lng: newPos.lng() });
+        if (newPos && reverseGeocodeRef.current) {
+          reverseGeocodeRef.current({ lat: newPos.lat(), lng: newPos.lng() }, true);
         }
       });
 
@@ -355,7 +318,9 @@ export default function AddressPickerWithMap({
         if (disabled) return;
         const newCoords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
         marker.setPosition(newCoords);
-        handleMapPinMove(newCoords);
+        if (reverseGeocodeRef.current) {
+          reverseGeocodeRef.current(newCoords, true);
+        }
       });
 
       mapInstanceRef.current = map;
@@ -728,7 +693,193 @@ export default function AddressPickerWithMap({
     });
   };
 
-  // Use Current Phone/Browser Location
+  // Multi-source Reverse Geocoding that ALWAYS autofills the Search Street / Area / Landmark bar, City, Pincode & Landmark
+  const reverseGeocodeAndAutofill = useCallback(async (newCoords, updateSearchBar = true) => {
+    const { lat, lng } = newCoords;
+    setCoordinates(newCoords);
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo(newCoords);
+      mapInstanceRef.current.setZoom(17);
+    }
+    if (markerInstanceRef.current) {
+      markerInstanceRef.current.setPosition(newCoords);
+      triggerPinDropAnimation();
+    }
+
+    let resolvedAddress = '';
+    let resolvedLandmark = '';
+    let resolvedCity = '';
+    let resolvedState = '';
+    let resolvedPincode = '';
+
+    // 1. Try Google Geocoder first (if available and enabled on API key)
+    if (geocoderRef.current) {
+      try {
+        const geoRes = await new Promise((resolve) => {
+          geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
+            if (status === 'OK' && Array.isArray(results) && results.length > 0) {
+              resolve(results);
+            } else {
+              resolve(null);
+            }
+          });
+        });
+
+        if (geoRes) {
+          // Prefer a street/sublocality/neighborhood address over a raw Plus Code (like "RPQ9+abc")
+          const bestReadable = geoRes.find(
+            (r) => r.formatted_address && !/^[A-Z0-9]{4}\+[A-Z0-9]{2,}/i.test(r.formatted_address.trim())
+          ) || geoRes[0];
+          resolvedAddress = bestReadable?.formatted_address || '';
+          const comps = extractFromGeocodeResults(geoRes);
+          resolvedCity = comps.city || '';
+          resolvedState = comps.state || '';
+          resolvedPincode = comps.pincode || '';
+
+          // Extract sublocality / neighborhood for landmark if available
+          for (const res of geoRes) {
+            for (const c of res.address_components || []) {
+              if (!resolvedLandmark && (c.types?.includes('sublocality_level_1') || c.types?.includes('neighborhood') || c.types?.includes('point_of_interest'))) {
+                resolvedLandmark = c.long_name;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fallback / Enrichment via OpenStreetMap Nominatim Reverse Geocoding (works even if Google Geocoding API is restricted)
+    if (!resolvedAddress || !resolvedPincode || !resolvedCity) {
+      try {
+        const nomRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        if (nomRes.ok) {
+          const data = await nomRes.json();
+          const addr = data?.address || {};
+          const roadOrArea = [
+            data?.name,
+            addr.amenity || addr.building || addr.shop,
+            addr.road || addr.pedestrian || addr.street,
+            addr.neighbourhood || addr.suburb || addr.residential || addr.village,
+            addr.city || addr.town || addr.county || addr.state_district,
+            addr.state,
+            addr.postcode
+          ]
+            .filter((x, i, a) => x && a.indexOf(x) === i)
+            .join(', ');
+
+          if (!resolvedAddress) {
+            resolvedAddress = roadOrArea || data?.display_name || '';
+          }
+          if (!resolvedLandmark) {
+            resolvedLandmark = addr.amenity || addr.neighbourhood || addr.suburb || '';
+          }
+          if (!resolvedCity) {
+            resolvedCity = addr.city || addr.town || addr.county || addr.state_district || '';
+          }
+          if (!resolvedState) {
+            resolvedState = addr.state || '';
+          }
+          if (!resolvedPincode && addr.postcode) {
+            const cleanPin = String(addr.postcode).replace(/\D/g, '').slice(0, 6);
+            if (cleanPin.length === 6) resolvedPincode = cleanPin;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Secondary Fallback via Photon Komoot Reverse Geocoding
+    if (!resolvedAddress || !resolvedCity) {
+      try {
+        const photRes = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+        if (photRes.ok) {
+          const photData = await photRes.json();
+          const p = photData?.features?.[0]?.properties;
+          if (p) {
+            const parts = [p.name, p.street, p.locality || p.district, p.city, p.state, p.postcode]
+              .filter((x, i, a) => x && a.indexOf(x) === i);
+            if (!resolvedAddress && parts.length > 0) {
+              resolvedAddress = parts.join(', ');
+            }
+            if (!resolvedLandmark && (p.name || p.locality)) {
+              resolvedLandmark = p.name || p.locality;
+            }
+            if (!resolvedCity && (p.city || p.district || p.county)) {
+              resolvedCity = p.city || p.district || p.county;
+            }
+            if (!resolvedState && p.state) {
+              resolvedState = p.state;
+            }
+            if (!resolvedPincode && p.postcode) {
+              resolvedPincode = String(p.postcode).replace(/\D/g, '').slice(0, 6);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 4. Match nearest saved MongoDB city if within its radius
+    let matchedMongoCity = null;
+    for (const c of mongoCities) {
+      if (resolvedCity && String(c.name || '').toLowerCase() === resolvedCity.toLowerCase()) {
+        matchedMongoCity = c;
+        break;
+      }
+      if (c.location?.coordinates?.length === 2) {
+        const [cLng, cLat] = c.location.coordinates;
+        const dLat = (lat - cLat) * (Math.PI / 180);
+        const dLon = (lng - cLng) * (Math.PI / 180);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(cLat * (Math.PI / 180)) * Math.cos(lat * (Math.PI / 180)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (distKm <= (c.serviceRadiusKm || 25)) {
+          matchedMongoCity = c;
+          break;
+        }
+      }
+    }
+
+    const finalCity = matchedMongoCity?.name || resolvedCity || cityText || defaultCity || 'Moradabad';
+    const finalState = resolvedState || matchedMongoCity?.state || stateText || 'Uttar Pradesh';
+    const finalPincode = resolvedPincode || matchedMongoCity?.pincodes?.[0] || getDefaultPincodeForCity(finalCity, mongoCities) || pincode || '244001';
+    const finalAddress = resolvedAddress || `${finalCity}, ${finalState} ${finalPincode}`;
+    const finalLandmark = landmark || resolvedLandmark || '';
+
+    setCityText(finalCity);
+    setStateText(finalState);
+    setPincode(finalPincode);
+    if (updateSearchBar || !streetQuery) {
+      setStreetQuery(finalAddress);
+    }
+    if (!landmark && resolvedLandmark) {
+      setLandmark(resolvedLandmark);
+    }
+
+    setRefinementTip(`GPS location autofilled: ${finalAddress}`);
+
+    emitChange({
+      coordinates: newCoords,
+      line1: (updateSearchBar || !streetQuery) ? finalAddress : streetQuery,
+      formattedAddress: finalAddress,
+      landmark: finalLandmark,
+      cityText: finalCity,
+      city: finalCity,
+      stateText: finalState,
+      state: finalState,
+      pincode: finalPincode
+    });
+  }, [cityText, stateText, pincode, streetQuery, landmark, mongoCities, defaultCity, emitChange]);
+
+  useEffect(() => {
+    reverseGeocodeRef.current = reverseGeocodeAndAutofill;
+  }, [reverseGeocodeAndAutofill]);
+
+  // Use Current Phone/Browser Location ("Locate Me (GPS)") & Autofill Search Bar
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
       alert('Location is not supported by your browser.');
@@ -736,39 +887,23 @@ export default function AddressPickerWithMap({
     }
 
     setIsLocatingUser(true);
+    setShowPredictions(false);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         const newCoords = { lat, lng };
 
-        setIsLocatingUser(false);
-
-        if (geocoderRef.current) {
-          geocoderRef.current.geocode({ location: newCoords }, (results, status) => {
-            if (status === 'OK' && results && results[0]) {
-              const bestResult = results[0];
-              const comps = extractFromGeocodeResults(results);
-              const nextCity = comps.city || cityText;
-              const nextPin = comps.pincode || getDefaultPincodeForCity(nextCity, mongoCities) || pincode;
-              applyLocationCoordinates(newCoords, {
-                line1: bestResult.formatted_address,
-                city: nextCity,
-                state: comps.state || stateText,
-                pincode: nextPin
-              });
-            } else {
-              applyLocationCoordinates(newCoords, { line1: streetQuery });
-            }
-          });
-        } else {
-          applyLocationCoordinates(newCoords, { line1: streetQuery });
+        try {
+          await reverseGeocodeAndAutofill(newCoords, true);
+        } finally {
+          setIsLocatingUser(false);
         }
       },
       (err) => {
         setIsLocatingUser(false);
         console.warn('Geolocation error:', err.message);
-        alert('Could not find your current location. Please allow location access or type your area above.');
+        alert('Could not find your current location. Please allow location access in your browser or type your area above.');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -826,7 +961,7 @@ export default function AddressPickerWithMap({
             ) : (
               <LuNavigation className="w-3 h-3 text-[#E9A23B]" />
             )}
-            <span>Use Current Location</span>
+            <span>{isLocatingUser ? 'Finding your address...' : 'Locate Me (GPS)'}</span>
           </button>
         </div>
 
