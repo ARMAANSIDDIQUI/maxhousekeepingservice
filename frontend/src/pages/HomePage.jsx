@@ -103,7 +103,7 @@ export default function HomePage() {
               </h1>
 
               <p className="text-base sm:text-lg text-[#3D524A] leading-relaxed max-w-xl mb-6 sm:mb-8 font-sans">
-                Book trained, background-verified cleaning professionals for your home or office. Deep cleaning, sofa, bathroom, kitchen, AC & pest control — all in one place.
+                Book trained, uniformed cleaning professionals for your home or office. Full home deep cleaning, sofa & carpet shampooing, bathroom tile descaling, kitchen degreasing, and water tank cleaning — all in one place.
               </p>
 
               {/* CTAs */}
@@ -414,6 +414,37 @@ export default function HomePage() {
                     }`}
                   >
                     <div>
+                      {/* Optional Video Testimonial Player */}
+                      {test.videoUrl && (
+                        <div className="mb-4 rounded-xl overflow-hidden bg-black border border-[#E2D9C8]">
+                          {/\.(mp4|webm|mov|ogg)(\?.*)?$/i.test(test.videoUrl) ||
+                          test.videoUrl.includes('/video/upload/') ||
+                          test.videoUrl.startsWith('data:video/') ? (
+                            <video
+                              src={test.videoUrl}
+                              poster={test.avatar || undefined}
+                              controls
+                              preload="metadata"
+                              playsInline
+                              className="w-full h-48 object-cover bg-black"
+                            />
+                          ) : (
+                            <a
+                              href={test.videoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between p-3 bg-[#10231D] text-[#F4EFE6] text-xs font-bold"
+                            >
+                              <span className="inline-flex items-center gap-1.5">
+                                <LuPlay className="w-3.5 h-3.5 text-[#E9A23B] fill-[#E9A23B]" />
+                                Watch Video Testimonial
+                              </span>
+                              <LuArrowRight className="w-3.5 h-3.5 text-[#E9A23B]" />
+                            </a>
+                          )}
+                        </div>
+                      )}
+
                       {/* Top Bar: Stars & Verified Badge */}
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-0.5 text-[#E9A23B]">
@@ -427,10 +458,20 @@ export default function HomePage() {
                         </span>
                       </div>
 
+                      {test.serviceTitle && (
+                        <div className="mb-2">
+                          <span className="inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#ECE5D8] text-[#10231D]">
+                            {test.serviceTitle}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Review Quote */}
-                      <p className="text-sm text-[#3D524A] leading-relaxed italic mb-6">
-                        "{test.quote}"
-                      </p>
+                      {test.quote && (
+                        <p className="text-sm text-[#3D524A] leading-relaxed italic mb-6">
+                          "{test.quote}"
+                        </p>
+                      )}
                     </div>
 
                     {/* Author Footer with Uploaded Avatar Support */}

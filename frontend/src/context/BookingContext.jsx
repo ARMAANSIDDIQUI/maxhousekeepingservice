@@ -33,19 +33,6 @@ export function BookingProvider({ children }) {
   const [isDetectingCity, setIsDetectingCity] = useState(false);
   const { toast } = useToast();
 
-  // Known coordinates of active service cities in Western UP
-  const CITY_COORDINATES = useMemo(() => ({
-    moradabad: { lat: 28.8386, lng: 78.7733 },
-    rampur: { lat: 28.8033, lng: 79.0250 },
-    amroha: { lat: 28.9044, lng: 78.4678 },
-    gajraula: { lat: 28.8500, lng: 78.2333 },
-    sambhal: { lat: 28.5833, lng: 78.5667 },
-    chandausi: { lat: 28.4500, lng: 78.7833 },
-    noorpur: { lat: 29.1500, lng: 78.4000 },
-    dhampur: { lat: 29.3100, lng: 78.5100 },
-    bijnor: { lat: 29.3732, lng: 78.1352 }
-  }), []);
-
   // Detect city via browser geolocation
   const detectAndSelectCity = useCallback(async ({ silent = false, showToast = true } = {}) => {
     if (!navigator.geolocation) {
@@ -101,11 +88,10 @@ export function BookingProvider({ children }) {
             let minDistance = Infinity;
 
             for (const c of cities) {
-              const dbCoords =
+              const coords =
                 Array.isArray(c.location?.coordinates) && c.location.coordinates.length === 2
                   ? { lat: Number(c.location.coordinates[1]), lng: Number(c.location.coordinates[0]) }
                   : null;
-              const coords = dbCoords || CITY_COORDINATES[c.slug] || CITY_COORDINATES[c.name?.toLowerCase()];
               if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
                 const dLat = (lat - coords.lat) * (Math.PI / 180);
                 const dLng = (lng - coords.lng) * (Math.PI / 180);
@@ -162,7 +148,7 @@ export function BookingProvider({ children }) {
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
       );
     });
-  }, [cities, CITY_COORDINATES, toast]);
+  }, [cities, toast]);
 
   // Load cities dynamically from MongoDB
   useEffect(() => {

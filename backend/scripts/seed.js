@@ -74,14 +74,6 @@ async function seedDatabase() {
         iconKey: 'PiBuildingOffice',
         image: { url: '/media/categories/commercial-cleaning.jpg', alt: 'Commercial office housekeeping' },
         sortOrder: 5
-      },
-      {
-        name: 'Pest Control',
-        slug: 'pest-control',
-        description: 'Odorless herbal gel pest treatments and long-lasting pest management protection.',
-        iconKey: 'PiBug',
-        image: { url: '/media/categories/pest-control.jpg', alt: 'Pest control service' },
-        sortOrder: 6
       }
     ];
 

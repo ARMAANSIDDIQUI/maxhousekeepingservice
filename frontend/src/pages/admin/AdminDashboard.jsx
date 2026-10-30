@@ -49,8 +49,7 @@ import {
 import { formatDateDMY } from '../../utils/date';
 import {
   apiRequest,
-  adminAPI,
-  FALLBACK_CATEGORIES
+  adminAPI
 } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -111,7 +110,7 @@ export default function AdminDashboard() {
   const [uploadingServiceVideo, setUploadingServiceVideo] = useState(false);
 
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  const [categories, setCategories] = useState([]);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [categorySearch, setCategorySearch] = useState('');
@@ -342,14 +341,18 @@ export default function AdminDashboard() {
     name: '',
     role: 'Homeowner',
     city: 'Moradabad',
+    serviceTitle: '',
     quote: '',
     rating: 5,
     avatar: '',
     avatarPublicId: '',
+    videoUrl: '',
+    videoPublicId: '',
     isFeatured: false,
     isActive: true
   });
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingTestimonialVideo, setUploadingTestimonialVideo] = useState(false);
 
   // Chat Communication Thread State
   const [chatBooking, setChatBooking] = useState(null);
@@ -2761,10 +2764,13 @@ export default function AdminDashboard() {
         name: item.name || '',
         role: item.role || 'Homeowner',
         city: item.city || 'Moradabad',
+        serviceTitle: item.serviceTitle || '',
         quote: item.quote || '',
         rating: item.rating || 5,
         avatar: item.avatar || '',
         avatarPublicId: item.avatarPublicId || '',
+        videoUrl: item.videoUrl || '',
+        videoPublicId: item.videoPublicId || '',
         isFeatured: Boolean(item.isFeatured),
         isActive: item.isActive !== false
       });
@@ -2774,10 +2780,13 @@ export default function AdminDashboard() {
         name: '',
         role: 'Homeowner',
         city: 'Moradabad',
+        serviceTitle: '',
         quote: '',
         rating: 5,
         avatar: '',
         avatarPublicId: '',
+        videoUrl: '',
+        videoPublicId: '',
         isFeatured: false,
         isActive: true
       });
@@ -2811,11 +2820,43 @@ export default function AdminDashboard() {
     }
   };
 
+  // Testimonial Video Upload to Cloudinary
+  const handleTestimonialVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Video size must be under 50MB.');
+      return;
+    }
+
+    setUploadingTestimonialVideo(true);
+    try {
+      const res = await adminAPI.uploadVideo(file, 'max-housekeeping/testimonials/videos');
+      if (res && res.url) {
+        setTestimonialForm(prev => ({
+          ...prev,
+          videoUrl: res.url,
+          videoPublicId: res.publicId || ''
+        }));
+        toast.success('Customer video testimonial uploaded successfully!');
+      } else {
+        toast.error('Failed to parse uploaded video response.');
+      }
+    } catch (err) {
+      console.error('[Testimonial Video Upload Error]', err);
+      toast.error(err.message || 'Failed to upload video testimonial.');
+    } finally {
+      setUploadingTestimonialVideo(false);
+      e.target.value = '';
+    }
+  };
+
   // Save Testimonial (Create or Update)
   const handleSaveTestimonial = async (e) => {
     e.preventDefault();
-    if (!testimonialForm.name.trim() || !testimonialForm.quote.trim()) {
-      toast.error('Client name and review quote are required.');
+    if (!testimonialForm.name.trim() || (!testimonialForm.quote.trim() && !testimonialForm.videoUrl.trim())) {
+      toast.error('Client name and either a written review quote or a video testimonial are required.');
       return;
     }
 
@@ -2832,7 +2873,7 @@ export default function AdminDashboard() {
       } else {
         const res = await adminAPI.createTestimonial(testimonialForm);
         if (res.success) {
-          toast.success('New testimonial added to Home Page!');
+          toast.success('New testimonial published to Home & About pages!');
           setTestimonials(prev => [res.testimonial, ...prev]);
           setTestimonialModalOpen(false);
         }
@@ -4866,9 +4907,21 @@ export default function AdminDashboard() {
 
                         {/* Name Column */}
                         <td className="py-3 px-3 font-bold text-[#10231D]">
-                          {test.name}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{test.name}</span>
+                            {test.videoUrl && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#10231D] text-[#E9A23B] text-[9px] font-mono font-bold uppercase">
+                                <LuVideo className="w-2.5 h-2.5" /> VIDEO
+                              </span>
+                            )}
+                          </div>
+                          {test.serviceTitle && (
+                            <span className="block text-[10px] font-medium text-[#6B8077]">
+                              {test.serviceTitle}
+                            </span>
+                          )}
                           {test.isFeatured && (
-                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#E9A23B]">
+                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-[#E9A23B] mt-0.5">
                               <LuStar className="w-2.5 h-2.5 fill-current" /> FEATURED
                             </span>
                           )}
@@ -4891,7 +4944,7 @@ export default function AdminDashboard() {
 
                         {/* Quote Excerpt */}
                         <td className="py-3 px-3 max-w-[320px] text-[#3D524A] leading-relaxed line-clamp-2">
-                          "{test.quote}"
+                          {test.quote ? `"${test.quote}"` : (test.videoUrl ? 'Video Testimonial' : '—')}
                         </td>
 
                         {/* Status Badge */}
@@ -6249,6 +6302,20 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Service Booked (Optional) */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Service Booked (Optional):
+                </label>
+                <input
+                  type="text"
+                  value={testimonialForm.serviceTitle || ''}
+                  onChange={(e) => setTestimonialForm({ ...testimonialForm, serviceTitle: e.target.value })}
+                  placeholder="e.g. Full Home Deep Cleaning (3 BHK), 7-Seater Sofa Shampooing"
+                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D]"
+                />
+              </div>
+
               {/* Cloudinary Avatar Upload Field */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
@@ -6296,18 +6363,83 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Video Testimonial Upload or URL */}
+              <div>
+                <label className="block text-xs font-bold text-[#10231D] mb-1">
+                  Video Testimonial (Upload MP4/MOV/WebM or Paste Video URL):
+                </label>
+                <div className="p-3 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#10231D] text-[#F4EFE6] text-xs font-bold cursor-pointer hover:bg-[#3D524A] transition-colors shrink-0">
+                      <LuVideo className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>{uploadingTestimonialVideo ? 'Uploading Video...' : 'Upload Video File'}</span>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/*"
+                        onChange={handleTestimonialVideoUpload}
+                        className="hidden"
+                        disabled={uploadingTestimonialVideo}
+                      />
+                    </label>
+                    <input
+                      type="url"
+                      value={testimonialForm.videoUrl || ''}
+                      onChange={(e) => setTestimonialForm({ ...testimonialForm, videoUrl: e.target.value })}
+                      placeholder="Or paste direct video / YouTube / Instagram Reel URL..."
+                      className="flex-1 min-w-[200px] p-2 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D]"
+                    />
+                    {testimonialForm.videoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setTestimonialForm(prev => ({ ...prev, videoUrl: '', videoPublicId: '' }))}
+                        className="px-2.5 py-2 rounded-xl bg-[#F9ECE8] text-[#C2512D] text-xs font-bold hover:bg-[#F2D7D1]"
+                      >
+                        Remove Video
+                      </button>
+                    )}
+                  </div>
+
+                  {testimonialForm.videoUrl && (
+                    <div className="rounded-xl overflow-hidden bg-black border border-[#10231D]/20">
+                      {/\.(mp4|webm|mov|ogg)(\?.*)?$/i.test(testimonialForm.videoUrl) ||
+                      testimonialForm.videoUrl.includes('/video/upload/') ||
+                      testimonialForm.videoUrl.startsWith('data:video/') ? (
+                        <video
+                          src={testimonialForm.videoUrl}
+                          controls
+                          preload="metadata"
+                          className="w-full max-h-52 object-contain bg-black"
+                        />
+                      ) : (
+                        <div className="p-2.5 text-[11px] text-[#DDEBE4] flex items-center justify-between">
+                          <span className="truncate">Linked Video: {testimonialForm.videoUrl}</span>
+                          <a
+                            href={testimonialForm.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#E9A23B] font-bold ml-2 shrink-0 underline"
+                          >
+                            Preview Link
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Review Quote Text */}
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Customer Review Quote / Feedback:
+                  Customer Review Quote / Feedback {testimonialForm.videoUrl ? '(Optional with Video)' : ''}:
                 </label>
                 <textarea
                   rows={3}
                   value={testimonialForm.quote}
                   onChange={(e) => setTestimonialForm({ ...testimonialForm, quote: e.target.value })}
-                  placeholder="Describe the cleaning experience, professional equipment used, punctuality, and overall satisfaction..."
+                  placeholder="Describe the cleaning experience, machines used, punctuality, and overall satisfaction..."
                   className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] leading-relaxed"
-                  required
+                  required={!testimonialForm.videoUrl}
                 />
               </div>
 

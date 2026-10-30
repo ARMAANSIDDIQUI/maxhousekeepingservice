@@ -17,12 +17,5 @@ export {
   adminAPI,
   supervisorAPI,
   publicAPI,
-  FALLBACK_CATEGORIES,
-  FALLBACK_CITIES,
-  FALLBACK_BRANDS,
-  FALLBACK_TESTIMONIALS,
-  FALLBACK_STATS,
-  FALLBACK_SERVICES,
-  getFallbackResponse,
-  calculateFallbackQuote
+  getFallbackResponse
 } from './client';

@@ -27,7 +27,7 @@ import SEO from '../components/common/SEO';
 import { useBooking } from '../context/BookingContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { apiRequest, FALLBACK_SERVICES } from '../api';
+import { apiRequest } from '../api';
 import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
@@ -377,7 +377,7 @@ export default function BookingPage() {
   };
 
   // All catalog services for the "Add a service" popover
-  const [allServices, setAllServices] = useState(FALLBACK_SERVICES);
+  const [allServices, setAllServices] = useState([]);
   const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
   const [serviceSearch, setServiceSearch] = useState('');
   const [inputCoupon, setInputCoupon] = useState('');
@@ -480,23 +480,17 @@ export default function BookingPage() {
     async function loadCatalog() {
       try {
         const res = await apiRequest('/services');
-        const srvs = (res.success && res.services && res.services.length > 0) ? res.services : FALLBACK_SERVICES;
+        const srvs = (res.success && Array.isArray(res.services)) ? res.services : [];
         setAllServices(srvs);
-        if (slug) {
+        if (slug && srvs.length > 0) {
           const matched = srvs.find(s => s.slug === slug);
           if (matched && (!items || items.length === 0 || !items.some(it => it.serviceId === matched._id))) {
             addItem(matched);
           }
         }
       } catch (err) {
-        console.warn('Error fetching catalog, using fallback services:', err);
-        setAllServices(FALLBACK_SERVICES);
-        if (slug) {
-          const matched = FALLBACK_SERVICES.find(s => s.slug === slug);
-          if (matched && (!items || items.length === 0 || !items.some(it => it.serviceId === matched._id))) {
-            addItem(matched);
-          }
-        }
+        console.warn('Error fetching catalog services:', err);
+        setAllServices([]);
       }
     }
     loadCatalog();

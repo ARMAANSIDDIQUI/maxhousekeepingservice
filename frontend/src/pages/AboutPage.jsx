@@ -14,7 +14,9 @@ import {
   LuArrowRight,
   LuStar,
   LuCalendar,
-  LuMail
+  LuMail,
+  LuVideo,
+  LuPlay
 } from 'react-icons/lu';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa6';
 import { useBooking } from '../context/BookingContext';
@@ -23,73 +25,73 @@ import SEO from '../components/common/SEO';
 
 const EQUIPMENT_INVENTORY = [
   {
-    title: 'Single-Disc Rotary Floor Scrubbers (175 RPM)',
-    spec: 'Marble, Kota Stone, Vitrified Tile & Granite Buffing',
+    title: 'Single-Disc Floor Scrubbing Machine',
+    spec: 'Marble, Vitrified Tiles, Porch & Hall Floors',
     detail:
-      'Used for deep floor scrubbing and edge-to-edge grout dirt extraction in independent kothis, flats, and commercial showrooms without scratching delicate stone surfaces.'
+      'Rotary brush and pad machine used across halls, bedrooms, verandahs, and commercial showrooms to lift stubborn floor grime and tile joint dirt that a normal mop cannot remove.'
   },
   {
-    title: 'Wet & Dry Injection-Extraction Machines',
-    spec: 'Fabric Sofa, Mattress, Carpet & Curtain Shampooing',
+    title: 'Foam Scrubber & Wet-Suction Vacuum',
+    spec: 'Fabric Sofas, Dining Chairs, Mattresses & Carpets',
     detail:
-      'Injects low-moisture Taski foam deep into upholstery fibers and immediately vacuums out 85%+ of dirty water, sweat, dust mites, and food stains for fast 3–4 hour drying.'
+      'Applies upholstery shampoo foam with a soft rotary brush to loosen sweat, dust, and food stains, followed by wet vacuum suction to pull out dirty water so fabric dries quickly.'
   },
   {
-    title: 'High-Pressure Jet & Steam Degreasers',
-    spec: 'Modular Kitchen Chimneys, Exhausts, Balconies & Driveways',
+    title: 'High-Pressure Water Jet & Dewatering Pump',
+    spec: 'Overhead Water Tanks, Swimming Pools & Driveways',
     detail:
-      'Cuts through baked-on oil, turmeric stains, and carbon buildup inside kitchen chimneys, gas hobs, exhaust fans, and exterior stone pathways.'
+      'Submersible sludge pump and high-pressure water jet washer used to drain, desilt, and pressure-wash overhead water tanks, swimming pools, balconies, and outdoor parking areas.'
   },
   {
-    title: 'Taski (Diversey) & 3M Hospital-Grade Chemicals',
-    spec: 'Non-Acidic, Child-Safe & Pet-Safe Formulations',
+    title: 'Non-Acidic Tile Descalers & Kitchen Degreasers',
+    spec: 'Safe on Chrome Taps, Sanitaryware & Cabinets',
     detail:
-      'We strictly ban raw acid (tezaab) that ruins expensive Jaguar/Kohler chrome taps and tile grout. Instead, we use pH-balanced Taski R1–R6 descalers and disinfectants.'
+      'We do not use raw market acid (tezaab) that turns steel taps black and eats away tile grout. We use safe bathroom descaling liquids, heavy-duty kitchen oil degreasers, and floor disinfectants.'
   },
   {
-    title: 'Industrial HEPA Dual-Motor Vacuums',
-    spec: 'Dry Dusting, Sofa Crevices, Window Channels & False Ceilings',
+    title: 'Commercial Dry & Wet Barrel Vacuum',
+    spec: 'Window Tracks, Sofa Crevices, Cobwebs & Dust',
     detail:
-      'Captures fine construction cement dust, ceiling fan cobwebs, sliding UPVC window track grit, and deep mattress allergens before wet wiping begins.'
+      'High-suction stainless-steel vacuum cleaner with crevice nozzles used to clear sliding window channels, sofa corners, ceiling cobwebs, and dry construction dust before wet cleaning.'
   },
   {
-    title: 'Odorless Bayer Herbal Gel & Spray Systems',
-    spec: 'Cockroach, Ant, Termite & Wood-Borer Protection',
+    title: 'Telescopic Poles, Glass Squeegees & Scrapers',
+    spec: 'High Glass Panels, Fans, Chandeliers & Paint Spots',
     detail:
-      'Applied inside kitchen hinges, sink under-cabinets, and drainage traps—no foul smell, no need to empty kitchen utensils or vacate your home.'
+      'Complete hand-tool kit including ladders, telescopic dusters, glass wipers, paint/cement scrapers for newly built homes, and separate color-coded microfiber cloths for bathrooms and kitchens.'
   }
 ];
 
 const SERVICE_SCOPE_COMPARISON = [
   {
     area: 'Bathrooms & Washrooms',
-    localMaid: 'Quick floor mop with phenyl or harsh raw acid that blackens steel taps and erodes tile joints.',
+    localMaid: 'Quick floor mop with phenyl or harsh raw acid that blackens steel taps and damages tile joints.',
     maxStandard:
-      'Machine scrubbing of wall & floor tiles, non-acidic hard-water scaling removal from taps/showers, WC & washbasin sanitization, mirror glass polishing, and exhaust fan cleaning.'
+      'Thorough scrubbing of wall and floor tiles, non-acidic hard-water stain removal from taps and showers, WC and washbasin sanitization, mirror cleaning, and exhaust fan wiping.'
   },
   {
     area: 'Modular Kitchen & Chimney',
     localMaid: 'Surface wiping of slab only; sticky oil layers remain on top cabinets, chimney filters, and wall tiles.',
     maxStandard:
-      'Complete degreasing of chimney hood & baffle filters, gas stove, wall tiles, outer/inner cabinet laminates (emptied or arranged), sink descaling, and appliance exterior wiping.'
+      'Complete degreasing of chimney hood and filters, gas stove, backsplash wall tiles, cabinet exteriors and interiors, steel trolleys, sink descaling, and appliance exterior wiping.'
   },
   {
     area: 'Living Room & Bedrooms',
-    localMaid: 'Basic broom sweep and wet cloth mop; ceiling fans, window tracks, and sofa fabric stay dusty.',
+    localMaid: 'Basic broom sweep and wet cloth mop; ceiling fans, window tracks, and doors stay dusty.',
     maxStandard:
-      'Single-disc rotary floor scrubbing, cobweb removal, ceiling fan & chandelier dry-wipe, UPVC/wooden window channel vacuuming, wardrobe outer polishing, and switchboard detailing.'
+      'Machine floor scrubbing, cobweb removal, ceiling fan and light fixture wiping, window glass and sliding track vacuuming, wardrobe outer cleaning, and switchboard wiping.'
   },
   {
     area: 'Sofas, Mattresses & Carpets',
-    localMaid: 'Beating with a stick or wet cloth rubbing that pushes dirt deeper and leaves damp smell.',
+    localMaid: 'Beating with a stick or wet cloth rubbing that pushes dirt deeper and leaves a damp smell.',
     maxStandard:
-      '3-step industrial dry vacuuming, Taski foam shampoo scrubbing, and high-suction wet extraction that pulls out embedded dirt and leaves fabric fresh and sanitised.'
+      'Dry vacuuming of dust, foam shampoo brushing across fabric and armrests, and wet vacuum water extraction that pulls out embedded dirt.'
   },
   {
-    area: 'Post-Construction / Move-In Homes',
-    localMaid: 'Cannot remove white cement splashes, paint drops, POP dust, or sticker glue from new glass.',
+    area: 'Post-Construction / Newly Built Homes',
+    localMaid: 'Cannot remove white cement splashes, paint drops, POP dust, or sticker marks from new glass and tiles.',
     maxStandard:
-      'Dedicated 4–6 member crew with scrapers, industrial vacuums, solvent spot-removers, and floor buffing machines to make newly built or renovated homes ready for Griha Pravesh.'
+      'Full crew with safety scrapers, dry/wet vacuums, stain removers, and floor scrubbing machines to clean newly built or renovated homes before moving in.'
   }
 ];
 
@@ -97,36 +99,47 @@ const WORKFLOW_STEPS = [
   {
     step: '01',
     title: 'Transparent Online or Call Booking',
-    desc: 'Select your exact package (Full Home 1–5 BHK, Bathroom, Kitchen, Sofa seats, or Commercial sq.ft.) with upfront rates—or call +91 98977 66002 for a custom inspection.'
+    desc: 'Select your exact service package (Full Home, Bathroom, Kitchen, Sofa seats, Water Tank, or Carpet/Pool) with clear upfront pricing—or call +91 98977 66002.'
   },
   {
     step: '02',
-    title: 'Uniformed Crew & Van Dispatch',
-    desc: 'Our background-verified team arrives on time from our Kanth Road, Moradabad hub carrying all machines, extension cords, ladders, microfiber cloths, and Taski chemicals.'
+    title: 'Uniformed Crew & Equipment Arrival',
+    desc: 'Our trained team arrives from our Kanth Road, Moradabad office carrying all required machines, extension boards, ladders, wipers, and cleaning liquids.'
   },
   {
     step: '03',
-    title: 'Supervisor-Led Room-by-Room Execution',
-    desc: 'A dedicated field supervisor oversees dry vacuuming, chemical foaming, rotary scrubbing, and detail polishing across every room on your checklist.'
+    title: 'Supervisor-Led Room-by-Room Cleaning',
+    desc: 'A field supervisor oversees dry vacuuming, degreasing, machine floor scrubbing, and bathroom detailing across every area included in your booking.'
   },
   {
     step: '04',
-    title: 'Walkthrough Inspection & Satisfaction Sign-Off',
-    desc: 'You inspect every corner—tiles, taps, kitchen cabinets, and window tracks—before the team packs up. If any spot needs a touch-up, we redo it on the spot.'
+    title: 'Final Walkthrough & Check',
+    desc: 'You check every room—tiles, taps, kitchen cabinets, and window tracks—before the team packs up. Any missed spot is touched up immediately.'
   }
 ];
+
+function getYoutubeEmbedUrl(url = '') {
+  const clean = String(url).trim();
+  const match = clean.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i
+  );
+  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+}
 
 export default function AboutPage() {
   const { cities, settings } = useBooking();
   const [brands, setBrands] = useState([]);
+  const [testimonials, setTestimonials] = useState([]);
+  const [testimonialFilter, setTestimonialFilter] = useState('all'); // 'all' | 'video' | 'written'
   const [servicesCount, setServicesCount] = useState(16);
 
   useEffect(() => {
     let active = true;
     Promise.allSettled([
       apiRequest('/public/brands'),
-      apiRequest('/services')
-    ]).then(([brandsRes, srvsRes]) => {
+      apiRequest('/services'),
+      apiRequest('/public/testimonials')
+    ]).then(([brandsRes, srvsRes, testsRes]) => {
       if (!active) return;
       if (brandsRes.status === 'fulfilled' && Array.isArray(brandsRes.value?.brands)) {
         setBrands(brandsRes.value.brands);
@@ -134,31 +147,29 @@ export default function AboutPage() {
       if (srvsRes.status === 'fulfilled' && Array.isArray(srvsRes.value?.services) && srvsRes.value.services.length > 0) {
         setServicesCount(srvsRes.value.services.length);
       }
+      if (testsRes.status === 'fulfilled' && Array.isArray(testsRes.value?.testimonials)) {
+        setTestimonials(testsRes.value.testimonials);
+      }
     });
     return () => {
       active = false;
     };
   }, []);
 
-  const displayCities = cities && cities.length > 0
+  const videoTestimonialsCount = testimonials.filter((t) => Boolean(t.videoUrl)).length;
+  const filteredTestimonials = testimonials.filter((t) => {
+    if (testimonialFilter === 'video') return Boolean(t.videoUrl);
+    if (testimonialFilter === 'written') return !t.videoUrl;
+    return true;
+  });
+
+  const displayCities = Array.isArray(cities) && cities.length > 0
     ? cities.map((c) => ({
         name: typeof c === 'string' ? c : (c.name || c.slug),
         pincodes: typeof c === 'object' && Array.isArray(c.pincodes) ? c.pincodes : [],
         radius: typeof c === 'object' && c.serviceRadiusKm ? c.serviceRadiusKm : 25
       }))
-    : [
-        { name: 'Moradabad', pincodes: ['244001', '244002', '244102', '244103', '244104'], radius: 30 },
-        { name: 'Rampur', pincodes: ['244901', '244921'], radius: 25 },
-        { name: 'Amroha', pincodes: ['244221', '244222'], radius: 25 },
-        { name: 'Sambhal', pincodes: ['244302', '244303'], radius: 25 },
-        { name: 'Chandausi', pincodes: ['244412'], radius: 25 },
-        { name: 'Gajraula', pincodes: ['244235'], radius: 25 },
-        { name: 'Bijnor', pincodes: ['246701'], radius: 25 },
-        { name: 'Dhampur', pincodes: ['246761'], radius: 25 },
-        { name: 'Noorpur', pincodes: ['246734'], radius: 25 },
-        { name: 'Hassanpur', pincodes: ['244241'], radius: 25 },
-        { name: 'Kashipur', pincodes: ['244713'], radius: 25 }
-      ];
+    : [];
 
   const hqAddress =
     settings?.address ||
@@ -188,11 +199,11 @@ export default function AboutPage() {
             </h1>
 
             <p className="text-base text-[#3D524A] leading-relaxed font-sans">
-              Anyone who has built or renovated a home in <strong>Moradabad, Rampur, Amroha, Sambhal, or Bijnor</strong> knows the frustration of hiring untrained daily-wage cleaners—raw acid poured on expensive bathroom fittings, sticky oil left on modular kitchen cabinets, and wet sofas that smell for days.
+              Anyone who has built or renovated a home in <strong>Moradabad and neighboring Western UP cities</strong> knows the frustration of hiring untrained daily-wage cleaners—raw acid poured on expensive bathroom fittings, sticky oil left on modular kitchen cabinets, and wet sofas that smell for days.
             </p>
 
             <p className="text-sm sm:text-base text-[#3D524A] leading-relaxed font-sans">
-              <strong>Max Housekeeping Service</strong> was founded right here in Moradabad (operating from <em>{hqAddress}</em>) to solve this exact problem. We operate our own mobile equipment vans, employ full-time uniformed technicians in our signature black-and-red attire, and bring industrial rotary scrubbers, wet-extraction vacuums, and non-acidic Taski chemicals directly to your doorstep.
+              <strong>Max Housekeeping Service</strong> was founded right here in Moradabad (operating from <em>{hqAddress}</em>) to solve this exact problem. We operate our own equipment teams, employ full-time uniformed technicians in our signature black-and-red attire, and bring floor scrubbing machines, wet-suction vacuums, high-pressure water jets, and safe non-acidic cleaning liquids directly to your doorstep.
             </p>
 
             {/* Key Operational Facts Strip */}
@@ -476,7 +487,193 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* 6. REGIONAL COVERAGE & HEADQUARTERS DETAILS */}
+        {/* 6. DEDICATED CUSTOMER & VIDEO TESTIMONIALS SECTION */}
+        <section id="testimonials" className="space-y-8 pb-14 border-b border-[#E2D9C8] scroll-mt-24">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-widest text-[#E9A23B] mb-1">
+                <LuStar className="w-3.5 h-3.5 fill-[#E9A23B]" />
+                <span>VERIFIED CUSTOMER FEEDBACK & VIDEO TESTIMONIALS</span>
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-display font-black text-[#10231D]">
+                What Homeowners & Businesses Say About Our Work
+              </h2>
+              <p className="text-xs sm:text-sm text-[#3D524A] mt-1">
+                Watch real client video reviews and read verified feedback from families and commercial spaces we have cleaned.
+              </p>
+            </div>
+
+            {videoTestimonialsCount > 0 && (
+              <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] self-start">
+                {[
+                  { id: 'all', label: `All (${testimonials.length})` },
+                  { id: 'video', label: `Video Reviews (${videoTestimonialsCount})` },
+                  { id: 'written', label: `Written (${testimonials.length - videoTestimonialsCount})` }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setTestimonialFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      testimonialFilter === tab.id
+                        ? 'bg-[#10231D] text-[#F4EFE6] shadow-xs'
+                        : 'text-[#3D524A] hover:text-[#10231D]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {filteredTestimonials.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredTestimonials.map((test, idx) => {
+                const initials = (test.name || 'Client')
+                  .split(' ')
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase();
+                const ytEmbed = test.videoUrl ? getYoutubeEmbedUrl(test.videoUrl) : null;
+                const isDirectVideo =
+                  test.videoUrl &&
+                  (/\.(mp4|webm|mov|ogg)(\?.*)?$/i.test(test.videoUrl) ||
+                    test.videoUrl.includes('/video/upload/') ||
+                    test.videoUrl.startsWith('data:video/'));
+
+                return (
+                  <div
+                    key={test._id || idx}
+                    className={`rounded-2xl bg-[#ECE5D8] border overflow-hidden flex flex-col justify-between transition-all hover:shadow-md ${
+                      test.isFeatured
+                        ? 'border-[#E9A23B] ring-1 ring-[#E9A23B]/30'
+                        : 'border-[#E2D9C8]'
+                    }`}
+                  >
+                    <div>
+                      {/* Video Player if Video Testimonial */}
+                      {test.videoUrl && (
+                        <div className="relative bg-black border-b border-[#E2D9C8]">
+                          {isDirectVideo ? (
+                            <video
+                              src={test.videoUrl}
+                              poster={test.avatar || undefined}
+                              controls
+                              preload="metadata"
+                              playsInline
+                              className="w-full h-56 object-cover bg-black"
+                            />
+                          ) : ytEmbed ? (
+                            <iframe
+                              src={ytEmbed}
+                              title={`${test.name} Video Testimonial`}
+                              className="w-full h-56"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <a
+                              href={test.videoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-between p-4 bg-[#10231D] text-[#F4EFE6] hover:bg-[#1A332B] transition-colors"
+                            >
+                              <span className="inline-flex items-center gap-2 text-xs font-bold">
+                                <LuPlay className="w-4 h-4 text-[#E9A23B] fill-[#E9A23B]" />
+                                Watch Customer Video Review
+                              </span>
+                              <LuArrowRight className="w-4 h-4 text-[#E9A23B]" />
+                            </a>
+                          )}
+                          <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#10231D]/90 text-[#E9A23B] text-[10px] font-mono font-bold uppercase backdrop-blur-xs">
+                            <LuVideo className="w-3 h-3" /> Video Testimonial
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="p-6">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-0.5 text-[#E9A23B]">
+                            {[...Array(test.rating || 5)].map((_, sIdx) => (
+                              <LuStar key={sIdx} className="w-4 h-4 fill-[#E9A23B]" />
+                            ))}
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#10231D] bg-[#F4EFE6] px-2.5 py-0.5 rounded-full border border-[#E2D9C8]">
+                            <LuShieldCheck className="w-3 h-3 text-[#E9A23B]" />
+                            Verified Client
+                          </span>
+                        </div>
+
+                        {test.serviceTitle && (
+                          <div className="mb-2.5">
+                            <span className="inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#10231D]/10 text-[#10231D]">
+                              {test.serviceTitle}
+                            </span>
+                          </div>
+                        )}
+
+                        {test.quote && (
+                          <p className="text-xs sm:text-sm text-[#3D524A] leading-relaxed italic">
+                            "{test.quote}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="px-6 py-4 bg-[#F4EFE6]/70 border-t border-[#E2D9C8] flex items-center gap-3">
+                      {test.avatar ? (
+                        <img
+                          src={test.avatar}
+                          alt={test.name}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-[#E9A23B] shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#10231D] text-[#E9A23B] font-display font-bold text-xs flex items-center justify-center shrink-0">
+                          {initials}
+                        </div>
+                      )}
+                      <div className="overflow-hidden">
+                        <h4 className="font-display font-bold text-xs sm:text-sm text-[#10231D] truncate">
+                          {test.name}
+                        </h4>
+                        <p className="text-[11px] text-[#6B8077] truncate">
+                          {test.role || 'Homeowner'} ·{' '}
+                          <span className="text-[#10231D] font-semibold">{test.city}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8] text-center">
+              <p className="text-sm font-bold text-[#10231D]">
+                Customer reviews and video testimonials are being updated.
+              </p>
+              <p className="text-xs text-[#6B8077] mt-1">
+                Visit our official Instagram{' '}
+                <a
+                  href={settings?.instagramUrl || 'https://www.instagram.com/maxhousekeepingservice/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#10231D] font-bold underline"
+                >
+                  @maxhousekeepingservice
+                </a>{' '}
+                to watch live site transformation videos.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* 7. REGIONAL COVERAGE & HEADQUARTERS DETAILS */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Active Cities & Pincodes */}
           <div className="lg:col-span-7 p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] flex flex-col justify-between space-y-6">
@@ -486,10 +683,10 @@ export default function AboutPage() {
                 <span>WESTERN UTTAR PRADESH & CORRIDOR COVERAGE</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-display font-black mb-3">
-                Direct Doorstep Dispatch Across {displayCities.length} Cities
+                Direct Doorstep Dispatch Across {displayCities.length || 'Our Operational'} Cities
               </h2>
               <p className="text-xs sm:text-sm text-[#DDEBE4]/85 leading-relaxed mb-6">
-                Within <strong>Moradabad city (244001–244104)</strong>, our mobile vans arrive with zero outstation travel fee. For outstation bookings in Rampur, Amroha, Sambhal, Chandausi, Gajraula, Bijnor, Dhampur, Noorpur, Hassanpur, and Kashipur, our full crew travels directly to your location on scheduled slots:
+                Within <strong>Moradabad city (244001–244104)</strong>, our teams arrive with zero outstation travel fee. For outstation bookings across our active operational cities, our full crew travels directly to your location on scheduled slots:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

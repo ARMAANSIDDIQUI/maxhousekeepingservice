@@ -8,16 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node scripts/seed.js",
-    "seed:media": "node scripts/upload-media.js",
-    "seed:all": "node scripts/upload-media.js && node scripts/seed.js",
-    "seed:reset": "node scripts/seed.js --reset",
-    "make-admin": "node scripts/makeAdmin.js",
-    "create-supervisor": "node scripts/createSupervisorCli.js",
-    "test:pricing": "node scripts/testPricing.js",
-    "test:email": "node scripts/testFunctions.js",
-    "test:supervisor": "node scripts/test-supervisor-system.js",
-    "generate-hash": "node scripts/generateHashOrSecret.js",
-    "sync:atlas": "node scripts/syncToAtlas.js"
+    "make-admin": "node scripts/makeAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

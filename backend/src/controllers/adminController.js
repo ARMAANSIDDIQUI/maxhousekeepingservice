@@ -721,20 +721,39 @@ export async function getAdminTestimonials(req, res, next) {
  */
 export async function createTestimonial(req, res, next) {
   try {
-    const { name, role, city, quote, rating, avatar, avatarPublicId, isFeatured, isActive } = req.body;
+    const {
+      name,
+      role,
+      city,
+      serviceTitle,
+      quote,
+      rating,
+      avatar,
+      avatarPublicId,
+      videoUrl,
+      videoPublicId,
+      isFeatured,
+      isActive
+    } = req.body;
 
-    if (!name || !city || !quote) {
-      return res.status(400).json({ success: false, message: 'Name, city, and quote are required.' });
+    if (!name || !city || (!quote && !videoUrl)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, city, and either a written review quote or a video testimonial are required.'
+      });
     }
 
     const testimonial = await Testimonial.create({
       name: name.trim(),
       role: role ? role.trim() : 'Homeowner',
       city: city.trim(),
-      quote: quote.trim(),
+      serviceTitle: serviceTitle ? serviceTitle.trim() : '',
+      quote: quote ? quote.trim() : '',
       rating: Math.max(1, Math.min(5, Number(rating) || 5)),
       avatar: avatar || '',
       avatarPublicId: avatarPublicId || '',
+      videoUrl: videoUrl ? videoUrl.trim() : '',
+      videoPublicId: videoPublicId || '',
       isFeatured: Boolean(isFeatured),
       isActive: isActive !== undefined ? Boolean(isActive) : true
     });
@@ -788,6 +807,12 @@ export async function deleteTestimonial(req, res, next) {
     if (testimonial.avatarPublicId) {
       deleteCloudinaryAsset(testimonial.avatarPublicId).catch(err =>
         console.warn('[Cloudinary Avatar Delete Warning]:', err.message)
+      );
+    }
+
+    if (testimonial.videoPublicId) {
+      deleteCloudinaryAsset(testimonial.videoPublicId, 'video').catch(err =>
+        console.warn('[Cloudinary Video Delete Warning]:', err.message)
       );
     }
 
