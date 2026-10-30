@@ -8192,7 +8192,8 @@ export default function AdminDashboard() {
                           </p>
                         )}
                       </div>
-                    ) : (
+                    </div>
+                  ) : (
                       <div className="py-2">
                         <p className="text-xs font-bold text-amber-800">No supervisor assigned yet</p>
                         <p className="text-[10px] text-[#6B8077] mt-0.5">Click "Assign Supervisor & Slot" to allocate this job to a supervisor.</p>
@@ -8688,14 +8689,11 @@ export default function AdminDashboard() {
           >
             <form onSubmit={handleSaveSupervisor} className="space-y-4 text-xs text-[#10231D]">
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#ECE5D8] border border-[#E2D9C8]">
-                <img
-                  src={
-                    supervisorForm.avatarUrl ||
-                    supervisorForm.avatar ||
-                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent((supervisorForm.name || 'MH').slice(0, 2))}&backgroundColor=10231D&textColor=F4EFE6&radius=50`
-                  }
-                  alt={supervisorForm.name || 'Supervisor'}
-                  className="w-12 h-12 rounded-full border-2 border-[#E2D9C8] bg-white object-cover shadow-xs shrink-0"
+                <UserAvatar
+                  user={{ name: supervisorForm.name }}
+                  avatarUrl={supervisorForm.avatarUrl || supervisorForm.avatar}
+                  name={supervisorForm.name}
+                  size="xl"
                 />
                 <div>
                   <p className="font-bold text-xs text-[#10231D]">

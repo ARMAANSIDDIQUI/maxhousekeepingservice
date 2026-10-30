@@ -300,7 +300,6 @@ export default function SupervisorDashboard() {
       }, 4000);
     }
   };
-  };
 
   // Auto-start GPS broadcasting on load without asking supervisor
   useEffect(() => {
@@ -775,9 +774,13 @@ export default function SupervisorDashboard() {
       <div className="bg-[#10231D] text-[#F4EFE6] border-b border-[#2C4A3E] px-4 py-3 sm:px-8">
         <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-black text-lg shadow-md shrink-0">
-              <LuShieldCheck className="w-6 h-6" />
-            </div>
+            <UserAvatar
+              user={user}
+              avatarUrl={user?.avatarUrl || user?.avatar}
+              name={user?.name}
+              size="lg"
+              className="border-2 border-[#E9A23B] shadow-md shrink-0"
+            />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-mono tracking-widest uppercase bg-[#E9A23B]/20 text-[#E9A23B] px-2 py-0.5 rounded-full border border-[#E9A23B]/30 font-bold">
@@ -2520,14 +2523,17 @@ export default function SupervisorDashboard() {
                   : 'Customer can view your arrival route'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => stopBroadcastingGps(sharingBookingId, true, 'manually')}
-              className="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
-              title="Stop sharing live location"
-            >
-              Stop Sharing
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => startBroadcastingGps(selectedBooking)}
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#10231D] text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1"
+                title="Force high-accuracy GPS update from phone"
+              >
+                <LuRotateCcw className="w-3.5 h-3.5" />
+                <span>Update GPS</span>
+              </button>
+            </div>
           </div>
         </aside>
       )}

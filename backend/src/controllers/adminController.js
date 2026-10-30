@@ -1685,6 +1685,7 @@ export async function assignSupervisorToBooking(req, res, next) {
       phone: supervisor.phone,
       email: supervisor.email,
       avatar: supervisor.avatar || supervisor.avatarUrl || '',
+      avatarUrl: supervisor.avatarUrl || supervisor.avatar || '',
       assignedAt: new Date()
     };
 
