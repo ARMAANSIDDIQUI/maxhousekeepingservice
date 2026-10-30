@@ -564,7 +564,11 @@ export default function BookingPage() {
           setSelectedSavedAddressId(matchingAddr._id);
           setAddressForm(prev => ({
             ...prev,
+            houseOrFlat: matchingAddr.houseOrFlat || '',
             line1: matchingAddr.line1,
+            formattedAddress: matchingAddr.formattedAddress || matchingAddr.line1,
+            placeId: matchingAddr.placeId || '',
+            coordinates: matchingAddr.coordinates || null,
             landmark: matchingAddr.landmark || '',
             cityText: matchingAddr.city,
             pincode: matchingAddr.pincode

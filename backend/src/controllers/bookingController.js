@@ -10,6 +10,7 @@ import Settings from '../models/Settings.js';
 import { calculateQuote } from '../services/pricing/engine.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
 import { validateDateMonthDays, formatDateDMY } from '../utils/dateValidation.js';
+import { geocodeAddressText } from '../services/location/locationService.js';
 
 /**
  * Guaranteed Unique, Non-Repeating Sequential Booking Code Generator
@@ -400,6 +401,20 @@ export async function createBooking(req, res, next) {
     // Check temporary address logic
     const isTempAddress = Boolean(address.isTemporary);
 
+    let bookingCoords = (address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number' && address.coordinates.lat !== 0) ? {
+      lat: address.coordinates.lat,
+      lng: address.coordinates.lng
+    } : undefined;
+
+    // Automatic Geocoding if coordinates were not captured from map
+    if (!bookingCoords) {
+      const fullText = [address.houseOrFlat, address.line1, address.landmark, address.cityText || cityDoc.name].filter(Boolean).join(', ');
+      const geocoded = await geocodeAddressText(fullText, address.cityText || cityDoc.name).catch(() => null);
+      if (geocoded?.lat && geocoded?.lng) {
+        bookingCoords = { lat: geocoded.lat, lng: geocoded.lng };
+      }
+    }
+
     const bookingData = {
       bookingCode,
       user: req.user ? req.user._id : undefined,
@@ -416,10 +431,7 @@ export async function createBooking(req, res, next) {
         houseOrFlat: address.houseOrFlat ? address.houseOrFlat.trim() : '',
         formattedAddress: address.formattedAddress ? address.formattedAddress.trim() : '',
         placeId: address.placeId ? address.placeId.trim() : '',
-        coordinates: (address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') ? {
-          lat: address.coordinates.lat,
-          lng: address.coordinates.lng
-        } : undefined,
+        coordinates: bookingCoords,
         landmark: address.landmark ? address.landmark.trim() : '',
         cityText: address.cityText.trim(),
         stateText: address.stateText || 'Uttar Pradesh',
@@ -496,10 +508,10 @@ export async function createBooking(req, res, next) {
               houseOrFlat: address.houseOrFlat ? address.houseOrFlat.trim() : '',
               formattedAddress: address.formattedAddress ? address.formattedAddress.trim() : '',
               placeId: address.placeId ? address.placeId.trim() : '',
-              coordinates: (address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') ? {
+              coordinates: bookingCoords || ((address.coordinates && typeof address.coordinates.lat === 'number' && typeof address.coordinates.lng === 'number') ? {
                 lat: address.coordinates.lat,
                 lng: address.coordinates.lng
-              } : undefined,
+              } : undefined),
               landmark: address.landmark ? address.landmark.trim() : '',
               city: address.cityText.trim(),
               state: address.stateText || 'Uttar Pradesh',
@@ -1058,28 +1070,49 @@ export async function getBookingLiveLocation(req, res, next) {
     }
 
     // Resolve Customer Destination Coordinates
-    if (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number' && booking.address.coordinates.lat !== 0) {
+    const isPlaceholderCityCenter = booking.address?.coordinates &&
+      Math.abs(booking.address.coordinates.lat - 28.8389) < 0.001 &&
+      Math.abs(booking.address.coordinates.lng - 78.7768) < 0.001;
+
+    if (booking.address?.coordinates && typeof booking.address.coordinates.lat === 'number' && booking.address.coordinates.lat !== 0 && !isPlaceholderCityCenter) {
       customerLoc = {
         lat: booking.address.coordinates.lat,
         lng: booking.address.coordinates.lng
       };
     } else {
-      let destLat = 28.8389;
-      let destLng = 78.7768;
-      if (booking.city) {
-        const cityDoc = await City.findById(booking.city);
-        if (cityDoc?.location?.coordinates?.length >= 2) {
-          destLng = cityDoc.location.coordinates[0];
-          destLat = cityDoc.location.coordinates[1];
-        }
-      } else if (booking.cityName) {
-        const cityDoc = await City.findOne({ name: new RegExp(booking.cityName, 'i') });
-        if (cityDoc?.location?.coordinates?.length >= 2) {
-          destLng = cityDoc.location.coordinates[0];
-          destLat = cityDoc.location.coordinates[1];
-        }
+      // Intelligently geocode address to actual destination coordinates before falling back
+      const addrQuery = [
+        booking.address?.houseOrFlat,
+        booking.address?.line1,
+        booking.address?.landmark,
+        booking.address?.cityText || booking.cityName
+      ].filter(Boolean).join(', ');
+
+      let geocoded = null;
+      if (addrQuery) {
+        geocoded = await geocodeAddressText(addrQuery, booking.address?.cityText || booking.cityName).catch(() => null);
       }
-      customerLoc = { lat: destLat, lng: destLng };
+
+      if (geocoded?.lat && geocoded?.lng) {
+        customerLoc = { lat: geocoded.lat, lng: geocoded.lng };
+      } else {
+        let destLat = 28.8389;
+        let destLng = 78.7768;
+        if (booking.city) {
+          const cityDoc = await City.findById(booking.city);
+          if (cityDoc?.location?.coordinates?.length >= 2) {
+            destLng = cityDoc.location.coordinates[0];
+            destLat = cityDoc.location.coordinates[1];
+          }
+        } else if (booking.cityName) {
+          const cityDoc = await City.findOne({ name: new RegExp(booking.cityName, 'i') });
+          if (cityDoc?.location?.coordinates?.length >= 2) {
+            destLng = cityDoc.location.coordinates[0];
+            destLat = cityDoc.location.coordinates[1];
+          }
+        }
+        customerLoc = { lat: destLat, lng: destLng };
+      }
       if (!booking.address) booking.address = {};
       booking.address.coordinates = customerLoc;
       await booking.save().catch(() => {});

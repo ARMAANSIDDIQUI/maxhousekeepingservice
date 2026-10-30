@@ -44,7 +44,7 @@ export default function LiveTrackingRadar({
   destinationAddress = '',
   supervisorInfo = null,
   isSupervisorAssigned: initialAssignedProp = undefined,
-  pollIntervalMs = 12000
+  pollIntervalMs = 3000
 }) {
   const initialHasSupervisor =
     typeof initialAssignedProp === 'boolean'
@@ -365,7 +365,7 @@ export default function LiveTrackingRadar({
         zoom: 15,
         mapTypeId: 'roadmap',
         mapTypeControl: false,
-        streetViewControl: true,
+        streetViewControl: false,
         fullscreenControl: true,
         zoomControl: true
       });

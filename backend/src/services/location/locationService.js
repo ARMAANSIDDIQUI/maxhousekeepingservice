@@ -647,5 +647,94 @@ export default {
   expandIndianQueryVariants,
   computeAddressPriorityScore,
   searchAndPrioritizeAddresses,
-  reverseGeocodeLocation
+  reverseGeocodeLocation,
+  geocodeAddressText
 };
+
+/**
+ * Forward geocodes an address string to precise latitude and longitude coordinates.
+ * Tries Google Maps Geocoding API first, then Photon Komoot, then Nominatim.
+ */
+export async function geocodeAddressText(addressText, cityName = '') {
+  const cleanAddr = String(addressText || '').trim();
+  if (!cleanAddr) return null;
+
+  // Build clean search query with city and state context
+  const hasCity = cityName && cleanAddr.toLowerCase().includes(cityName.toLowerCase());
+  const query = `${cleanAddr}${hasCity ? '' : (cityName ? `, ${cityName}` : '')}, Uttar Pradesh, India`;
+
+  // 1. Google Maps Geocoding API
+  let googleApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+  if (!googleApiKey) {
+    try {
+      const settings = await Settings.getSingleton();
+      googleApiKey = settings?.integrations?.googleMapsApiKey || '';
+    } catch {}
+  }
+
+  if (googleApiKey && googleApiKey !== 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+    try {
+      const gUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${googleApiKey}`;
+      const res = await fetch(gUrl, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const data = await res.json();
+        const first = data?.results?.[0];
+        if (first?.geometry?.location?.lat && first?.geometry?.location?.lng) {
+          return {
+            lat: Number(first.geometry.location.lat),
+            lng: Number(first.geometry.location.lng),
+            formattedAddress: first.formatted_address || cleanAddr,
+            placeId: first.place_id || ''
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[geocodeAddressText Google Geocode Notice]:', err.message);
+    }
+  }
+
+  // 2. Photon Komoot Geocoder
+  try {
+    const pUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(`${cleanAddr} ${cityName || 'Moradabad'}`)}&limit=1`;
+    const res = await fetch(pUrl, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      const first = data?.features?.[0];
+      const coords = first?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        return {
+          lat: Number(coords[1]),
+          lng: Number(coords[0]),
+          formattedAddress: cleanAddr,
+          placeId: ''
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[geocodeAddressText Photon Notice]:', err.message);
+  }
+
+  // 3. OpenStreetMap Nominatim
+  try {
+    const nUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${cleanAddr}, ${cityName || 'Moradabad'}, Uttar Pradesh, India`)}&format=json&limit=1`;
+    const res = await fetch(nUrl, {
+      headers: { 'User-Agent': 'MaxHousekeeping/1.0 (info@maxhousekeepingservice.com)' },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]?.lat && data[0]?.lon) {
+        return {
+          lat: Number(parseFloat(data[0].lat)),
+          lng: Number(parseFloat(data[0].lon)),
+          formattedAddress: data[0].display_name || cleanAddr,
+          placeId: `nom_${data[0].place_id || ''}`
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[geocodeAddressText Nominatim Notice]:', err.message);
+  }
+
+  return null;
+}

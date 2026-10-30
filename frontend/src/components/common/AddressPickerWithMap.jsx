@@ -313,7 +313,7 @@ export default function AddressPickerWithMap({
         zoom: 16,
         mapTypeId: 'roadmap',
         mapTypeControl: false,
-        streetViewControl: true,
+        streetViewControl: false,
         fullscreenControl: true,
         zoomControl: true,
         clickableIcons: true,
