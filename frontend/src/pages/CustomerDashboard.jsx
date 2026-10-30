@@ -105,10 +105,8 @@ export default function CustomerDashboard() {
 
   // Change Password Modal & Form State
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -672,11 +670,10 @@ export default function CustomerDashboard() {
     }
 
     setChangingPassword(true);
-    const res = await changePassword(currentPassword, newPassword);
+    const res = await changePassword(newPassword);
     setChangingPassword(false);
 
     if (res?.success) {
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setIsChangePasswordModalOpen(false);
@@ -1685,30 +1682,6 @@ export default function CustomerDashboard() {
               </div>
 
               <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Current Password:
-                  </label>
-                  <div className="relative">
-                    <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
-                    <input
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      placeholder="Enter current password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1 transition-colors"
-                      title={showCurrentPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showCurrentPassword ? <LuEyeOff className="w-4 h-4" /> : <LuEye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-[#10231D] mb-1">
@@ -1927,33 +1900,10 @@ export default function CustomerDashboard() {
             isOpen={true}
             onClose={() => setIsChangePasswordModalOpen(false)}
             title="Change Account Password"
-            subtitle="Enter your current password and choose a new secure password"
+            subtitle="Choose and confirm a new password for your account"
             maxWidth="max-w-md"
           >
             <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Current Password:
-                </label>
-                <div className="relative">
-                  <LuKey className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B8077]" />
-                  <input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    placeholder="Enter current password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B8077] hover:text-[#10231D] p-1"
-                  >
-                    {showCurrentPassword ? <LuEyeOff className="w-4 h-4" /> : <LuEye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-xs font-bold text-[#10231D] mb-1">
                   New Password (min 6 chars):

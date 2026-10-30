@@ -934,7 +934,7 @@ export async function resetPassword(req, res, next) {
  */
 export async function changePassword(req, res, next) {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { newPassword } = req.body;
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({
@@ -951,25 +951,9 @@ export async function changePassword(req, res, next) {
       });
     }
 
-    // If user has an existing passwordHash, verify current password
-    if (user.passwordHash) {
-      if (!currentPassword) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please provide your current password.'
-        });
-      }
-      const isMatch = await user.comparePassword(currentPassword);
-      if (!isMatch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password is incorrect.'
-        });
-      }
-    }
-
     user.passwordHash = newPassword; // Pre-save hook will hash it
     await user.save();
+    invalidateAuthUserCache(user._id);
 
     res.status(200).json({
       success: true,

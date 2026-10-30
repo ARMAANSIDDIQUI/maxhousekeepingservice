@@ -332,12 +332,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Change Password
-  const changePassword = async (currentPassword, newPassword) => {
+  // Change Password (no current password required for authenticated user)
+  const changePassword = async (firstArg, secondArg) => {
+    const newPassword = secondArg !== undefined ? secondArg : firstArg;
     try {
       const data = await apiRequest('/auth/change-password', {
         method: 'PUT',
-        body: { currentPassword, newPassword }
+        body: { newPassword }
       });
       if (data.success) {
         toast.success(data.message || 'Password updated successfully.');
