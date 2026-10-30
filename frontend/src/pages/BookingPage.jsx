@@ -87,6 +87,7 @@ function areCitiesMatching(cityA, cityB) {
   const normB = String(cityB || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!normA || !normB) return false;
   if (normA === normB) return true;
+  if (normA.includes(normB) || normB.includes(normA)) return true;
   const aliases = {
     gurgaon: 'gurugram',
     gurugram: 'gurgaon',

@@ -595,40 +595,124 @@ export default function AddressPickerWithMap({
     }, 180);
   };
 
+  // Multi-engine forward geocoder fallback (Backend API -> Photon -> Nominatim)
+  const geocodeAddressFallback = async (queryText) => {
+    const targetCity = cityText || defaultCity || 'Moradabad';
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/locations/geocode?q=${encodeURIComponent(queryText)}&city=${encodeURIComponent(targetCity)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && typeof data.lat === 'number' && typeof data.lng === 'number') {
+          return {
+            lat: data.lat,
+            lng: data.lng,
+            formattedAddress: data.formattedAddress || queryText
+          };
+        }
+      }
+    } catch (_) {}
+
+    // Photon Komoot fallback
+    try {
+      const pUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(`${queryText} ${targetCity}`)}&limit=1`;
+      const pRes = await fetch(pUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const feat = pData?.features?.[0];
+        if (feat?.geometry?.coordinates?.length === 2) {
+          return {
+            lat: feat.geometry.coordinates[1],
+            lng: feat.geometry.coordinates[0],
+            formattedAddress: feat.properties?.name || queryText
+          };
+        }
+      }
+    } catch (_) {}
+
+    // Nominatim fallback
+    try {
+      const nUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(`${queryText}, ${targetCity}, Uttar Pradesh, India`)}&limit=1`;
+      const nRes = await fetch(nUrl, { headers: { 'Accept-Language': 'en' } });
+      if (nRes.ok) {
+        const nData = await nRes.json();
+        if (Array.isArray(nData) && nData[0]?.lat && nData[0]?.lon) {
+          return {
+            lat: parseFloat(nData[0].lat),
+            lng: parseFloat(nData[0].lon),
+            formattedAddress: nData[0].display_name
+          };
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  };
+
   // Search and move map pin when user clicks "Find on Map" or presses Enter
-  const handleRefineLocationFromSearch = (searchText = streetQuery) => {
+  const handleRefineLocationFromSearch = async (searchText = streetQuery) => {
     const query = (searchText || '').trim();
     if (!query) return;
 
     setShowPredictions(false);
     setIsSearching(true);
 
+    let foundCoords = null;
+    let foundComps = {};
+    let resolvedText = query;
+
+    // 1. Try Google Geocoder first if available
     if (geocoderRef.current) {
-      geocoderRef.current.geocode(
-        {
-          address: query,
-          componentRestrictions: { country: 'in' }
-        },
-        (results, status) => {
-          setIsSearching(false);
-          if (status === 'OK' && results && results[0]) {
-            const best = results[0];
-            const loc = best.geometry?.location;
-            if (loc) {
-              const newCoords = { lat: loc.lat(), lng: loc.lng() };
-              const comps = extractFromGeocodeResults(results);
-              applyLocationCoordinates(newCoords, {
-                line1: query,
-                city: comps.city || cityText,
-                state: comps.state || stateText,
-                pincode: comps.pincode || getDefaultPincodeForCity(comps.city || cityText, mongoCities) || pincode
-              });
+      try {
+        const geoResults = await new Promise((resolve) => {
+          geocoderRef.current.geocode(
+            {
+              address: `${query}, ${cityText || defaultCity || 'Moradabad'}, Uttar Pradesh, India`,
+              componentRestrictions: { country: 'in' }
+            },
+            (results, status) => {
+              if (status === 'OK' && results?.[0]?.geometry?.location) {
+                resolve(results);
+              } else {
+                resolve(null);
+              }
             }
-          }
+          );
+        });
+
+        if (geoResults && geoResults[0]) {
+          const loc = geoResults[0].geometry.location;
+          foundCoords = { lat: loc.lat(), lng: loc.lng() };
+          foundComps = extractFromGeocodeResults(geoResults);
+          resolvedText = geoResults[0].formatted_address || query;
         }
-      );
+      } catch (_) {}
+    }
+
+    // 2. If Google Geocoder didn't return coords, use multi-engine fallback
+    if (!foundCoords) {
+      const fallback = await geocodeAddressFallback(query);
+      if (fallback) {
+        foundCoords = { lat: fallback.lat, lng: fallback.lng };
+        resolvedText = fallback.formattedAddress || query;
+      }
+    }
+
+    setIsSearching(false);
+
+    if (foundCoords) {
+      applyLocationCoordinates(foundCoords, {
+        line1: resolvedText,
+        city: foundComps.city || cityText || defaultCity,
+        state: foundComps.state || stateText || 'Uttar Pradesh',
+        pincode: foundComps.pincode || getDefaultPincodeForCity(foundComps.city || cityText, mongoCities) || pincode
+      });
+      if (reverseGeocodeRef.current) {
+        await reverseGeocodeRef.current(foundCoords, false);
+      }
     } else {
-      setIsSearching(false);
+      setRefinementTip(`Location query recorded. Please tap directly on the map to place your pin.`);
     }
   };
 
@@ -656,7 +740,7 @@ export default function AddressPickerWithMap({
     setPincode(newPincode);
     if (newLine1) setStreetQuery(newLine1);
 
-    setRefinementTip(`Location set in ${newCity} (${newPincode}).`);
+    setRefinementTip(`Pin placed at: ${newLine1}`);
 
     emitChange({
       coordinates: newCoords,
@@ -670,7 +754,7 @@ export default function AddressPickerWithMap({
     });
   };
 
-  // When user picks a recommendation from the dropdown
+  // When user picks a recommendation from the dropdown -> Pinpoint & Auto-fill!
   const handleSelectPrediction = async (prediction) => {
     setShowPredictions(false);
     const chosenText = prediction.description || prediction.structured_formatting?.main_text || '';
@@ -679,7 +763,7 @@ export default function AddressPickerWithMap({
     // 1. If prediction already has lat/lng
     if (typeof prediction.lat === 'number' && typeof prediction.lng === 'number') {
       const newCoords = { lat: prediction.lat, lng: prediction.lng };
-      const resolvedCity = prediction.city || prediction.mongoCityName || cityText;
+      const resolvedCity = prediction.city || prediction.mongoCityName || cityText || defaultCity;
       const resolvedPin = prediction.pincode || getDefaultPincodeForCity(resolvedCity, mongoCities) || pincode;
       applyLocationCoordinates(newCoords, {
         line1: chosenText,
@@ -687,6 +771,9 @@ export default function AddressPickerWithMap({
         state: prediction.state || 'Uttar Pradesh',
         pincode: resolvedPin
       });
+      if (reverseGeocodeRef.current) {
+        await reverseGeocodeRef.current(newCoords, false);
+      }
       return;
     }
 
@@ -702,14 +789,20 @@ export default function AddressPickerWithMap({
       const comps = extractAddressComponents(prediction, true);
       applyLocationCoordinates(newCoords, {
         line1: chosenText,
-        city: comps.city,
-        state: comps.state,
-        pincode: comps.pincode
+        city: comps.city || cityText || defaultCity,
+        state: comps.state || 'Uttar Pradesh',
+        pincode: comps.pincode || pincode
       });
+      if (reverseGeocodeRef.current) {
+        await reverseGeocodeRef.current(newCoords, false);
+      }
       return;
     }
 
-    // 3. Try Places API (New): placePredictionObj.toPlace().fetchFields(...)
+    // 3. Try Places API (New) or Legacy PlacesService
+    let resolvedCoords = null;
+    let resolvedComps = {};
+
     if (prediction.placePredictionObj?.toPlace || (window.google?.maps?.places?.Place && prediction.place_id)) {
       try {
         setIsSearching(true);
@@ -719,112 +812,97 @@ export default function AddressPickerWithMap({
         await placeObj.fetchFields({
           fields: ['displayName', 'formattedAddress', 'location', 'addressComponents']
         });
-        if (window.google?.maps?.places?.AutocompleteSessionToken) {
-          sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
-        }
         if (placeObj.location) {
-          const lat = typeof placeObj.location.lat === 'function' ? placeObj.location.lat() : placeObj.location.lat;
-          const lng = typeof placeObj.location.lng === 'function' ? placeObj.location.lng() : placeObj.location.lng;
-          let detectedCity = '';
-          let detectedState = '';
-          let detectedPincode = '';
+          resolvedCoords = {
+            lat: typeof placeObj.location.lat === 'function' ? placeObj.location.lat() : placeObj.location.lat,
+            lng: typeof placeObj.location.lng === 'function' ? placeObj.location.lng() : placeObj.location.lng
+          };
           for (const comp of placeObj.addressComponents || []) {
             const types = comp.types || [];
             const val = comp.longText || comp.shortText || '';
-            if (!detectedPincode && types.includes('postal_code')) detectedPincode = val;
-            if (!detectedCity && (types.includes('locality') || types.includes('administrative_area_level_2'))) detectedCity = val;
-            if (!detectedState && types.includes('administrative_area_level_1')) detectedState = val;
+            if (!resolvedComps.pincode && types.includes('postal_code')) resolvedComps.pincode = val;
+            if (!resolvedComps.city && (types.includes('locality') || types.includes('administrative_area_level_2'))) resolvedComps.city = val;
+            if (!resolvedComps.state && types.includes('administrative_area_level_1')) resolvedComps.state = val;
           }
-          const finalCity = detectedCity || prediction.city || prediction.mongoCityName || cityText;
-          const finalPin = detectedPincode || prediction.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
-          setIsSearching(false);
-          applyLocationCoordinates(
-            { lat, lng },
+        }
+      } catch (_) {}
+    }
+
+    if (!resolvedCoords && placesServiceRef.current && prediction.place_id) {
+      try {
+        setIsSearching(true);
+        const place = await new Promise((resolve) => {
+          placesServiceRef.current.getDetails(
             {
-              line1: chosenText || placeObj.formattedAddress,
-              city: finalCity,
-              state: detectedState || 'Uttar Pradesh',
-              pincode: finalPin
+              placeId: prediction.place_id,
+              fields: ['name', 'geometry', 'formatted_address', 'address_components', 'place_id'],
+              sessionToken: sessionTokenRef.current
+            },
+            (res, status) => {
+              if (status === window.google?.maps?.places?.PlacesServiceStatus?.OK && res?.geometry?.location) {
+                resolve(res);
+              } else {
+                resolve(null);
+              }
             }
           );
-          return;
+        });
+
+        if (place?.geometry?.location) {
+          resolvedCoords = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng()
+          };
+          resolvedComps = extractAddressComponents(place, false);
         }
-      } catch (_) {
-        // Fall through to legacy getDetails / Geocoder
-      }
+      } catch (_) {}
     }
 
-    // 4. Try Legacy PlacesService.getDetails or Geocoder by placeId
-    if (!placesServiceRef.current || !prediction.place_id) {
-      handleRefineLocationFromSearch(chosenText);
-      return;
-    }
-
-    setIsSearching(true);
-    placesServiceRef.current.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['name', 'geometry', 'formatted_address', 'address_components', 'place_id'],
-        sessionToken: sessionTokenRef.current
-      },
-      (place, status) => {
-        setIsSearching(false);
-        if (window.google?.maps?.places?.AutocompleteSessionToken) {
-          sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
-        }
-
-        if (status === window.google?.maps?.places?.PlacesServiceStatus?.OK && place?.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const newCoords = { lat, lng };
-
-          const displayAddr = chosenText || place.formatted_address;
-          const comps = extractAddressComponents(place, false);
-          setStreetQuery(displayAddr);
-
-          if (!comps.pincode && geocoderRef.current) {
-            geocoderRef.current.geocode({ location: newCoords }, (geoResults, geoStatus) => {
-              const geoComps = (geoStatus === 'OK' && geoResults) ? extractFromGeocodeResults(geoResults) : {};
-              const finalCity = geoComps.city || comps.city || cityText;
-              const finalPin = geoComps.pincode || comps.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
-              applyLocationCoordinates(newCoords, {
-                line1: displayAddr,
-                city: finalCity,
-                state: geoComps.state || comps.state || 'Uttar Pradesh',
-                pincode: finalPin
-              });
-            });
-          } else {
-            applyLocationCoordinates(newCoords, {
-              line1: displayAddr,
-              city: comps.city,
-              state: comps.state,
-              pincode: comps.pincode
-            });
-          }
-        } else if (geocoderRef.current && prediction.place_id) {
-          geocoderRef.current.geocode({ placeId: prediction.place_id }, (geoResults, geoStatus) => {
-            if (geoStatus === 'OK' && geoResults?.[0]?.geometry?.location) {
-              const loc = geoResults[0].geometry.location;
-              const newCoords = { lat: loc.lat(), lng: loc.lng() };
-              const comps = extractFromGeocodeResults(geoResults);
-              const finalCity = comps.city || prediction.city || cityText;
-              const finalPin = comps.pincode || prediction.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
-              applyLocationCoordinates(newCoords, {
-                line1: chosenText,
-                city: finalCity,
-                state: comps.state || 'Uttar Pradesh',
-                pincode: finalPin
-              });
+    // 4. Try Geocoder by placeId
+    if (!resolvedCoords && geocoderRef.current && prediction.place_id) {
+      try {
+        const geoResults = await new Promise((resolve) => {
+          geocoderRef.current.geocode({ placeId: prediction.place_id }, (results, status) => {
+            if (status === 'OK' && results?.[0]?.geometry?.location) {
+              resolve(results);
             } else {
-              handleRefineLocationFromSearch(chosenText);
+              resolve(null);
             }
           });
-        } else {
-          handleRefineLocationFromSearch(chosenText);
+        });
+        if (geoResults && geoResults[0]) {
+          const loc = geoResults[0].geometry.location;
+          resolvedCoords = { lat: loc.lat(), lng: loc.lng() };
+          resolvedComps = extractFromGeocodeResults(geoResults);
         }
+      } catch (_) {}
+    }
+
+    // 5. Fallback: Multi-Engine Geocoder (Backend + Photon + Nominatim)
+    if (!resolvedCoords) {
+      const fallback = await geocodeAddressFallback(chosenText);
+      if (fallback) {
+        resolvedCoords = { lat: fallback.lat, lng: fallback.lng };
       }
-    );
+    }
+
+    setIsSearching(false);
+
+    if (resolvedCoords) {
+      const finalCity = resolvedComps.city || prediction.city || cityText || defaultCity;
+      const finalPin = resolvedComps.pincode || prediction.pincode || getDefaultPincodeForCity(finalCity, mongoCities) || pincode;
+      applyLocationCoordinates(resolvedCoords, {
+        line1: chosenText,
+        city: finalCity,
+        state: resolvedComps.state || 'Uttar Pradesh',
+        pincode: finalPin
+      });
+      if (reverseGeocodeRef.current) {
+        await reverseGeocodeRef.current(resolvedCoords, false);
+      }
+    } else {
+      handleRefineLocationFromSearch(chosenText);
+    }
   };
 
   // Quick-select one of our saved MongoDB cities
@@ -1166,70 +1244,68 @@ export default function AddressPickerWithMap({
     reverseGeocodeRef.current = reverseGeocodeAndAutofill;
   }, [reverseGeocodeAndAutofill]);
 
-  // Use Current Phone/Browser Location ("Locate Me (GPS)") & Autofill "Search Street / Area / Landmark:" Bar
+  // Use Current Phone/Browser Location ("Locate Me (GPS)") & Autofill all address fields
   const handleUseCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      setRefinementTip('Geolocation is not supported by your browser.');
+      return;
+    }
+
     setIsLocatingUser(true);
     setShowPredictions(false);
+    setRefinementTip('Acquiring high-accuracy GPS fix from device...');
 
     const getBrowserCoords = (options) =>
       new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('Geolocation not supported'));
-          return;
-        }
         navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
 
     let detectedCoords = null;
+    let gpsAccuracy = 0;
 
-    // Step 1: Try High-Accuracy GPS first
     try {
       const pos = await getBrowserCoords({
         enableHighAccuracy: true,
-        timeout: 6000,
+        timeout: 12000,
         maximumAge: 0
       });
+      gpsAccuracy = pos.coords.accuracy || 10;
       detectedCoords = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude
+        lat: Number(pos.coords.latitude.toFixed(6)),
+        lng: Number(pos.coords.longitude.toFixed(6))
       };
-    } catch (_) {
-      // Step 2: Retry with Standard/Network Location (faster on laptops & desktops)
-      try {
-        const posLow = await getBrowserCoords({
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 300000
-        });
-        detectedCoords = {
-          lat: posLow.coords.latitude,
-          lng: posLow.coords.longitude
-        };
-      } catch (_) {}
+    } catch (err) {
+      console.warn('[Locate Me GPS notice]:', err.message);
     }
 
-    // Step 3: If browser geolocation timed out or was blocked, fall back to IP/Client location or current map pin
-    if (!detectedCoords) {
-      try {
-        const ipRes = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?localityLanguage=en');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          if (typeof ipData.latitude === 'number' && typeof ipData.longitude === 'number') {
-            detectedCoords = { lat: ipData.latitude, lng: ipData.longitude };
-          }
-        }
-      } catch (_) {}
+    // Reject inaccurate cellular ISP packet gateways (>5000m) that place users in Meerut/Delhi
+    if (detectedCoords && gpsAccuracy > 5000) {
+      setRefinementTip('Network tower location was inaccurate (>5km). Please tap your exact location on the map.');
+      setIsLocatingUser(false);
+      return;
     }
 
     if (!detectedCoords) {
-      detectedCoords =
-        coordinates && typeof coordinates.lat === 'number'
-          ? coordinates
-          : { lat: 28.8386, lng: 78.7733 };
+      setIsLocatingUser(false);
+      setRefinementTip('Could not acquire GPS fix. Please search your area or tap on the map.');
+      return;
     }
 
+    // Move map and update pinpoint marker immediately
+    setCoordinates(detectedCoords);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo(detectedCoords);
+      mapInstanceRef.current.setZoom(17);
+    }
+    if (markerInstanceRef.current) {
+      markerInstanceRef.current.setPosition(detectedCoords);
+      triggerPinDropAnimation();
+    }
+
+    // Reverse-geocode to auto-fill Search box / Line 1, Landmark, City, State, and Pincode
     try {
       await reverseGeocodeAndAutofill(detectedCoords, true);
+      setRefinementTip('GPS located! Pin dropped at your doorstep and address autofilled.');
     } finally {
       setIsLocatingUser(false);
     }

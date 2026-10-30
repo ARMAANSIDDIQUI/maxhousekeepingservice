@@ -1,5 +1,36 @@
 import City from '../models/City.js';
-import { resolveLocation, searchAndPrioritizeAddresses, reverseGeocodeLocation } from '../services/location/locationService.js';
+import { resolveLocation, searchAndPrioritizeAddresses, reverseGeocodeLocation, geocodeAddressText } from '../services/location/locationService.js';
+
+/**
+ * Forward geocode address query to precise GPS coordinates
+ * GET /api/v1/locations/geocode?q=...&city=...
+ */
+export async function geocodeAddress(req, res, next) {
+  try {
+    const { q, city } = req.query;
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: 'Query parameter q is required.'
+      });
+    }
+
+    const result = await geocodeAddressText(q, city);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coordinates could not be resolved for this address query.'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Reverse geocode GPS coordinates to street/area/landmark, city, and pincode
