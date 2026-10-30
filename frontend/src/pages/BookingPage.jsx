@@ -56,12 +56,15 @@ export function isServiceAvailableInCity(service, citySlug) {
     }
   }
 
-  // 2. Check if service has rates configured for this specific city
+  // 2. Check if service or any of its matrix variants has rates configured for this specific city
   if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
     const hasCityRate = service.cityRates.some(cr => (cr.citySlug || '').toLowerCase().trim() === targetCity);
     if (hasCityRate) {
       return true;
     }
+  }
+  if (Array.isArray(service.matrix) && service.matrix.some(r => Array.isArray(r.cityRates) && r.cityRates.some(cr => (cr.citySlug || '').toLowerCase().trim() === targetCity))) {
+    return true;
   }
 
   // 3. Fallback for specialized doorstep cleaning services
@@ -77,18 +80,38 @@ export function isServiceAvailableInCity(service, citySlug) {
   return isSpecialty;
 }
 
+// Helper to compare two city names/slugs strictly (ignoring case/whitespace/punctuation)
+function areCitiesMatching(cityA, cityB) {
+  const normA = String(cityA || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normB = String(cityB || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!normA || !normB) return false;
+  if (normA === normB) return true;
+  const aliases = {
+    gurgaon: 'gurugram',
+    gurugram: 'gurgaon',
+    newdelhi: 'delhi',
+    delhi: 'newdelhi',
+    delhincr: 'delhi',
+    bangalore: 'bengaluru',
+    bengaluru: 'bangalore',
+    prayagraj: 'allahabad',
+    allahabad: 'prayagraj'
+  };
+  return aliases[normA] === normB || aliases[normB] === normA;
+}
+
 // Helper to calculate exact variant unit price and MRP
 function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad', selections = {}) {
   if (!service) return { price: 0, mrp: 0 };
-  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
+  const targetSlug = String(citySlug || 'moradabad').toLowerCase().trim();
+  const isMoradabad = !targetSlug || targetSlug === 'moradabad';
 
-  // Check custom city-specific rates
+  // Check custom city-specific rates at service level
   let cityRateMatched = false;
   let cityMatchedRate = null;
   let cityMatchedMrp = null;
 
-  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && citySlug) {
-    const targetSlug = String(citySlug).toLowerCase().trim();
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && targetSlug) {
     const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
     if (match && typeof match.rate === 'number' && match.rate > 0) {
       cityRateMatched = true;
@@ -128,10 +151,8 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     let m = cityMatchedMrp ? Math.round(cityMatchedMrp * effectiveUnits) : Math.round(p * mrpFactor);
 
     let outstationExtra = 0;
-    if (!isMoradabad) {
-      outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-        ? service.cityExtraCharge
-        : 100;
+    if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+      outstationExtra = service.cityExtraCharge;
       p += outstationExtra;
       m += outstationExtra;
     }
@@ -163,16 +184,30 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     for (const row of service.matrix) {
       if (row.isActive === false) continue;
       const sel = row.selection instanceof Map ? Object.fromEntries(row.selection) : (row.selection || {});
-      const rowVal = String(sel[groupKey] || '').toLowerCase().trim();
+      const rowVal = String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase().trim();
       if (rowVal === String(optKey).toLowerCase().trim()) {
-        if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
-          const ratio = cityMatchedRate / service.price;
-          basePrice = Math.round(row.price * ratio);
-          const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
-          baseMrp = Math.round((row.mrp || row.price) * mrpRatio);
-        } else {
-          basePrice = row.price;
-          baseMrp = row.mrp || row.price;
+        let rowCityMatched = false;
+        if (Array.isArray(row.cityRates) && row.cityRates.length > 0 && targetSlug) {
+          const rowMatch = row.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+          if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
+            rowCityMatched = true;
+            cityRateMatched = true;
+            basePrice = rowMatch.rate;
+            baseMrp = (typeof rowMatch.mrp === 'number' && rowMatch.mrp > 0)
+              ? rowMatch.mrp
+              : (row.mrp && row.price ? Math.round(rowMatch.rate * (row.mrp / row.price)) : rowMatch.rate);
+          }
+        }
+        if (!rowCityMatched) {
+          if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+            const ratio = cityMatchedRate / service.price;
+            basePrice = Math.round(row.price * ratio);
+            const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
+            baseMrp = Math.round((row.mrp || row.price) * mrpRatio);
+          } else {
+            basePrice = row.price;
+            baseMrp = row.mrp || row.price;
+          }
         }
         if (row.duration) duration = row.duration;
         break;
@@ -182,11 +217,23 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     const group = service.optionGroups?.find(g => g.key === groupKey);
     const opt = group?.options?.find(o => o.key === optKey);
     if (opt) {
-      basePrice += (opt.priceDelta || 0);
-      baseMrp += (opt.mrpDelta || opt.priceDelta || 0);
-      if (opt.multiplier && opt.multiplier > 0) {
-        basePrice = Math.round(basePrice * opt.multiplier);
-        baseMrp = Math.round(baseMrp * opt.multiplier);
+      let optCityMatched = false;
+      if (Array.isArray(opt.cityRates) && opt.cityRates.length > 0 && targetSlug) {
+        const optMatch = opt.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+        if (optMatch && typeof optMatch.rate === 'number' && optMatch.rate > 0) {
+          optCityMatched = true;
+          cityRateMatched = true;
+          basePrice = optMatch.rate;
+          baseMrp = (typeof optMatch.mrp === 'number' && optMatch.mrp > 0) ? optMatch.mrp : optMatch.rate;
+        }
+      }
+      if (!optCityMatched) {
+        basePrice += (opt.priceDelta || 0);
+        baseMrp += (opt.mrpDelta || opt.priceDelta || 0);
+        if (opt.multiplier && opt.multiplier > 0) {
+          basePrice = Math.round(basePrice * opt.multiplier);
+          baseMrp = Math.round(baseMrp * opt.multiplier);
+        }
       }
       if (opt.durationDelta) duration = opt.durationDelta;
     }
@@ -207,12 +254,10 @@ function getServiceVariantPrice(service, optKey, groupKey, citySlug = 'moradabad
     }
   }
 
-  // Outstation dispatch surcharge (automatically added for cities outside Moradabad)
+  // Outstation dispatch surcharge (only if no city-specific rate matched and cityExtraCharge > 0)
   let outstationExtra = 0;
-  if (!isMoradabad) {
-    outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-      ? service.cityExtraCharge
-      : 100;
+  if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+    outstationExtra = service.cityExtraCharge;
     basePrice += outstationExtra;
     baseMrp += outstationExtra;
   }
@@ -386,6 +431,7 @@ export default function BookingPage() {
   // Address Feature (Saved Address Selection vs New Address)
   const [isTemporaryAddress, setIsTemporaryAddress] = useState(false);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
+  const [cityMismatchModal, setCityMismatchModal] = useState(null);
   const [addressForm, setAddressForm] = useState({
     houseOrFlat: '',
     line1: '',
@@ -449,7 +495,7 @@ export default function BookingPage() {
     };
   }, [paymentChoice]);
 
-  // Pre-fill user data if logged in
+  // Pre-fill user data if logged in (only auto-select saved address if its city matches selectedCity)
   useEffect(() => {
     if (user) {
       setCustomer(prev => ({
@@ -460,18 +506,54 @@ export default function BookingPage() {
       }));
 
       if (user.addresses && user.addresses.length > 0 && !selectedSavedAddressId) {
-        const defaultAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
-        setSelectedSavedAddressId(defaultAddr._id);
-        setAddressForm(prev => ({
-          ...prev,
-          line1: defaultAddr.line1,
-          landmark: defaultAddr.landmark || '',
-          cityText: defaultAddr.city,
-          pincode: defaultAddr.pincode
-        }));
+        const siteCityName = selectedCity?.name || selectedCity?.slug || 'Moradabad';
+        const matchingAddr =
+          user.addresses.find(a => a.isDefault && areCitiesMatching(a.city, siteCityName)) ||
+          user.addresses.find(a => areCitiesMatching(a.city, siteCityName));
+
+        if (matchingAddr) {
+          setSelectedSavedAddressId(matchingAddr._id);
+          setAddressForm(prev => ({
+            ...prev,
+            line1: matchingAddr.line1,
+            landmark: matchingAddr.landmark || '',
+            cityText: matchingAddr.city,
+            pincode: matchingAddr.pincode
+          }));
+        } else {
+          setSelectedSavedAddressId('new');
+          setAddressForm(prev => ({
+            ...prev,
+            cityText: selectedCity?.name || 'Moradabad',
+            pincode: selectedCity?.pincodes?.[0] || '244001'
+          }));
+        }
       }
     }
   }, [user]);
+
+  // Whenever selectedCity changes in header/booking, check if current address city matches
+  useEffect(() => {
+    if (!selectedCity) return;
+    const siteCityName = selectedCity.name || selectedCity.slug || 'Moradabad';
+    if (selectedSavedAddressId && selectedSavedAddressId !== 'new' && user?.addresses) {
+      const addr = user.addresses.find(a => a._id === selectedSavedAddressId);
+      if (addr && addr.city && !areCitiesMatching(addr.city, siteCityName)) {
+        const matchedCityObj = cities.find(c => areCitiesMatching(typeof c === 'string' ? c : c.name, addr.city));
+        setCityMismatchModal({
+          siteCity: siteCityName,
+          addressCity: addr.city,
+          matchedCityObj: typeof matchedCityObj === 'object' ? matchedCityObj : null
+        });
+      }
+    } else if (!addressForm.line1) {
+      setAddressForm(prev => ({
+        ...prev,
+        cityText: selectedCity.name || 'Moradabad',
+        pincode: selectedCity.pincodes?.[0] || prev.pincode || '244001'
+      }));
+    }
+  }, [selectedCity?.slug, selectedCity?.name]);
 
   const { slug } = useParams();
 
@@ -528,9 +610,15 @@ export default function BookingPage() {
           pincode: addr.pincode,
           tempText: ''
         });
-        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === addr.city?.toLowerCase());
-        if (matchedCity && typeof matchedCity === 'object') {
-          setSelectedCity(matchedCity);
+        const siteCityName = selectedCity?.name || selectedCity?.slug || 'Moradabad';
+        if (addr.city && !areCitiesMatching(addr.city, siteCityName)) {
+          const matchedCityObj = cities.find(c => areCitiesMatching(typeof c === 'string' ? c : c.name, addr.city));
+          setCityMismatchModal({
+            siteCity: siteCityName,
+            addressCity: addr.city,
+            matchedCityObj: typeof matchedCityObj === 'object' ? matchedCityObj : null
+          });
+          toast.error(`Selected address is in "${addr.city}", which does not match your selected site city "${siteCityName}".`);
         }
       }
     }
@@ -556,25 +644,14 @@ export default function BookingPage() {
         tempText: ''
       });
     } else {
-      // When unchecked, restore default saved address if available
+      // When unchecked, restore default saved address if available in selected city
       if (user?.addresses && user.addresses.length > 0) {
-        const defaultAddr = user.addresses.find(a => a.isDefault) || user.addresses[0];
-        setSelectedSavedAddressId(defaultAddr._id);
-        setAddressForm({
-          houseOrFlat: defaultAddr.houseOrFlat || '',
-          line1: defaultAddr.line1,
-          formattedAddress: defaultAddr.formattedAddress || defaultAddr.line1,
-          placeId: defaultAddr.placeId || '',
-          coordinates: defaultAddr.coordinates || null,
-          landmark: defaultAddr.landmark || '',
-          cityText: defaultAddr.city,
-          pincode: defaultAddr.pincode,
-          tempText: ''
-        });
-        const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === defaultAddr.city?.toLowerCase());
-        if (matchedCity && typeof matchedCity === 'object') {
-          setSelectedCity(matchedCity);
-        }
+        const siteCityName = selectedCity?.name || selectedCity?.slug || 'Moradabad';
+        const matchingAddr =
+          user.addresses.find(a => a.isDefault && areCitiesMatching(a.city, siteCityName)) ||
+          user.addresses.find(a => areCitiesMatching(a.city, siteCityName)) ||
+          user.addresses[0];
+        handleSavedAddressChange(matchingAddr._id);
       }
     }
   };
@@ -583,9 +660,23 @@ export default function BookingPage() {
   const executeBookingCreation = async (paymentDetails = null) => {
     const resolvedLine1 = (addressForm.line1 || addressForm.houseOrFlat || addressForm.landmark || '').trim();
     const resolvedPincode = (addressForm.pincode || selectedCity?.pincodes?.[0] || '244001').trim();
+    const siteCityName = (selectedCity?.name || (typeof selectedCity === 'string' ? selectedCity : 'Moradabad')).trim();
+    const resolvedAddressCity = (addressForm.cityText || '').trim();
 
     if (!resolvedLine1) {
       toast.error('Please enter your area, street, or house address.');
+      return;
+    }
+
+    // Strict check: selected site city and booking address city name MUST be the same
+    if (!resolvedAddressCity || !areCitiesMatching(resolvedAddressCity, siteCityName)) {
+      const matchedCityObj = cities.find(c => areCitiesMatching(typeof c === 'string' ? c : c.name, resolvedAddressCity));
+      setCityMismatchModal({
+        siteCity: siteCityName,
+        addressCity: resolvedAddressCity || 'Unknown City',
+        matchedCityObj: typeof matchedCityObj === 'object' ? matchedCityObj : null
+      });
+      toast.error(`Booking blocked: Your selected site city is "${siteCityName}" but your address is in "${resolvedAddressCity || 'another city'}". Both city names must be the same!`);
       return;
     }
 
@@ -727,6 +818,20 @@ export default function BookingPage() {
     if (!line1Trimmed || line1Trimmed.length < 3) {
       toast.error('Please enter your area, street, or house address.');
       setFieldErrors(prev => ({ ...prev, line1: 'Please enter your address.' }));
+      return;
+    }
+
+    // 4b. Validate City Match (Selected site city MUST match the selected address city)
+    const siteCityName = (selectedCity?.name || (typeof selectedCity === 'string' ? selectedCity : 'Moradabad')).trim();
+    const addrCityName = (addressForm.cityText || '').trim();
+    if (!addrCityName || !areCitiesMatching(addrCityName, siteCityName)) {
+      const matchedCityObj = cities.find(c => areCitiesMatching(typeof c === 'string' ? c : c.name, addrCityName));
+      setCityMismatchModal({
+        siteCity: siteCityName,
+        addressCity: addrCityName || 'Different City',
+        matchedCityObj: typeof matchedCityObj === 'object' ? matchedCityObj : null
+      });
+      toast.error(`Booking not allowed: Selected site city (${siteCityName}) does not match address city (${addrCityName || 'Not set'}). City name must be the same.`);
       return;
     }
 
@@ -1450,9 +1555,14 @@ export default function BookingPage() {
                       onChange={(newFields) => {
                         setAddressForm(prev => ({ ...prev, ...newFields }));
                         if (newFields.cityText) {
-                          const matchedCity = cities.find(c => (typeof c === 'string' ? c : c.name)?.toLowerCase() === newFields.cityText?.toLowerCase());
-                          if (matchedCity && typeof matchedCity === 'object') {
-                            setSelectedCity(matchedCity);
+                          const siteCityName = selectedCity?.name || selectedCity?.slug || 'Moradabad';
+                          if (!areCitiesMatching(newFields.cityText, siteCityName)) {
+                            const matchedCityObj = cities.find(c => areCitiesMatching(typeof c === 'string' ? c : c.name, newFields.cityText));
+                            setCityMismatchModal({
+                              siteCity: siteCityName,
+                              addressCity: newFields.cityText,
+                              matchedCityObj: typeof matchedCityObj === 'object' ? matchedCityObj : null
+                            });
                           }
                         }
                       }}
@@ -1998,6 +2108,77 @@ export default function BookingPage() {
               </div>
             ))}
           </div>
+        </Modal>
+
+        {/* Modal: City Mismatch Warning Popup */}
+        <Modal
+          isOpen={Boolean(cityMismatchModal)}
+          onClose={() => setCityMismatchModal(null)}
+          title="City Mismatch Warning"
+          subtitle="Selected site city and service address city must be the same"
+          maxWidth="max-w-md"
+        >
+          {cityMismatchModal && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-[#F9ECE8] border border-[#C2512D]/40 flex items-start gap-3">
+                <LuCircleAlert className="w-6 h-6 text-[#C2512D] shrink-0 mt-0.5" />
+                <div className="text-xs text-[#10231D] space-y-1.5">
+                  <p className="font-bold text-sm text-[#C2512D]">
+                    Booking Not Allowed for Mismatched Cities
+                  </p>
+                  <p className="leading-relaxed">
+                    You have selected <strong className="underline">{cityMismatchModal.siteCity}</strong> as your city on the site, but the selected address is in <strong className="underline">{cityMismatchModal.addressCity}</strong>.
+                  </p>
+                  <p className="text-[#3D524A]">
+                    Because service availability and variant rates vary by city, both the selected site city and your booking address city name must be the same.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetSiteCity = cityMismatchModal.siteCity;
+                    setCityMismatchModal(null);
+                    handleSavedAddressChange('new');
+                    setAddressForm(prev => ({
+                      ...prev,
+                      line1: '',
+                      formattedAddress: '',
+                      cityText: targetSiteCity,
+                      pincode: selectedCity?.pincodes?.[0] || '244001'
+                    }));
+                  }}
+                  className="w-full py-3 px-4 rounded-xl bg-[#10231D] hover:bg-[#1A382F] text-[#F4EFE6] font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Enter an Address in {cityMismatchModal.siteCity}
+                </button>
+
+                {cityMismatchModal.matchedCityObj && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCity(cityMismatchModal.matchedCityObj);
+                      setCityMismatchModal(null);
+                      toast.success(`Switched site city to ${cityMismatchModal.matchedCityObj.name}`);
+                    }}
+                    className="w-full py-3 px-4 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Switch Site City to {cityMismatchModal.matchedCityObj.name}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setCityMismatchModal(null)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#3D524A] font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
 
       </div>

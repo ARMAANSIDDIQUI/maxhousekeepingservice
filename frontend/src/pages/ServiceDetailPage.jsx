@@ -54,15 +54,15 @@ function getYouTubeEmbedUrl(url) {
 // Helper to compute exact variant pricing for any service and variant key
 function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad') {
   if (!service) return { price: 0, mrp: 0, duration: '1 hr' };
-  const isMoradabad = !citySlug || String(citySlug).toLowerCase().trim() === 'moradabad';
+  const targetSlug = String(citySlug || 'moradabad').toLowerCase().trim();
+  const isMoradabad = !targetSlug || targetSlug === 'moradabad';
 
-  // Check custom city-specific rates
+  // Check custom city-specific rates at service level
   let cityRateMatched = false;
   let cityMatchedRate = null;
   let cityMatchedMrp = null;
 
-  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && citySlug) {
-    const targetSlug = String(citySlug).toLowerCase().trim();
+  if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0 && targetSlug) {
     const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
     if (match && typeof match.rate === 'number' && match.rate > 0) {
       cityRateMatched = true;
@@ -82,20 +82,30 @@ function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad'
       if (rowVal === String(optKey).toLowerCase().trim()) {
         let p = row.price;
         let m = row.mrp || row.price;
+        let rowCityMatched = false;
 
-        if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+        if (Array.isArray(row.cityRates) && row.cityRates.length > 0 && targetSlug) {
+          const rowMatch = row.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+          if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
+            rowCityMatched = true;
+            cityRateMatched = true;
+            p = rowMatch.rate;
+            m = (typeof rowMatch.mrp === 'number' && rowMatch.mrp > 0)
+              ? rowMatch.mrp
+              : (row.mrp && row.price ? Math.round(rowMatch.rate * (row.mrp / row.price)) : rowMatch.rate);
+          }
+        }
+
+        if (!rowCityMatched && cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
           const ratio = cityMatchedRate / service.price;
           p = Math.round(row.price * ratio);
           const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
           m = Math.round((row.mrp || row.price) * mrpRatio);
         }
 
-        if (!isMoradabad) {
-          const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-            ? service.cityExtraCharge
-            : 100;
-          p += outstationExtra;
-          m += outstationExtra;
+        if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+          p += service.cityExtraCharge;
+          m += service.cityExtraCharge;
         }
 
         return {
@@ -116,18 +126,26 @@ function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad'
   const group = service.optionGroups?.find(g => g.key === groupKey) || service.optionGroups?.[0];
   const opt = group?.options?.find(o => o.key === optKey);
   if (opt) {
+    if (Array.isArray(opt.cityRates) && opt.cityRates.length > 0 && targetSlug) {
+      const optMatch = opt.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug);
+      if (optMatch && typeof optMatch.rate === 'number' && optMatch.rate > 0) {
+        return {
+          price: optMatch.rate,
+          mrp: (typeof optMatch.mrp === 'number' && optMatch.mrp > 0) ? optMatch.mrp : optMatch.rate,
+          duration: opt.durationDelta || service.duration || '1 hr'
+        };
+      }
+    }
+
     let p = basePrice + (opt.priceDelta || 0);
     let m = baseMrp + (opt.mrpDelta || opt.priceDelta || 0);
     if (opt.multiplier && opt.multiplier > 0) {
       p = Math.round(p * opt.multiplier);
       m = Math.round(m * opt.multiplier);
     }
-    if (!isMoradabad) {
-      const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-        ? service.cityExtraCharge
-        : 100;
-      p += outstationExtra;
-      m += outstationExtra;
+    if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+      p += service.cityExtraCharge;
+      m += service.cityExtraCharge;
     }
     return {
       price: p,
@@ -136,12 +154,9 @@ function getVariantPricingInfo(service, optKey, groupKey, citySlug = 'moradabad'
     };
   }
 
-  if (!isMoradabad) {
-    const outstationExtra = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-      ? service.cityExtraCharge
-      : 100;
-    basePrice += outstationExtra;
-    baseMrp += outstationExtra;
+  if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+    basePrice += service.cityExtraCharge;
+    baseMrp += service.cityExtraCharge;
   }
 
   return { price: basePrice, mrp: baseMrp, duration: service.duration || '1 hr' };

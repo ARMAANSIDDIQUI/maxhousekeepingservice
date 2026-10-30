@@ -118,6 +118,9 @@ export default function ServicesPage() {
     if (s.hasCitySpecificRates && Array.isArray(s.cityRates)) {
       if (s.cityRates.some(cr => (cr.citySlug || '').toLowerCase() === citySlug)) return true;
     }
+    if (Array.isArray(s.matrix) && s.matrix.some(r => Array.isArray(r.cityRates) && r.cityRates.some(cr => (cr.citySlug || '').toLowerCase() === citySlug))) {
+      return true;
+    }
     // Doorstep mobile van specialized cleaning keywords
     const titleLow = (s.title || '').toLowerCase();
     const slugLow = (s.slug || '').toLowerCase();
@@ -159,13 +162,31 @@ export default function ServicesPage() {
     let price = service.price || 0;
     let mrp = service.mrp || 0;
     if (citySlug && citySlug !== 'moradabad' && citySlug !== 'all') {
-      if (service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
+      let matchedVariantCity = false;
+      if (Array.isArray(service.matrix) && service.matrix.length > 0) {
+        const optGroup = service.optionGroups?.[0];
+        const groupKey = optGroup?.key || 'size';
+        const defaultOpt = optGroup?.options?.find(o => o.isDefault) || optGroup?.options?.[0];
+        const defaultRow = (defaultOpt && service.matrix.find(r => {
+          const sel = r.selection instanceof Map ? Object.fromEntries(r.selection) : (r.selection || {});
+          return String(sel[groupKey] || Object.values(sel)[0] || '').toLowerCase() === String(defaultOpt.key).toLowerCase();
+        })) || service.matrix[0];
+        if (defaultRow && Array.isArray(defaultRow.cityRates)) {
+          const rowMatch = defaultRow.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+          if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
+            price = rowMatch.rate;
+            if (rowMatch.mrp && rowMatch.mrp > 0) mrp = rowMatch.mrp;
+            matchedVariantCity = true;
+          }
+        }
+      }
+      if (!matchedVariantCity && service.hasCitySpecificRates && Array.isArray(service.cityRates) && service.cityRates.length > 0) {
         const match = service.cityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
         if (match && typeof match.rate === 'number' && match.rate > 0) {
           price = match.rate;
           if (match.mrp && match.mrp > 0) mrp = match.mrp;
         }
-      } else if (Array.isArray(service.cityOverrides)) {
+      } else if (!matchedVariantCity && Array.isArray(service.cityOverrides)) {
         const override = service.cityOverrides.find(o => (o.citySlug || '').toLowerCase() === citySlug && o.isActive !== false);
         if (override) {
           if (override.priceOverride) price = override.priceOverride;

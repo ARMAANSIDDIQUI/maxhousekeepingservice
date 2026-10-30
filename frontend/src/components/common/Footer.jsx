@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LuPhone, LuMail, LuMapPin, LuClock, LuShieldCheck, LuDownload, LuCheck } from 'react-icons/lu';
-import { FaInstagram } from 'react-icons/fa6';
+import { FaInstagram, FaYoutube } from 'react-icons/fa6';
 import { apiRequest } from '../../api';
 import { useBooking } from '../../context/BookingContext';
 import { usePWA } from '../../context/PWAContext';
@@ -116,20 +116,31 @@ export default function Footer() {
               <span>Verified Professional Crews</span>
             </div>
 
-            {/* Official Instagram Handle */}
-            <div className="mt-4 pt-3 border-t border-[#3D524A]/50">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#E9A23B] block mb-1.5 font-bold">
-                Official Instagram Channel
+            {/* Official Social Channels (Instagram & YouTube) */}
+            <div className="mt-4 pt-3 border-t border-[#3D524A]/50 space-y-2">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#E9A23B] block font-bold">
+                Official Social Channels
               </span>
-              <a
-                href="https://www.instagram.com/maxhousekeepingservice/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
-              >
-                <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
-                <span>@maxhousekeepingservice</span>
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://www.instagram.com/maxhousekeepingservice/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+                >
+                  <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
+                  <span>@maxhousekeepingservice</span>
+                </a>
+                <a
+                  href="https://youtube.com/@maxhousekeepingservices"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FF0000] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+                >
+                  <FaYoutube className="w-4 h-4 transition-transform group-hover:scale-110" />
+                  <span>@maxhousekeepingservices</span>
+                </a>
+              </div>
             </div>
           </div>
 
@@ -259,6 +270,17 @@ export default function Footer() {
                   Follow on Instagram for Real Videos
                 </a>
               </li>
+              <li className="flex items-center gap-2.5">
+                <FaYoutube className="w-4 h-4 text-[#FF0000] shrink-0" />
+                <a
+                  href="https://youtube.com/@maxhousekeepingservices"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs hover:text-[#E9A23B] text-[#DDEBE4] font-medium"
+                >
+                  Subscribe on YouTube (@maxhousekeepingservices)
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -295,6 +317,15 @@ export default function Footer() {
             >
               <FaInstagram className="w-3.5 h-3.5 text-[#E9A23B]" />
               <span>Instagram</span>
+            </a>
+            <a
+              href="https://youtube.com/@maxhousekeepingservices"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#E9A23B] flex items-center gap-1.5 transition-colors"
+            >
+              <FaYoutube className="w-3.5 h-3.5 text-[#FF0000]" />
+              <span>YouTube</span>
             </a>
           </div>
         </div>

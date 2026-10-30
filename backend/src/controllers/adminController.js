@@ -328,7 +328,7 @@ function processVariantsPayload(payload) {
   if (payload.cityExtraCharge !== undefined && payload.cityExtraCharge !== null) {
     payload.cityExtraCharge = Math.max(0, Number(payload.cityExtraCharge) || 0);
   } else {
-    payload.cityExtraCharge = 100;
+    payload.cityExtraCharge = 0;
   }
 
   // Preserve and sync both YouTube and Uploaded Video fields
@@ -376,7 +376,29 @@ function processVariantsPayload(payload) {
         const mrp = Math.max(price, Number(v.mrp || v.price) || price);
         const duration = v.duration || '1.5 hrs';
         const isDefault = Boolean(v.isDefault ?? (i === 0));
-        return { key, label, price, mrp, duration, isDefault };
+        const normalizedVariantCityRates = Array.isArray(v.cityRates)
+          ? v.cityRates
+              .map(cr => ({
+                citySlug: String(cr.citySlug || '').trim().toLowerCase(),
+                cityName: String(cr.cityName || cr.citySlug || '').trim(),
+                rate: Math.max(0, Number(cr.rate) || 0),
+                mrp: cr.mrp ? Math.max(0, Number(cr.mrp) || 0) : undefined
+              }))
+              .filter(cr => cr.citySlug && cr.rate > 0)
+          : [];
+        const hasCitySpecificRates = Boolean(
+          v.hasCitySpecificRates || payload.hasCitySpecificRates || normalizedVariantCityRates.length > 0
+        );
+        return {
+          key,
+          label,
+          price,
+          mrp,
+          duration,
+          isDefault,
+          hasCitySpecificRates,
+          cityRates: normalizedVariantCityRates
+        };
       });
 
     if (validVariants.length > 0) {
@@ -387,11 +409,32 @@ function processVariantsPayload(payload) {
       payload.duration = defaultVar.duration;
       payload.pricingMode = payload.pricingType === 'unit' ? 'combination' : 'tiered';
 
+      // If any variant has cityRates configured, ensure service-level hasCitySpecificRates is enabled
+      // and sync default variant's cityRates into service-level cityRates if not already set
+      const anyVariantHasCityRates = validVariants.some(v => v.cityRates && v.cityRates.length > 0);
+      if (anyVariantHasCityRates) {
+        payload.hasCitySpecificRates = true;
+        if (defaultVar.cityRates && defaultVar.cityRates.length > 0) {
+          const mergedMap = new Map();
+          if (Array.isArray(payload.cityRates)) {
+            payload.cityRates.forEach(cr => {
+              if (cr.citySlug) mergedMap.set(cr.citySlug, cr);
+            });
+          }
+          defaultVar.cityRates.forEach(cr => {
+            if (cr.citySlug) mergedMap.set(cr.citySlug, cr);
+          });
+          payload.cityRates = Array.from(mergedMap.values());
+        }
+      }
+
       payload.matrix = validVariants.map(v => ({
         selection: { [groupKey]: v.key },
         price: v.price,
         mrp: v.mrp,
         duration: v.duration,
+        hasCitySpecificRates: v.hasCitySpecificRates,
+        cityRates: v.cityRates,
         isActive: true
       }));
 
@@ -409,6 +452,8 @@ function processVariantsPayload(payload) {
             priceDelta: v.price - defaultVar.price,
             mrpDelta: v.mrp - defaultVar.mrp,
             durationDelta: v.duration,
+            hasCitySpecificRates: v.hasCitySpecificRates,
+            cityRates: v.cityRates,
             isActive: true
           }))
         }

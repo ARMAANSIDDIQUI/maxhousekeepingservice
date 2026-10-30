@@ -1,5 +1,12 @@
 import mongoose from 'mongoose';
 
+const cityRateSubSchema = new mongoose.Schema({
+  citySlug: { type: String, trim: true, lowercase: true },
+  cityName: { type: String, trim: true },
+  rate: { type: Number },
+  mrp: { type: Number }
+}, { _id: false });
+
 const optionSchema = new mongoose.Schema({
   key: { type: String, required: true },
   label: { type: String, required: true },
@@ -9,6 +16,8 @@ const optionSchema = new mongoose.Schema({
   mrpDelta: { type: Number, default: 0 },
   multiplier: { type: Number, default: 1 },
   durationDelta: { type: String },
+  hasCitySpecificRates: { type: Boolean, default: false },
+  cityRates: [cityRateSubSchema],
   isDefault: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true }
 }, { _id: false });
@@ -27,6 +36,8 @@ const matrixRowSchema = new mongoose.Schema({
   price: { type: Number, required: true },              // Offered price (discounted)
   mrp: { type: Number, required: true },                // Shown price (regular)
   duration: { type: String },
+  hasCitySpecificRates: { type: Boolean, default: false },
+  cityRates: [cityRateSubSchema],
   isActive: { type: Boolean, default: true }
 }, { _id: false });
 
@@ -63,7 +74,7 @@ const serviceSchema = new mongoose.Schema({
     rate: { type: Number },
     mrp: { type: Number }
   }],
-  cityExtraCharge: { type: Number, default: 100 },
+  cityExtraCharge: { type: Number, default: 0 },
   moradabadOnly: { type: Boolean, default: false },
   videoUrl: { type: String, trim: true },
   videoPublicId: { type: String, trim: true },

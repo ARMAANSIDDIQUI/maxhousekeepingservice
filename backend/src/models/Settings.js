@@ -13,6 +13,7 @@ const settingsSchema = new mongoose.Schema({
   email: { type: String, default: 'contactmaxhousekeepingservice@gmail.com' },
   supportEmail: { type: String, default: 'contactmaxhousekeepingservice@gmail.com' },
   instagramUrl: { type: String, default: 'https://www.instagram.com/maxhousekeepingservice/' },
+  youtubeUrl: { type: String, default: 'https://youtube.com/@maxhousekeepingservices' },
   address: { type: String, default: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001' },
   workingHours: { type: String, default: '8:00 AM – 8:00 PM (Monday – Sunday)' },
   heroStats: [{

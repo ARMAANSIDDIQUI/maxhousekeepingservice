@@ -301,6 +301,37 @@ export async function createBooking(req, res, next) {
       }
     }
 
+    // Strict check: if citySlug or cityDoc is selected, address.cityText must match the selected city name
+    if (address?.cityText) {
+      const normAddrCity = String(address.cityText).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normSiteCityName = String(cityDoc?.name || citySlug || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normSiteCitySlug = String(cityDoc?.slug || citySlug || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const aliases = {
+        gurgaon: 'gurugram',
+        gurugram: 'gurgaon',
+        newdelhi: 'delhi',
+        delhi: 'newdelhi',
+        delhincr: 'delhi',
+        bangalore: 'bengaluru',
+        bengaluru: 'bangalore',
+        prayagraj: 'allahabad',
+        allahabad: 'prayagraj'
+      };
+      const isSameCity =
+        !normSiteCityName ||
+        normAddrCity === normSiteCityName ||
+        normAddrCity === normSiteCitySlug ||
+        aliases[normAddrCity] === normSiteCityName ||
+        aliases[normAddrCity] === normSiteCitySlug;
+
+      if (!isSameCity) {
+        return res.status(400).json({
+          success: false,
+          message: `Selected site city (${cityDoc?.name || citySlug}) does not match the booking address city (${address.cityText}). Both city names must be the same.`
+        });
+      }
+    }
+
     // Resolve Services & Calculate Quote
     const serviceIds = items.map(i => i.serviceId || i.service);
     const services = await Service.find({ _id: { $in: serviceIds }, isActive: true });

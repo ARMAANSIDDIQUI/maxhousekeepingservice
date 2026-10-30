@@ -968,10 +968,12 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-[#10231D] block">
-                        City-Wise Custom Rates & Pricing
+                        City-Wise Custom Rates & Pricing {form.variants?.length > 0 ? '(Base / Default Variant)' : ''}
                       </span>
                       <span className="text-[10px] text-[#6B8077]">
-                        Enter specific rate and MRP for each city. Unset cities use the base price (₹{form.price || 0}). For variant services, variant prices automatically scale relative to this city's base rate.
+                        {form.variants?.length > 0
+                          ? `This service has ${form.variants.length} variants. Set exact city-wise rates for each individual variant in the "Service Variants & Tiered Rates" cards below!`
+                          : `Enter specific rate and MRP for each city. Unset cities use the base price (₹${form.price || 0}).`}
                       </span>
                     </div>
                   </div>
@@ -1080,7 +1082,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-[#ECE5D8]/50 border border-[#E2D9C8] text-[11px] text-[#6B8077]">
-                  All serviceable cities currently use the uniform base price of <strong>₹{form.price || 0}</strong>. Check "Different rates for different cities?" above to customize prices per city.
+                  All serviceable cities currently use the uniform base price of <strong>₹{form.price || 0}</strong> (and uniform variant prices below). Check "Different rates for different cities?" above to customize prices per city for the base service and for every variant.
                 </div>
               )}
             </div>
@@ -1094,7 +1096,7 @@ export default function AdminDashboard() {
                     <span>Service Variants & Tiered Rates ({form.variants?.length || 0})</span>
                   </h4>
                   <p className="text-[11px] text-[#6B8077]">
-                    Add 1, 2, 3, 4, 5+ BHK variants or custom sizes with individual rates & MRPs.
+                    Add 1, 2, 3, 4, 5+ BHK variants or custom sizes with individual rates, MRPs & city-specific pricing.
                   </p>
                 </div>
                 <button
@@ -1108,7 +1110,8 @@ export default function AdminDashboard() {
                         price: (Number(prev.price) || 2800) + (newIdx * 1000),
                         mrp: (Number(prev.mrp) || 2999) + (newIdx * 1500),
                         duration: `${newIdx + 2}-${newIdx + 3} hrs`,
-                        isDefault: (prev.variants?.length || 0) === 0
+                        isDefault: (prev.variants?.length || 0) === 0,
+                        cityRates: []
                       };
                       return {
                         ...prev,
@@ -1155,11 +1158,11 @@ export default function AdminDashboard() {
                           mrp: 6999,
                           duration: '4-5 hrs',
                           variants: [
-                            { key: '1-bhk', label: '1 BHK', price: 4999, mrp: 6999, duration: '3-4 hrs', isDefault: true },
-                            { key: '2-bhk', label: '2 BHK', price: 7500, mrp: 9999, duration: '4-5 hrs', isDefault: false },
-                            { key: '3-bhk', label: '3 BHK', price: 9999, mrp: 12999, duration: '5-7 hrs', isDefault: false },
-                            { key: '4-bhk', label: '4 BHK', price: 14999, mrp: 18999, duration: '1-2 Days', isDefault: false },
-                            { key: '5-bhk', label: '5 BHK', price: 16999, mrp: 21999, duration: '2 Days', isDefault: false }
+                            { key: '1-bhk', label: '1 BHK', price: 4999, mrp: 6999, duration: '3-4 hrs', isDefault: true, cityRates: [] },
+                            { key: '2-bhk', label: '2 BHK', price: 7500, mrp: 9999, duration: '4-5 hrs', isDefault: false, cityRates: [] },
+                            { key: '3-bhk', label: '3 BHK', price: 9999, mrp: 12999, duration: '5-7 hrs', isDefault: false, cityRates: [] },
+                            { key: '4-bhk', label: '4 BHK', price: 14999, mrp: 18999, duration: '1-2 Days', isDefault: false, cityRates: [] },
+                            { key: '5-bhk', label: '5 BHK', price: 16999, mrp: 21999, duration: '2 Days', isDefault: false, cityRates: [] }
                           ]
                         }));
                       }}
@@ -1180,9 +1183,9 @@ export default function AdminDashboard() {
                           mrp: 1800,
                           duration: '2-3 hrs',
                           variants: [
-                            { key: '3-seater', label: '3 Seater Sofa', price: 900, mrp: 1200, duration: '1.5-2 hrs', isDefault: false },
-                            { key: '5-seater', label: '5 Seater Sofa (3+1+1)', price: 1500, mrp: 1800, duration: '2-3 hrs', isDefault: true },
-                            { key: '7-seater', label: '7 Seater Sofa', price: 2100, mrp: 2500, duration: '3-4 hrs', isDefault: false }
+                            { key: '3-seater', label: '3 Seater Sofa', price: 900, mrp: 1200, duration: '1.5-2 hrs', isDefault: false, cityRates: [] },
+                            { key: '5-seater', label: '5 Seater Sofa (3+1+1)', price: 1500, mrp: 1800, duration: '2-3 hrs', isDefault: true, cityRates: [] },
+                            { key: '7-seater', label: '7 Seater Sofa', price: 2100, mrp: 2500, duration: '3-4 hrs', isDefault: false, cityRates: [] }
                           ]
                         }));
                       }}
@@ -1194,11 +1197,11 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[34rem] overflow-y-auto pr-1">
                   {form.variants.map((v, vIdx) => {
                     const discount = v.mrp > v.price ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0;
                     return (
-                      <div key={vIdx} className="p-3 rounded-xl bg-white border border-[#E2D9C8] shadow-2xs space-y-2">
+                      <div key={vIdx} className="p-3 rounded-xl bg-white border border-[#E2D9C8] shadow-2xs space-y-2.5">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-mono font-bold text-[#6B8077] uppercase">
                             Variant #{vIdx + 1}
@@ -1210,13 +1213,20 @@ export default function AdminDashboard() {
                                 name={isEdit ? "edit-default-variant" : "create-default-variant"}
                                 checked={Boolean(v.isDefault)}
                                 onChange={() => {
-                                  setter(prev => ({
-                                    ...prev,
-                                    variants: prev.variants.map((item, i) => ({
+                                  setter(prev => {
+                                    const nextVariants = prev.variants.map((item, i) => ({
                                       ...item,
                                       isDefault: i === vIdx
-                                    }))
-                                  }));
+                                    }));
+                                    const chosen = nextVariants[vIdx];
+                                    return {
+                                      ...prev,
+                                      price: chosen?.price ?? prev.price,
+                                      mrp: chosen?.mrp ?? prev.mrp,
+                                      cityRates: Array.isArray(chosen?.cityRates) && chosen.cityRates.length > 0 ? chosen.cityRates : prev.cityRates,
+                                      variants: nextVariants
+                                    };
+                                  });
                                 }}
                                 className="accent-[#E9A23B]"
                               />
@@ -1247,7 +1257,7 @@ export default function AdminDashboard() {
                           <div className="sm:col-span-2">
                             <input
                               type="text"
-                              placeholder="Variant Label (e.g. 2 BHK)"
+                              placeholder="Variant Label (e.g. 3 Seater Sofa, 2 BHK)"
                               value={v.label}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -1270,15 +1280,24 @@ export default function AdminDashboard() {
                               <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
                               <input
                                 type="number"
-                                placeholder="Payable"
-                                title="Payable Price"
+                                placeholder="Base Price"
+                                title="Base Payable Price (Moradabad / Default)"
                                 value={v.price}
                                 onChange={(e) => {
                                   const val = Number(e.target.value) || 0;
                                   setter(prev => {
                                     const updated = [...prev.variants];
-                                    updated[vIdx] = { ...updated[vIdx], price: val };
-                                    return { ...prev, variants: updated };
+                                    const existingVarRates = Array.isArray(updated[vIdx].cityRates) ? [...updated[vIdx].cityRates] : [];
+                                    const mbdIdx = existingVarRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === 'moradabad');
+                                    if (mbdIdx >= 0) {
+                                      existingVarRates[mbdIdx] = { ...existingVarRates[mbdIdx], rate: val };
+                                    }
+                                    updated[vIdx] = { ...updated[vIdx], price: val, cityRates: existingVarRates };
+                                    const nextState = { ...prev, variants: updated };
+                                    if (updated[vIdx].isDefault) {
+                                      nextState.price = val;
+                                    }
+                                    return nextState;
                                   });
                                 }}
                                 className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D] font-black tnum"
@@ -1291,15 +1310,24 @@ export default function AdminDashboard() {
                               <span className="absolute left-2.5 top-2 text-[#6B8077] font-bold text-[11px]">₹</span>
                               <input
                                 type="number"
-                                placeholder="MRP"
-                                title="Shown Price (MRP Crossed Out)"
+                                placeholder="Base MRP"
+                                title="Base Shown Price (MRP Crossed Out)"
                                 value={v.mrp}
                                 onChange={(e) => {
                                   const val = Number(e.target.value) || 0;
                                   setter(prev => {
                                     const updated = [...prev.variants];
-                                    updated[vIdx] = { ...updated[vIdx], mrp: val };
-                                    return { ...prev, variants: updated };
+                                    const existingVarRates = Array.isArray(updated[vIdx].cityRates) ? [...updated[vIdx].cityRates] : [];
+                                    const mbdIdx = existingVarRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === 'moradabad');
+                                    if (mbdIdx >= 0) {
+                                      existingVarRates[mbdIdx] = { ...existingVarRates[mbdIdx], mrp: val };
+                                    }
+                                    updated[vIdx] = { ...updated[vIdx], mrp: val, cityRates: existingVarRates };
+                                    const nextState = { ...prev, variants: updated };
+                                    if (updated[vIdx].isDefault) {
+                                      nextState.mrp = val;
+                                    }
+                                    return nextState;
                                   });
                                 }}
                                 className="w-full p-2 pl-6 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#6B8077] font-bold line-through tnum"
@@ -1326,6 +1354,142 @@ export default function AdminDashboard() {
                             className="flex-1 p-1.5 rounded-lg bg-[#F4EFE6] border border-[#E2D9C8] text-[#10231D]"
                           />
                         </div>
+
+                        {/* Per-Variant City-Wise Custom Rates Grid */}
+                        {form.hasCitySpecificRates && (
+                          <div className="pt-2 border-t border-[#E2D9C8] space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-[#10231D] uppercase tracking-wider">
+                                City-Wise Rates for {v.label || `Variant #${vIdx + 1}`}
+                              </span>
+                              <span className="text-[10px] text-[#6B8077]">
+                                Base: ₹{v.price || 0} (MRP ₹{v.mrp || 0})
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {cities.filter(c => c.status === 'active' || !c.status).map(city => {
+                                const citySlug = (city.slug || city.name.toLowerCase()).trim();
+                                const varCityRates = Array.isArray(v.cityRates) ? v.cityRates : [];
+                                const currentVarCityRate = varCityRates.find(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                const varDisplayPrice = currentVarCityRate?.rate !== undefined
+                                  ? currentVarCityRate.rate
+                                  : (v.price || 0);
+                                const varDisplayMrp = currentVarCityRate?.mrp !== undefined
+                                  ? currentVarCityRate.mrp
+                                  : (v.mrp || 0);
+
+                                return (
+                                  <div key={`${vIdx}-${citySlug}`} className="p-2 rounded-lg bg-[#F4EFE6]/70 border border-[#E2D9C8] space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[11px] font-bold text-[#10231D]">{city.name}</span>
+                                      <span className="text-[9px] font-mono text-[#6B8077] uppercase">{city.state || 'UP'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-[#10231D]">Price (₹)</label>
+                                        <div className="relative">
+                                          <span className="absolute left-1.5 top-1 text-[#6B8077] font-bold text-[10px]">₹</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={varDisplayPrice}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value) || 0;
+                                              setter(prev => {
+                                                const updatedVariants = [...prev.variants];
+                                                const targetVar = { ...updatedVariants[vIdx] };
+                                                const existingRates = Array.isArray(targetVar.cityRates) ? [...targetVar.cityRates] : [];
+                                                const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                                const prevMrp = existingRates[idx]?.mrp !== undefined ? existingRates[idx].mrp : varDisplayMrp;
+                                                const entry = {
+                                                  cityId: city._id,
+                                                  cityName: city.name,
+                                                  citySlug,
+                                                  rate: val,
+                                                  mrp: prevMrp
+                                                };
+                                                if (idx >= 0) {
+                                                  existingRates[idx] = entry;
+                                                } else {
+                                                  existingRates.push(entry);
+                                                }
+                                                targetVar.cityRates = existingRates;
+                                                targetVar.hasCitySpecificRates = true;
+                                                if (citySlug === 'moradabad') {
+                                                  targetVar.price = val;
+                                                }
+                                                updatedVariants[vIdx] = targetVar;
+
+                                                const nextState = { ...prev, variants: updatedVariants };
+                                                if (targetVar.isDefault) {
+                                                  nextState.cityRates = existingRates;
+                                                  if (citySlug === 'moradabad') {
+                                                    nextState.price = val;
+                                                  }
+                                                }
+                                                return nextState;
+                                              });
+                                            }}
+                                            className="w-full pl-4 pr-1 py-1 rounded bg-white border border-[#E2D9C8] text-[11px] font-black text-[#10231D] tnum"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[9px] font-bold text-[#6B8077]">MRP (₹)</label>
+                                        <div className="relative">
+                                          <span className="absolute left-1.5 top-1 text-[#6B8077] font-bold text-[10px]">₹</span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={varDisplayMrp}
+                                            onChange={(e) => {
+                                              const val = Number(e.target.value) || 0;
+                                              setter(prev => {
+                                                const updatedVariants = [...prev.variants];
+                                                const targetVar = { ...updatedVariants[vIdx] };
+                                                const existingRates = Array.isArray(targetVar.cityRates) ? [...targetVar.cityRates] : [];
+                                                const idx = existingRates.findIndex(cr => (cr.citySlug || '').toLowerCase() === citySlug);
+                                                const prevRate = existingRates[idx]?.rate !== undefined ? existingRates[idx].rate : varDisplayPrice;
+                                                const entry = {
+                                                  cityId: city._id,
+                                                  cityName: city.name,
+                                                  citySlug,
+                                                  rate: prevRate,
+                                                  mrp: val
+                                                };
+                                                if (idx >= 0) {
+                                                  existingRates[idx] = entry;
+                                                } else {
+                                                  existingRates.push(entry);
+                                                }
+                                                targetVar.cityRates = existingRates;
+                                                targetVar.hasCitySpecificRates = true;
+                                                if (citySlug === 'moradabad') {
+                                                  targetVar.mrp = val;
+                                                }
+                                                updatedVariants[vIdx] = targetVar;
+
+                                                const nextState = { ...prev, variants: updatedVariants };
+                                                if (targetVar.isDefault) {
+                                                  nextState.cityRates = existingRates;
+                                                  if (citySlug === 'moradabad') {
+                                                    nextState.mrp = val;
+                                                  }
+                                                }
+                                                return nextState;
+                                              });
+                                            }}
+                                            className="w-full pl-4 pr-1 py-1 rounded bg-white border border-[#E2D9C8] text-[11px] font-bold text-[#6B8077] line-through tnum"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2049,24 +2213,34 @@ export default function AdminDashboard() {
         const sel = r.selection instanceof Map ? Object.fromEntries(r.selection) : (r.selection || {});
         const key = sel[groupKey] || Object.values(sel)[0] || `var-${i + 1}`;
         const opt = optGroup?.options?.find(o => o.key === key);
+        const rawCityRates = Array.isArray(r.cityRates) && r.cityRates.length > 0
+          ? r.cityRates
+          : (Array.isArray(opt?.cityRates) ? opt.cityRates : []);
         return {
           key,
           label: opt?.label || key.replace(/-/g, ' ').toUpperCase(),
           price: r.price,
           mrp: r.mrp || r.price,
           duration: r.duration || service.duration || '1.5 hrs',
-          isDefault: Boolean(opt?.isDefault ?? (i === 0))
+          isDefault: Boolean(opt?.isDefault ?? (i === 0)),
+          hasCitySpecificRates: Boolean(r.hasCitySpecificRates || rawCityRates.length > 0),
+          cityRates: rawCityRates
         };
       });
     } else if (optGroup && optGroup.options?.length > 0) {
-      variants = optGroup.options.map((opt, i) => ({
-        key: opt.key,
-        label: opt.label,
-        price: service.price + (opt.priceDelta || 0),
-        mrp: service.mrp + (opt.mrpDelta || opt.priceDelta || 0),
-        duration: opt.durationDelta || service.duration || '1.5 hrs',
-        isDefault: Boolean(opt.isDefault ?? (i === 0))
-      }));
+      variants = optGroup.options.map((opt, i) => {
+        const rawCityRates = Array.isArray(opt.cityRates) ? opt.cityRates : [];
+        return {
+          key: opt.key,
+          label: opt.label,
+          price: service.price + (opt.priceDelta || 0),
+          mrp: service.mrp + (opt.mrpDelta || opt.priceDelta || 0),
+          duration: opt.durationDelta || service.duration || '1.5 hrs',
+          isDefault: Boolean(opt.isDefault ?? (i === 0)),
+          hasCitySpecificRates: Boolean(opt.hasCitySpecificRates || rawCityRates.length > 0),
+          cityRates: rawCityRates
+        };
+      });
     }
 
     let initialImages = [];
@@ -2101,9 +2275,9 @@ export default function AdminDashboard() {
       unitRateOther: service.unitRateOther ?? service.unitRateMoradabad ?? service.price ?? 0,
       unitLabel: service.unitLabel || (service.pricingUnit === 'litre' ? 'Litres' : 'Sq. Ft.'),
       minUnitQuantity: service.minUnitQuantity || (service.pricingUnit === 'sq_ft' ? 100 : service.pricingUnit === 'litre' ? 500 : 1),
-      hasCitySpecificRates: Boolean(service.hasCitySpecificRates),
+      hasCitySpecificRates: Boolean(service.hasCitySpecificRates || variants.some(v => v.cityRates?.length > 0)),
       cityRates: Array.isArray(service.cityRates) ? service.cityRates : [],
-      cityExtraCharge: typeof service.cityExtraCharge === 'number' ? service.cityExtraCharge : 100,
+      cityExtraCharge: typeof service.cityExtraCharge === 'number' ? service.cityExtraCharge : 0,
       moradabadOnly: Boolean(service.moradabadOnly || (allAvailableCities.length === 1 && allAvailableCities[0] === 'moradabad')),
       cityAvailability: allAvailableCities,
       videoUrl: service.videoUrl || '',
@@ -2188,7 +2362,7 @@ export default function AdminDashboard() {
         minUnitQuantity: Number(serviceForm.minUnitQuantity) || 1,
         hasCitySpecificRates: Boolean(serviceForm.hasCitySpecificRates),
         cityRates: Array.isArray(serviceForm.cityRates) ? serviceForm.cityRates : [],
-        cityExtraCharge: serviceForm.cityExtraCharge !== undefined && serviceForm.cityExtraCharge !== null ? Number(serviceForm.cityExtraCharge) : 100,
+        cityExtraCharge: serviceForm.cityExtraCharge !== undefined && serviceForm.cityExtraCharge !== null ? Number(serviceForm.cityExtraCharge) : 0,
         moradabadOnly: Boolean(serviceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: serviceForm.uploadedVideoUrl || serviceForm.youtubeUrl || serviceForm.videoUrl || '',
@@ -2308,7 +2482,7 @@ export default function AdminDashboard() {
         minUnitQuantity: Number(newServiceForm.minUnitQuantity) || 1,
         hasCitySpecificRates: Boolean(newServiceForm.hasCitySpecificRates),
         cityRates: Array.isArray(newServiceForm.cityRates) ? newServiceForm.cityRates : [],
-        cityExtraCharge: newServiceForm.cityExtraCharge !== undefined && newServiceForm.cityExtraCharge !== null ? Number(newServiceForm.cityExtraCharge) : 100,
+        cityExtraCharge: newServiceForm.cityExtraCharge !== undefined && newServiceForm.cityExtraCharge !== null ? Number(newServiceForm.cityExtraCharge) : 0,
         moradabadOnly: Boolean(newServiceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: newServiceForm.uploadedVideoUrl || newServiceForm.youtubeUrl || newServiceForm.videoUrl || '',

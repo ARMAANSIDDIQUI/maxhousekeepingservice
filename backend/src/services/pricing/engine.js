@@ -82,15 +82,29 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
 
         if (isMatch) {
           matchedMatrixRow = row;
-          if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
-            // Proportional scaling for city rate relative to base price
+          const targetSlug = citySlug ? String(citySlug).toLowerCase().trim() : '';
+          const rowCityMatch = (targetSlug && Array.isArray(row.cityRates) && row.cityRates.length > 0)
+            ? row.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === targetSlug && typeof cr.rate === 'number' && cr.rate > 0)
+            : null;
+
+          if (rowCityMatch) {
+            // 1. Variant-specific city rate (highest priority)
+            cityRateMatched = true;
+            unitPrice = rowCityMatch.rate;
+            const defaultRowMrpRatio = (row.mrp && row.price && row.mrp > row.price) ? (row.mrp / row.price) : 1.25;
+            unitMrp = (typeof rowCityMatch.mrp === 'number' && rowCityMatch.mrp > 0)
+              ? rowCityMatch.mrp
+              : Math.round(rowCityMatch.rate * defaultRowMrpRatio);
+          } else if (cityRateMatched && cityMatchedRate !== null && service.price && service.price > 0) {
+            // 2. Proportional scaling from service-level city rate relative to base price
             const ratio = cityMatchedRate / service.price;
             unitPrice = Math.round(row.price * ratio);
             const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (service.mrp || service.price)) : ratio;
             unitMrp = Math.round((row.mrp || row.price) * mrpRatio);
           } else {
+            // 3. Base variant price
             unitPrice = row.price;
-            unitMrp = row.mrp;
+            unitMrp = row.mrp || row.price;
           }
           if (row.duration) duration = row.duration;
           break;
@@ -161,13 +175,10 @@ export function calculateItemPrice(service, selections = {}, citySlug = null, qt
     }
   }
 
-  // 4. Outstation Extra Dispatch Surcharge (₹ added for cities outside Moradabad)
-  // Applied AFTER matrix / option calculation so it is never overwritten
+  // 4. Optional Outstation Extra Surcharge (only when explicitly configured > 0 and no city-specific rate was already matched)
   let outstationSurcharge = 0;
-  if (!isMoradabad) {
-    outstationSurcharge = (typeof service.cityExtraCharge === 'number' && service.cityExtraCharge >= 0)
-      ? service.cityExtraCharge
-      : 100; // Default outstation surcharge is ₹100
+  if (!isMoradabad && !cityRateMatched && typeof service.cityExtraCharge === 'number' && service.cityExtraCharge > 0) {
+    outstationSurcharge = service.cityExtraCharge;
     unitPrice += outstationSurcharge;
     unitMrp += outstationSurcharge;
   }

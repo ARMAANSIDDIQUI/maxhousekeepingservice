@@ -417,24 +417,36 @@ export function BookingProvider({ children }) {
             return keys.length > 0 && keys.every(k => String(sel[k]).toLowerCase().trim() === String((i.selections || {})[k] || '').toLowerCase().trim());
           });
           if (match) {
-            if (cityRateMatched && cityMatchedRate !== null && i.service.price && i.service.price > 0) {
-              const ratio = cityMatchedRate / i.service.price;
-              p = Math.round(match.price * ratio);
-              const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (i.service.mrp || i.service.price)) : ratio;
-              m = Math.round((match.mrp || match.price) * mrpRatio);
-            } else {
-              p = match.price;
-              m = match.mrp || match.price;
+            let rowCityMatched = false;
+            if (Array.isArray(match.cityRates) && match.cityRates.length > 0 && citySlug) {
+              const rowMatch = match.cityRates.find(cr => (cr.citySlug || '').toLowerCase().trim() === citySlug);
+              if (rowMatch && typeof rowMatch.rate === 'number' && rowMatch.rate > 0) {
+                rowCityMatched = true;
+                cityRateMatched = true;
+                p = rowMatch.rate;
+                m = (typeof rowMatch.mrp === 'number' && rowMatch.mrp > 0)
+                  ? rowMatch.mrp
+                  : (match.mrp && match.price ? Math.round(rowMatch.rate * (match.mrp / match.price)) : rowMatch.rate);
+              }
+            }
+            if (!rowCityMatched) {
+              if (cityRateMatched && cityMatchedRate !== null && i.service.price && i.service.price > 0) {
+                const ratio = cityMatchedRate / i.service.price;
+                p = Math.round(match.price * ratio);
+                const mrpRatio = cityMatchedMrp ? (cityMatchedMrp / (i.service.mrp || i.service.price)) : ratio;
+                m = Math.round((match.mrp || match.price) * mrpRatio);
+              } else {
+                p = match.price;
+                m = match.mrp || match.price;
+              }
             }
           }
         }
 
-        // Outstation extra surcharge
+        // Outstation extra surcharge (only if no city-specific rate matched and cityExtraCharge > 0)
         let outstationExtra = 0;
-        if (!isMbd) {
-          outstationExtra = (typeof i.service.cityExtraCharge === 'number' && i.service.cityExtraCharge >= 0)
-            ? i.service.cityExtraCharge
-            : 100;
+        if (!isMbd && !cityRateMatched && typeof i.service.cityExtraCharge === 'number' && i.service.cityExtraCharge > 0) {
+          outstationExtra = i.service.cityExtraCharge;
           p += outstationExtra;
           m += outstationExtra;
         }

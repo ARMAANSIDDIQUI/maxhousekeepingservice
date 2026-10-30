@@ -8,7 +8,7 @@ import {
   LuShieldCheck,
   LuMessageSquare
 } from 'react-icons/lu';
-import { FaWhatsapp, FaInstagram } from 'react-icons/fa6';
+import { FaWhatsapp, FaInstagram, FaYoutube } from 'react-icons/fa6';
 import { useToast } from '../context/ToastContext';
 
 import { publicAPI } from '../api';
@@ -131,21 +131,34 @@ export default function ContactPage() {
                 </a>
               </div>
 
-              <div className="pt-4 border-t border-[#E2D9C8]/10">
-                <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1">
-                  Instagram Page
-                </span>
-                <a
-                  href="https://www.instagram.com/maxhousekeepingservice/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
-                >
-                  <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
-                  <span>Follow @maxhousekeepingservice</span>
-                </a>
-                <p className="text-[11px] text-[#DDEBE4]/70 mt-1.5 leading-relaxed">
-                  Watch our real cleaning videos, before & after photos, and message us anytime.
+              <div className="pt-4 border-t border-[#E2D9C8]/10 space-y-3">
+                <div>
+                  <span className="text-xs font-mono text-[#E9A23B] uppercase tracking-widest block mb-1.5">
+                    Instagram & YouTube Channels
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <a
+                      href="https://www.instagram.com/maxhousekeepingservice/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+                    >
+                      <FaInstagram className="w-4 h-4 transition-transform group-hover:scale-110" />
+                      <span>@maxhousekeepingservice</span>
+                    </a>
+                    <a
+                      href="https://youtube.com/@maxhousekeepingservices"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FF0000] text-white text-xs font-bold hover:brightness-110 transition-all shadow-md group"
+                    >
+                      <FaYoutube className="w-4 h-4 transition-transform group-hover:scale-110" />
+                      <span>@maxhousekeepingservices</span>
+                    </a>
+                  </div>
+                </div>
+                <p className="text-[11px] text-[#DDEBE4]/70 leading-relaxed">
+                  Watch our real cleaning videos, client video testimonials, and before & after transformations on Instagram and YouTube.
                 </p>
               </div>
 
