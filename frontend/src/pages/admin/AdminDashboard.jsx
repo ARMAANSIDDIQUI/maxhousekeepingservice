@@ -323,9 +323,9 @@ export default function AdminDashboard() {
   const [cityForm, setCityForm] = useState({
     name: '',
     slug: '',
-    state: 'Uttar Pradesh',
-    latitude: '28.8386',
-    longitude: '78.7733',
+    state: '',
+    latitude: '',
+    longitude: '',
     serviceRadiusKm: 25,
     pincodes: '',
     status: 'active',
@@ -2930,36 +2930,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // Automated City Presets (Uttar Pradesh & Neighboring Hubs) for 1-click / live typing auto-fill
-  const CITY_AUTO_PRESETS = {
-    moradabad: { name: 'Moradabad', state: 'Uttar Pradesh', lat: 28.8386, lng: 78.7733, pincodes: '244001, 244002, 244102, 244103, 244104', radius: 30, score: 1000, tier: 'primary', tags: 'headquarters, moradabad, uttar-pradesh, full-home-cleaning, zero-dispatch-fee, same-day-service' },
-    bareilly: { name: 'Bareilly', state: 'Uttar Pradesh', lat: 28.3670, lng: 79.4304, pincodes: '243001, 243002, 243003, 243005, 243006, 243122', radius: 30, score: 890, tier: 'tier_1', tags: 'bareilly, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service' },
-    meerut: { name: 'Meerut', state: 'Uttar Pradesh', lat: 28.9845, lng: 77.7064, pincodes: '250001, 250002, 250003, 250004, 250005, 250110', radius: 30, score: 870, tier: 'tier_1', tags: 'meerut, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service' },
-    sambhal: { name: 'Sambhal', state: 'Uttar Pradesh', lat: 28.5833, lng: 78.5667, pincodes: '244302, 244303, 244304', radius: 25, score: 860, tier: 'tier_1', tags: 'sambhal, uttar-pradesh, full-home-cleaning, doorstep-dispatch, same-day-service' },
-    rampur: { name: 'Rampur', state: 'Uttar Pradesh', lat: 28.8033, lng: 79.0250, pincodes: '244901, 244921, 244922, 244924', radius: 25, score: 900, tier: 'tier_1', tags: 'rampur, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, same-day-service' },
-    amroha: { name: 'Amroha', state: 'Uttar Pradesh', lat: 28.9044, lng: 78.4678, pincodes: '244221, 244222, 244231', radius: 25, score: 880, tier: 'tier_1', tags: 'amroha, uttar-pradesh, full-home-cleaning, doorstep-dispatch, same-day-service' },
-    chandausi: { name: 'Chandausi', state: 'Uttar Pradesh', lat: 28.4500, lng: 78.7833, pincodes: '244412, 244413', radius: 25, score: 840, tier: 'tier_1', tags: 'chandausi, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
-    gajraula: { name: 'Gajraula', state: 'Uttar Pradesh', lat: 28.8500, lng: 78.2333, pincodes: '244235, 244223', radius: 25, score: 820, tier: 'tier_1', tags: 'gajraula, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
-    bijnor: { name: 'Bijnor', state: 'Uttar Pradesh', lat: 29.3732, lng: 78.1352, pincodes: '246701, 246726, 246728', radius: 25, score: 800, tier: 'tier_1', tags: 'bijnor, uttar-pradesh, full-home-cleaning, doorstep-dispatch, fast-service' },
-    dhampur: { name: 'Dhampur', state: 'Uttar Pradesh', lat: 29.3100, lng: 78.5100, pincodes: '246761, 246762', radius: 25, score: 780, tier: 'tier_2', tags: 'dhampur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    noorpur: { name: 'Noorpur', state: 'Uttar Pradesh', lat: 29.1500, lng: 78.4000, pincodes: '246734', radius: 20, score: 760, tier: 'tier_2', tags: 'noorpur, uttar-pradesh, doorstep-dispatch, fast-service' },
-    hassanpur: { name: 'Hassanpur', state: 'Uttar Pradesh', lat: 28.7167, lng: 78.2833, pincodes: '244241, 244242', radius: 20, score: 740, tier: 'tier_2', tags: 'hassanpur, uttar-pradesh, doorstep-dispatch, fast-service' },
-    hapur: { name: 'Hapur', state: 'Uttar Pradesh', lat: 28.7306, lng: 77.7759, pincodes: '245101, 245201, 245304', radius: 25, score: 790, tier: 'tier_1', tags: 'hapur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    ghaziabad: { name: 'Ghaziabad', state: 'Uttar Pradesh', lat: 28.6692, lng: 77.4538, pincodes: '201001, 201002, 201009, 201010, 201014', radius: 30, score: 850, tier: 'tier_1', tags: 'ghaziabad, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, fast-service' },
-    noida: { name: 'Noida', state: 'Uttar Pradesh', lat: 28.5355, lng: 77.3910, pincodes: '201301, 201303, 201304, 201307, 201310', radius: 30, score: 850, tier: 'tier_1', tags: 'noida, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, fast-service' },
-    bulandshahr: { name: 'Bulandshahr', state: 'Uttar Pradesh', lat: 28.4070, lng: 77.8498, pincodes: '203001, 203002', radius: 25, score: 770, tier: 'tier_2', tags: 'bulandshahr, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    aligarh: { name: 'Aligarh', state: 'Uttar Pradesh', lat: 27.8974, lng: 78.0880, pincodes: '202001, 202002', radius: 25, score: 800, tier: 'tier_1', tags: 'aligarh, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    muzaffarnagar: { name: 'Muzaffarnagar', state: 'Uttar Pradesh', lat: 29.4727, lng: 77.7085, pincodes: '251001, 251002', radius: 25, score: 780, tier: 'tier_1', tags: 'muzaffarnagar, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    saharanpur: { name: 'Saharanpur', state: 'Uttar Pradesh', lat: 29.9680, lng: 77.5460, pincodes: '247001, 247002', radius: 25, score: 780, tier: 'tier_1', tags: 'saharanpur, uttar-pradesh, full-home-cleaning, doorstep-dispatch' },
-    budaun: { name: 'Budaun', state: 'Uttar Pradesh', lat: 28.0340, lng: 79.1215, pincodes: '243601, 243632', radius: 25, score: 750, tier: 'tier_2', tags: 'budaun, uttar-pradesh, doorstep-dispatch, fast-service' },
-    shahjahanpur: { name: 'Shahjahanpur', state: 'Uttar Pradesh', lat: 27.8815, lng: 79.9119, pincodes: '242001, 242226', radius: 25, score: 760, tier: 'tier_2', tags: 'shahjahanpur, uttar-pradesh, doorstep-dispatch, fast-service' },
-    pilibhit: { name: 'Pilibhit', state: 'Uttar Pradesh', lat: 28.6312, lng: 79.8044, pincodes: '262001, 262121', radius: 25, score: 750, tier: 'tier_2', tags: 'pilibhit, uttar-pradesh, doorstep-dispatch, fast-service' },
-    najibabad: { name: 'Najibabad', state: 'Uttar Pradesh', lat: 29.6107, lng: 78.3422, pincodes: '246763, 246764', radius: 20, score: 750, tier: 'tier_2', tags: 'najibabad, uttar-pradesh, doorstep-dispatch, fast-service' },
-    kashipur: { name: 'Kashipur', state: 'Uttarakhand', lat: 29.2104, lng: 78.9619, pincodes: '244713, 244714', radius: 25, score: 720, tier: 'tier_2', tags: 'kashipur, uttarakhand, full-home-cleaning, doorstep-dispatch' },
-    rudrapur: { name: 'Rudrapur', state: 'Uttarakhand', lat: 28.9875, lng: 79.4036, pincodes: '263153', radius: 25, score: 720, tier: 'tier_2', tags: 'rudrapur, uttarakhand, full-home-cleaning, doorstep-dispatch' },
-    haldwani: { name: 'Haldwani', state: 'Uttarakhand', lat: 29.2183, lng: 79.5130, pincodes: '263139', radius: 25, score: 720, tier: 'tier_2', tags: 'haldwani, uttarakhand, full-home-cleaning, doorstep-dispatch' }
-  };
-
   const toCitySlug = (str = '') =>
     String(str)
       .toLowerCase()
@@ -2967,38 +2937,67 @@ export default function AdminDashboard() {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-  // Handle typing City Name -> Automatically generate URL Slug & auto-fill preset metadata if matched
+  const buildCityDefaultTags = (citySlug, stateStr) => {
+    const cleanCitySlug = toCitySlug(citySlug);
+    const cleanStateSlug = toCitySlug(stateStr);
+    return [
+      cleanCitySlug,
+      cleanStateSlug,
+      'full-home-cleaning',
+      'sofa-carpet-hub',
+      'doorstep-dispatch',
+      'fast-service'
+    ]
+      .filter(Boolean)
+      .join(', ');
+  };
+
+  // Handle typing City Name -> Automatically generate URL Slug & check existing MongoDB cities first
   const handleCityNameAutoChange = (rawName) => {
     const autoSlug = toCitySlug(rawName);
-    const preset = CITY_AUTO_PRESETS[autoSlug];
+    const existingMongoCity = cities.find(
+      (c) =>
+        toCitySlug(c.slug || c.name) === autoSlug ||
+        String(c.name || '').toLowerCase() === String(rawName || '').trim().toLowerCase()
+    );
 
-    if (preset) {
+    if (existingMongoCity) {
+      const [lng, lat] = Array.isArray(existingMongoCity.location?.coordinates) && existingMongoCity.location.coordinates.length === 2
+        ? existingMongoCity.location.coordinates
+        : [78.7733, 28.8386];
       setCityForm(prev => ({
         ...prev,
         name: rawName,
         slug: autoSlug,
-        state: preset.state,
-        latitude: String(preset.lat),
-        longitude: String(preset.lng),
-        serviceRadiusKm: preset.radius,
-        pincodes: preset.pincodes,
-        rankingScore: preset.score,
-        rankingTier: preset.tier,
-        tags: preset.tags
+        state: existingMongoCity.state || '',
+        latitude: String(lat),
+        longitude: String(lng),
+        serviceRadiusKm: existingMongoCity.serviceRadiusKm || 25,
+        pincodes: Array.isArray(existingMongoCity.pincodes) ? existingMongoCity.pincodes.join(', ') : '',
+        rankingScore: existingMongoCity.rankingScore || 800,
+        rankingTier: existingMongoCity.rankingTier || 'tier_1',
+        tags: Array.isArray(existingMongoCity.tags) && existingMongoCity.tags.length > 0
+          ? existingMongoCity.tags.join(', ')
+          : buildCityDefaultTags(autoSlug, existingMongoCity.state)
       }));
     } else {
       setCityForm(prev => ({
         ...prev,
         name: rawName,
         slug: autoSlug,
+        state: '',
+        latitude: '',
+        longitude: '',
+        pincodes: '',
         tags: autoSlug
-          ? `${autoSlug}, uttar-pradesh, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service`
+          ? buildCityDefaultTags(autoSlug, '')
           : prev.tags
       }));
     }
   };
 
-  // Live Map Lookup for ANY City Name -> Auto-fills Slug, GPS Lat/Lng, State, Covered Pincodes & SEO Tags
+  // Live Lookup for ANY City Name using free public APIs (OpenStreetMap Nominatim + Photon + India Post API `api.postalpincode.in`)
+  // Zero hardcoded city dictionaries!
   const handleAutoDetectCityFromMap = async (targetCityName = cityForm.name) => {
     const cleanName = String(targetCityName || '').trim();
     if (!cleanName) {
@@ -3007,83 +3006,133 @@ export default function AdminDashboard() {
     }
 
     const autoSlug = toCitySlug(cleanName);
-    const preset = CITY_AUTO_PRESETS[autoSlug];
-    if (preset) {
-      setCityForm(prev => ({
-        ...prev,
-        name: preset.name,
-        slug: autoSlug,
-        state: preset.state,
-        latitude: String(preset.lat),
-        longitude: String(preset.lng),
-        serviceRadiusKm: preset.radius,
-        pincodes: preset.pincodes,
-        rankingScore: preset.score,
-        rankingTier: preset.tier,
-        tags: preset.tags
-      }));
-      toast.success(`Auto-filled slug, GPS coordinates, and covered pincodes for ${preset.name}!`);
-      return;
-    }
-
+    setCityForm(prev => ({ ...prev, name: cleanName, slug: autoSlug }));
     setIsAutoDetectingCityGeo(true);
+
     try {
-      const q = encodeURIComponent(`${cleanName}, ${cityForm.state || 'Uttar Pradesh'}, India`);
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=in&q=${q}`,
-        { headers: { 'Accept-Language': 'en' } }
-      );
-      if (res.ok) {
-        const results = await res.json();
-        if (Array.isArray(results) && results.length > 0) {
-          const best = results[0];
-          const lat = parseFloat(best.lat);
-          const lng = parseFloat(best.lon);
-          const detectedState = best.address?.state || cityForm.state || 'Uttar Pradesh';
+      let detectedState = '';
+      let detectedLat = NaN;
+      let detectedLng = NaN;
+      const pinSet = new Set();
 
-          const pinSet = new Set();
-          for (const r of results) {
-            const pc = String(r.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
-            if (pc.length === 6) pinSet.add(pc);
+      // 1. Live Geocode via OpenStreetMap Nominatim (Free, zero API key) -> State, Lat/Lng & Postcodes
+      try {
+        const q = encodeURIComponent(`${cleanName}, India`);
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=in&q=${q}`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        if (res.ok) {
+          const results = await res.json();
+          if (Array.isArray(results) && results.length > 0) {
+            const best = results[0];
+            detectedLat = parseFloat(best.lat);
+            detectedLng = parseFloat(best.lon);
+            detectedState =
+              best.address?.state ||
+              best.address?.state_district ||
+              '';
+            for (const r of results) {
+              const pc = String(r.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
+              if (pc.length === 6) pinSet.add(pc);
+            }
           }
-
-          // If Nominatim search didn't include postcode, reverse-geocode the center point
-          if (pinSet.size === 0 && !isNaN(lat) && !isNaN(lng)) {
-            try {
-              const revRes = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`,
-                { headers: { 'Accept-Language': 'en' } }
-              );
-              if (revRes.ok) {
-                const revData = await revRes.json();
-                const revPin = String(revData?.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
-                if (revPin.length === 6) pinSet.add(revPin);
-              }
-            } catch (_) {}
-          }
-
-          const pinsStr = Array.from(pinSet).join(', ');
-          const stateSlug = toCitySlug(detectedState);
-
-          setCityForm(prev => ({
-            ...prev,
-            slug: autoSlug,
-            state: detectedState,
-            latitude: !isNaN(lat) ? lat.toFixed(4) : prev.latitude,
-            longitude: !isNaN(lng) ? lng.toFixed(4) : prev.longitude,
-            pincodes: pinsStr || prev.pincodes,
-            tags: `${autoSlug}, ${stateSlug || 'uttar-pradesh'}, full-home-cleaning, sofa-carpet-hub, doorstep-dispatch, fast-service`,
-            rankingScore: prev.rankingScore === 100 ? 800 : prev.rankingScore,
-            rankingTier: prev.rankingTier === 'primary' ? 'tier_1' : prev.rankingTier
-          }));
-
-          toast.success(`Map auto-filled coordinates (${lat.toFixed(4)}, ${lng.toFixed(4)})${pinsStr ? ` & pincode ${pinsStr}` : ''} for ${cleanName}!`);
-        } else {
-          toast.error(`Could not find "${cleanName}" on map. Please check spelling.`);
         }
+      } catch (_) {}
+
+      // 2. Fallback / Enrichment via Photon Komoot API (Free OpenStreetMap geocoder)
+      if (!detectedState || isNaN(detectedLat) || isNaN(detectedLng)) {
+        try {
+          const photRes = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(`${cleanName}, India`)}&limit=5`
+          );
+          if (photRes.ok) {
+            const photData = await photRes.json();
+            const feat = (photData?.features || []).find(
+              (f) => String(f?.properties?.countrycode || '').toUpperCase() === 'IN'
+            ) || photData?.features?.[0];
+            if (feat) {
+              const [lng, lat] = feat.geometry?.coordinates || [];
+              if (isNaN(detectedLat) && typeof lat === 'number') detectedLat = lat;
+              if (isNaN(detectedLng) && typeof lng === 'number') detectedLng = lng;
+              if (!detectedState && feat.properties?.state) {
+                detectedState = feat.properties.state;
+              }
+              const pc = String(feat.properties?.postcode || '').replace(/\D/g, '').slice(0, 6);
+              if (pc.length === 6) pinSet.add(pc);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Official India Post Public API (`https://api.postalpincode.in/postoffice/{City}`) -> Official State & Covered Pincodes
+      try {
+        const postRes = await fetch(
+          `https://api.postalpincode.in/postoffice/${encodeURIComponent(cleanName)}`
+        );
+        if (postRes.ok) {
+          const postData = await postRes.json();
+          const postOffices = postData?.[0]?.PostOffice;
+          if (Array.isArray(postOffices) && postOffices.length > 0) {
+            const matchingOffices = detectedState
+              ? postOffices.filter((po) => String(po.State || '').toLowerCase() === detectedState.toLowerCase())
+              : postOffices;
+            const listToUse = matchingOffices.length > 0 ? matchingOffices : postOffices;
+
+            if (!detectedState && listToUse[0]?.State) {
+              detectedState = listToUse[0].State;
+            }
+            for (const po of listToUse.slice(0, 8)) {
+              const pin = String(po.Pincode || '').replace(/\D/g, '').slice(0, 6);
+              if (pin.length === 6) pinSet.add(pin);
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 4. Reverse-geocode center point if pincode set is still empty
+      if (pinSet.size === 0 && !isNaN(detectedLat) && !isNaN(detectedLng)) {
+        try {
+          const revRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${detectedLat}&lon=${detectedLng}&zoom=14&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          if (revRes.ok) {
+            const revData = await revRes.json();
+            const revPin = String(revData?.address?.postcode || '').replace(/\D/g, '').slice(0, 6);
+            if (revPin.length === 6) pinSet.add(revPin);
+            if (!detectedState && revData?.address?.state) {
+              detectedState = revData.address.state;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!isNaN(detectedLat) || detectedState || pinSet.size > 0) {
+        const pinsStr = Array.from(pinSet).join(', ');
+        const isUp = /uttar pradesh/i.test(detectedState);
+
+        setCityForm(prev => ({
+          ...prev,
+          name: cleanName,
+          slug: autoSlug,
+          state: detectedState || prev.state,
+          latitude: !isNaN(detectedLat) ? detectedLat.toFixed(4) : prev.latitude,
+          longitude: !isNaN(detectedLng) ? detectedLng.toFixed(4) : prev.longitude,
+          pincodes: pinsStr || prev.pincodes,
+          tags: buildCityDefaultTags(autoSlug, detectedState || prev.state),
+          rankingScore: isUp ? 850 : 750,
+          rankingTier: 'tier_1'
+        }));
+
+        toast.success(
+          `Auto-filled state (${detectedState || 'Detected'})${!isNaN(detectedLat) ? `, GPS (${detectedLat.toFixed(4)}, ${detectedLng.toFixed(4)})` : ''}${pinsStr ? ` & pincodes (${pinsStr})` : ''} for ${cleanName}!`
+        );
+      } else {
+        toast.error(`Could not find "${cleanName}" via live geo/postal APIs. Please check spelling.`);
       }
     } catch (err) {
-      toast.error('Map lookup failed. Check your internet connection.');
+      toast.error('Live city lookup failed. Check your internet connection.');
     } finally {
       setIsAutoDetectingCityGeo(false);
     }
@@ -3099,7 +3148,7 @@ export default function AdminDashboard() {
       setCityForm({
         name: city.name || '',
         slug: city.slug || toCitySlug(city.name || ''),
-        state: city.state || 'Uttar Pradesh',
+        state: city.state || '',
         latitude: String(lat ?? 28.8386),
         longitude: String(lng ?? 78.7733),
         serviceRadiusKm: city.serviceRadiusKm || 25,
@@ -3115,9 +3164,9 @@ export default function AdminDashboard() {
       setCityForm({
         name: '',
         slug: '',
-        state: 'Uttar Pradesh',
-        latitude: '28.8386',
-        longitude: '78.7733',
+        state: '',
+        latitude: '',
+        longitude: '',
         serviceRadiusKm: 25,
         pincodes: '',
         status: 'active',
@@ -3151,9 +3200,9 @@ export default function AdminDashboard() {
     const payload = {
       name: cityForm.name.trim(),
       slug: generatedSlug,
-      state: cityForm.state.trim() || 'Uttar Pradesh',
-      latitude: Number(cityForm.latitude) || 28.8386,
-      longitude: Number(cityForm.longitude) || 78.7733,
+      state: cityForm.state.trim(),
+      latitude: cityForm.latitude !== '' ? Number(cityForm.latitude) : undefined,
+      longitude: cityForm.longitude !== '' ? Number(cityForm.longitude) : undefined,
       serviceRadiusKm: Number(cityForm.serviceRadiusKm) || 25,
       pincodes: pincodesArray,
       status: cityForm.status,
@@ -6408,32 +6457,34 @@ export default function AdminDashboard() {
             maxWidth="max-w-lg"
           >
             <form onSubmit={handleSaveCity} className="space-y-4">
-              {/* 1-Click Quick Auto-Fill City Chips */}
-              <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10231D] flex items-center gap-1">
-                    <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
-                    <span>1-Click Auto-Fill UP & Nearby Cities:</span>
-                  </span>
-                  <span className="text-[10px] text-[#6B8077]">Fills Slug, GPS, Pincodes & SEO</span>
+              {/* 1-Click Quick Auto-Fill from MongoDB Cities */}
+              {cities.length > 0 && (
+                <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10231D] flex items-center gap-1">
+                      <LuSparkles className="w-3.5 h-3.5 text-[#E9A23B]" />
+                      <span>Saved Operational Cities (Live API Auto-Fill):</span>
+                    </span>
+                    <span className="text-[10px] text-[#6B8077]">Fills State, GPS, Pincodes & SEO</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cities.map((cObj) => (
+                      <button
+                        key={cObj._id || cObj.slug || cObj.name}
+                        type="button"
+                        onClick={() => handleAutoDetectCityFromMap(cObj.name)}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                          cityForm.name.toLowerCase() === String(cObj.name || '').toLowerCase()
+                            ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D]'
+                            : 'bg-white text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                        }`}
+                      >
+                        +{cObj.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {['Bareilly', 'Meerut', 'Sambhal', 'Moradabad', 'Rampur', 'Amroha', 'Chandausi', 'Gajraula', 'Bijnor', 'Hapur', 'Ghaziabad', 'Noida', 'Haldwani'].map((cName) => (
-                    <button
-                      key={cName}
-                      type="button"
-                      onClick={() => handleAutoDetectCityFromMap(cName)}
-                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                        cityForm.name.toLowerCase() === cName.toLowerCase()
-                          ? 'bg-[#10231D] text-[#F4EFE6] border-[#10231D]'
-                          : 'bg-white text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
-                      }`}
-                    >
-                      +{cName}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -6490,8 +6541,28 @@ export default function AdminDashboard() {
                   </label>
                   <input
                     type="text"
+                    placeholder="Auto-detected from city (e.g. Maharashtra, Uttar Pradesh)"
                     value={cityForm.state}
-                    onChange={(e) => setCityForm({ ...cityForm, state: e.target.value })}
+                    onChange={(e) => {
+                      const nextState = e.target.value;
+                      setCityForm(prev => {
+                        const prevStateSlug = toCitySlug(prev.state);
+                        const nextStateSlug = toCitySlug(nextState);
+                        let nextTags = prev.tags || '';
+                        if (nextStateSlug) {
+                          const tagList = nextTags.split(',').map(t => t.trim()).filter(Boolean);
+                          if (prevStateSlug && tagList.includes(prevStateSlug)) {
+                            nextTags = tagList.map(t => (t === prevStateSlug ? nextStateSlug : t)).join(', ');
+                          } else if (tagList.includes('uttar-pradesh') && nextStateSlug !== 'uttar-pradesh') {
+                            nextTags = tagList.map(t => (t === 'uttar-pradesh' ? nextStateSlug : t)).join(', ');
+                          } else if (!tagList.includes(nextStateSlug) && tagList.length > 0) {
+                            tagList.splice(1, 0, nextStateSlug);
+                            nextTags = tagList.join(', ');
+                          }
+                        }
+                        return { ...prev, state: nextState, tags: nextTags };
+                      });
+                    }}
                     className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                     required
                   />

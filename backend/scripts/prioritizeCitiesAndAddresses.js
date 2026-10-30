@@ -24,7 +24,10 @@ async function syncAndPrioritizeMongoCities() {
 
   for (let idx = 0; idx < mongoCities.length; idx++) {
     const city = mongoCities[idx];
-    const isUp = /uttar pradesh/i.test(city.state || 'Uttar Pradesh');
+    const isUp = /uttar pradesh/i.test(city.state || '');
+    if (Array.isArray(city.tags)) {
+      city.tags = city.tags.filter((t) => !['molsari-masjid', 'maulsari-masjid', 'molsiry-masjid'].includes(t));
+    }
     if (!city.rankingScore) {
       city.rankingScore = isUp ? Math.max(800, 1000 - idx * 20) : 700;
     }
@@ -33,7 +36,7 @@ async function syncAndPrioritizeMongoCities() {
     }
     await city.save();
     console.log(
-      `  [${idx + 1}] ${city.name} (${city.state || 'Uttar Pradesh'}) -> Score: ${city.rankingScore}, Pincodes: ${(city.pincodes || []).join(', ')}`
+      `  [${idx + 1}] ${city.name} (${city.state || ''}) -> Score: ${city.rankingScore}, Tags: ${(city.tags || []).join(', ')}, Pincodes: ${(city.pincodes || []).join(', ')}`
     );
   }
 
