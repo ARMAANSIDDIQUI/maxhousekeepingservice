@@ -290,17 +290,17 @@ export default function SupervisorDashboard() {
       });
     }
 
-    // Active continuous heartbeat every 4 seconds to guarantee constant GPS broadcast even when stationary
+    // Active continuous heartbeat every 3 seconds to guarantee constant GPS broadcast even when stationary
     if (heartbeatTimerRef.current === null) {
       heartbeatTimerRef.current = setInterval(() => {
         if (!document.hidden && typeof navigator !== 'undefined' && navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(onPosSuccess, onPosError, {
             enableHighAccuracy: true,
-            maximumAge: 3000,
-            timeout: 8000
+            maximumAge: 2000,
+            timeout: 6000
           });
         }
-      }, 4000);
+      }, 3000);
     }
   };
 

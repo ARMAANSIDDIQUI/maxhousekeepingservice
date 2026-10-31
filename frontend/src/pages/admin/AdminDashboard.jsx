@@ -44,7 +44,9 @@ import {
   LuPercent,
   LuCompass,
   LuNavigation,
-  LuExternalLink
+  LuExternalLink,
+  LuCircleHelp,
+  LuFileText
 } from 'react-icons/lu';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../../utils/date';
 import {
@@ -175,6 +177,10 @@ export default function AdminDashboard() {
   const [newServiceForm, setNewServiceForm] = useState({
     title: '',
     slug: '',
+    shortDescription: '',
+    description: '',
+    duration: '1.5 hrs',
+    icon: 'Sparkles',
     pricingType: 'normal',
     pricingUnit: 'fixed',
     price: 499,
@@ -191,10 +197,6 @@ export default function AdminDashboard() {
     videoUrl: '',
     youtubeUrl: '',
     uploadedVideoUrl: '',
-    duration: '1.5 hrs',
-    icon: 'Sparkles',
-    shortDescription: '',
-    description: '',
     categories: [],
     imageUrl: '',
     images: [],
@@ -203,20 +205,29 @@ export default function AdminDashboard() {
     variants: [],
     inclusions: '',
     exclusions: '',
+    faqs: [],
+    beforeUrl: '',
+    afterUrl: '',
     tags: 'deep-cleaning, housekeeping, professional-cleaning',
     rankingScore: 100,
-    rankingTier: 'standard'
+    rankingTier: 'standard',
+    isPopular: false,
+    isActive: true
   });
   const [savingNewService, setSavingNewService] = useState(false);
   const [uploadingNewServiceImage, setUploadingNewServiceImage] = useState(false);
   const [uploadingMultiple, setUploadingMultiple] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Edit Service Dual-Pricing Modal State
+  // Edit Service Dual-Pricing & Full Details Modal State
   const [editingService, setEditingService] = useState(null);
   const [serviceForm, setServiceForm] = useState({
     title: '',
     slug: '',
+    shortDescription: '',
+    description: '',
+    duration: '1.5 hrs',
+    icon: 'Sparkles',
     pricingType: 'normal',
     pricingUnit: 'fixed',
     price: 0,
@@ -234,16 +245,22 @@ export default function AdminDashboard() {
     youtubeUrl: '',
     uploadedVideoUrl: '',
     categories: [],
-    icon: 'Sparkles',
-    duration: '',
-    matrix: [],
     imageUrl: '',
     images: [],
+    matrix: [],
+    variantGroupLabel: 'Apartment / House Size',
+    variantGroupKey: 'size',
+    variants: [],
     inclusions: '',
     exclusions: '',
+    faqs: [],
+    beforeUrl: '',
+    afterUrl: '',
     tags: '',
     rankingScore: 100,
-    rankingTier: 'standard'
+    rankingTier: 'standard',
+    isPopular: false,
+    isActive: true
   });
 
   // Booking Details Modal State
@@ -406,7 +423,15 @@ export default function AdminDashboard() {
       variantGroupKey: 'size',
       variants: [],
       inclusions: '',
-      exclusions: ''
+      exclusions: '',
+      faqs: [],
+      beforeUrl: '',
+      afterUrl: '',
+      tags: 'deep-cleaning, housekeeping, professional-cleaning',
+      rankingScore: 100,
+      rankingTier: 'standard',
+      isPopular: false,
+      isActive: true
     });
     setCreateServiceModalOpen(true);
   };
@@ -751,6 +776,423 @@ export default function AdminDashboard() {
             <p className="text-xs font-bold text-[#10231D]">No photos uploaded yet</p>
             <p className="text-[11px] text-[#6B8077] max-w-xs mt-0.5">
               Click the button above to upload multiple photos. Images will show in a carousel on cards and service details.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Dedicated Service Detail Fields (Title, Slug, Duration, Icon, Short & Full Descriptions, Visibility, Badges, Videos, Before/After, Tags)
+  const renderServiceDetailFields = (isEdit = false) => {
+    const form = isEdit ? serviceForm : newServiceForm;
+    const setter = isEdit ? setServiceForm : setNewServiceForm;
+
+    return (
+      <div className="space-y-4">
+        {/* Basic Identity & URL */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-[#E2D9C8]">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuFileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                Service Identity & Basic Info
+              </h4>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Service title, URL slug, estimated duration, and icon
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#10231D] mb-1">
+              Service Title <span className="text-red-500">*</span>:
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Full Villa Deep Clean & Machine Buffing"
+              value={form.title || ''}
+              onChange={(e) => setter(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-sm font-semibold text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                URL Slug (Optional):
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. full-villa-deep-cleaning"
+                value={form.slug || ''}
+                onChange={(e) => setter(prev => ({ ...prev, slug: e.target.value }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-0.5">Used in URL: /services/{form.slug || 'slug'}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                Estimated Service Duration:
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="e.g. 1.5 - 2 hrs or 4 hrs"
+                  value={form.duration || ''}
+                  onChange={(e) => setter(prev => ({ ...prev, duration: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-semibold text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+                />
+                <LuClock className="w-4 h-4 text-[#6B8077] absolute right-3 top-2.5 pointer-events-none" />
+              </div>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">Customer-facing duration estimate</p>
+            </div>
+          </div>
+
+          {/* Service Icon */}
+          <div>
+            <label className="block text-xs font-bold text-[#10231D] mb-1">
+              Service Icon:
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-white border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
+                {getServiceIcon(form.icon, 'w-6 h-6 text-[#E9A23B]')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <CustomSelect
+                  value={form.icon}
+                  onChange={(val) => setter(prev => ({ ...prev, icon: val }))}
+                  options={ICON_SELECT_OPTIONS}
+                  placeholder="Select Service Icon..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Descriptions (Short Teaser & Full Description) */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-[#E2D9C8]">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuFileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                Detailed Descriptions & Narrative Content
+              </h4>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Short teaser for card catalogs and full comprehensive description for service detail page
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#10231D]">
+                Short Description (Catalog Card Teaser):
+              </label>
+              <span className="text-[10px] text-[#6B8077]">1-2 sentences</span>
+            </div>
+            <textarea
+              rows={2}
+              placeholder="e.g. Intensive machine scrubbing, descaling, steam sanitisation, and chrome polishing by trained verified crew."
+              value={form.shortDescription || ''}
+              onChange={(e) => setter(prev => ({ ...prev, shortDescription: e.target.value }))}
+              className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+            />
+            <p className="text-[10px] text-[#6B8077] mt-0.5">
+              Displays on service catalog cards, search previews, and WhatsApp booking shares.
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#10231D]">
+                Full Service Detailed Description <span className="text-red-500">*</span>:
+              </label>
+              <span className="text-[10px] text-[#6B8077]">Comprehensive Overview</span>
+            </div>
+            <textarea
+              rows={5}
+              placeholder="Comprehensive details on the cleaning procedure, trained personnel, heavy-duty machinery, eco-friendly chemicals used, and quality check protocols..."
+              value={form.description || ''}
+              onChange={(e) => setter(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              required
+            />
+            <p className="text-[10px] text-[#6B8077] mt-0.5">
+              Displays on the customer service detail page under "About This Service".
+            </p>
+          </div>
+        </div>
+
+        {/* Status, Visibility & Ranking Controls */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-[#E2D9C8]">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuStar className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                Visibility, Ranking & Badges
+              </h4>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Catalog active status, homepage highlights, priority score, and badge tier
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-[#E2D9C8] cursor-pointer hover:border-[#E9A23B] transition-colors shadow-2xs select-none">
+              <input
+                type="checkbox"
+                checked={form.isActive !== false}
+                onChange={(e) => setter(prev => ({ ...prev, isActive: e.target.checked }))}
+                className="w-4 h-4 text-[#E9A23B] rounded focus:ring-[#E9A23B] cursor-pointer"
+              />
+              <div>
+                <span className="text-xs font-bold text-[#10231D] block">Service Active</span>
+                <span className="text-[10px] text-[#6B8077]">Visible in catalog and bookable</span>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-[#E2D9C8] cursor-pointer hover:border-[#E9A23B] transition-colors shadow-2xs select-none">
+              <input
+                type="checkbox"
+                checked={Boolean(form.isPopular)}
+                onChange={(e) => setter(prev => ({ ...prev, isPopular: e.target.checked }))}
+                className="w-4 h-4 text-[#E9A23B] rounded focus:ring-[#E9A23B] cursor-pointer"
+              />
+              <div>
+                <span className="text-xs font-bold text-[#10231D] block">Featured / Popular Badge</span>
+                <span className="text-[10px] text-[#6B8077]">Highlighted on homepage & top banners</span>
+              </div>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                Ranking Badge Tier:
+              </label>
+              <div className="relative">
+                <select
+                  value={form.rankingTier || 'standard'}
+                  onChange={(e) => setter(prev => ({ ...prev, rankingTier: e.target.value }))}
+                  className="w-full p-2.5 pr-8 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="standard">Standard Listing</option>
+                  <option value="top_rated">Top Rated ⭐</option>
+                  <option value="trending">Trending 🔥</option>
+                  <option value="bestseller">Bestseller 🏆</option>
+                  <option value="budget">Budget Saver 💰</option>
+                </select>
+                <LuChevronDown className="w-4 h-4 text-[#10231D] absolute right-2.5 top-3 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                Priority Ranking Score (10-1000):
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                value={form.rankingScore ?? 100}
+                onChange={(e) => setter(prev => ({ ...prev, rankingScore: Number(e.target.value) || 0 }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-mono font-bold text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-0.5">Higher score places service higher in catalog sorting</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#10231D] mb-1">
+              Search Tags & Keywords:
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. sofa cleaning, shampoo wash, upholstery, moradabad"
+              value={form.tags || ''}
+              onChange={(e) => setter(prev => ({ ...prev, tags: e.target.value }))}
+              className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+            />
+            <p className="text-[10px] text-[#6B8077] mt-0.5">Comma-separated keywords for instant search matching</p>
+          </div>
+        </div>
+
+        {/* Video Walkthroughs & Transformation Showcase */}
+        <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-[#E2D9C8]">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuVideo className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                Video Walkthroughs & Transformation Showcase
+              </h4>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Field cleaning video demonstrations and before/after transformation comparison
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                YouTube Video Stream URL:
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={form.youtubeUrl || ''}
+                onChange={(e) => setter(prev => ({ ...prev, youtubeUrl: e.target.value }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-0.5">Embeds YouTube player on service detail page</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#10231D] mb-1">
+                Direct / Uploaded Video URL:
+              </label>
+              <input
+                type="url"
+                placeholder="https://res.cloudinary.com/.../video.mp4"
+                value={form.uploadedVideoUrl || ''}
+                onChange={(e) => setter(prev => ({ ...prev, uploadedVideoUrl: e.target.value }))}
+                className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+              />
+              <p className="text-[10px] text-[#6B8077] mt-0.5">Hosted HD video player walkthrough</p>
+            </div>
+          </div>
+
+          {/* Transformation Before & After */}
+          <div className="pt-2 border-t border-[#E2D9C8]">
+            <span className="text-[11px] font-bold text-[#10231D] block mb-2">
+              Before & After Transformation Photos (Optional Slider):
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-[#6B8077] mb-1">Before Picture URL:</label>
+                <input
+                  type="url"
+                  placeholder="https://.../before.jpg"
+                  value={form.beforeUrl || ''}
+                  onChange={(e) => setter(prev => ({ ...prev, beforeUrl: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-[#6B8077] mb-1">After Picture URL:</label>
+                <input
+                  type="url"
+                  placeholder="https://.../after.jpg"
+                  value={form.afterUrl || ''}
+                  onChange={(e) => setter(prev => ({ ...prev, afterUrl: e.target.value }))}
+                  className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Dedicated Service FAQ Section
+  const renderServiceFaqsSection = (isEdit = false) => {
+    const form = isEdit ? serviceForm : newServiceForm;
+    const faqs = Array.isArray(form.faqs) ? form.faqs : [];
+
+    return (
+      <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-3.5 shadow-2xs">
+        <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs">
+              <LuCircleHelp className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-black text-[#10231D] uppercase tracking-wider">
+                  Frequently Asked Questions ({faqs.length})
+                </h4>
+              </div>
+              <p className="text-[10px] text-[#6B8077] mt-0.5">
+                Answer customer queries about equipment, duration, electricity/water, and guarantees
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleAddFaq(isEdit)}
+            className="px-3 py-1.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+          >
+            <LuPlus className="w-3.5 h-3.5 text-[#E9A23B]" />
+            <span>Add FAQ</span>
+          </button>
+        </div>
+
+        {faqs.length > 0 ? (
+          <div className="space-y-3">
+            {faqs.map((faq, fIdx) => (
+              <div
+                key={fIdx}
+                className="p-3.5 rounded-xl bg-white border border-[#E2D9C8] space-y-2 relative shadow-2xs group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold uppercase text-[#E9A23B] bg-[#10231D] px-2 py-0.5 rounded-md">
+                    FAQ #{fIdx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFaq(fIdx, isEdit)}
+                    className="p-1 rounded-md text-[#C2512D] hover:bg-[#F9ECE8] transition-colors cursor-pointer"
+                    title="Delete this FAQ"
+                  >
+                    <LuTrash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#10231D] mb-1">
+                    Question:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Do I need to supply buckets or cleaning chemicals?"
+                    value={faq.question || ''}
+                    onChange={(e) => handleUpdateFaq(fIdx, 'question', e.target.value, isEdit)}
+                    className="w-full p-2 rounded-lg bg-[#ECE5D8]/50 border border-[#E2D9C8] text-xs text-[#10231D] font-semibold focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#10231D] mb-1">
+                    Answer:
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. No, our verified crew arrives fully equipped with industrial extraction machinery, vacuum cleaners, and premium German eco-friendly cleaning agents."
+                    value={faq.answer || ''}
+                    onChange={(e) => handleUpdateFaq(fIdx, 'answer', e.target.value, isEdit)}
+                    className="w-full p-2 rounded-lg bg-[#ECE5D8]/50 border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-5 text-center border-2 border-dashed border-[#E2D9C8] rounded-xl p-3 bg-white/50">
+            <p className="text-xs font-bold text-[#10231D]">No service FAQs added yet</p>
+            <p className="text-[10px] text-[#6B8077] mt-0.5">
+              Click "+ Add FAQ" above to add helpful Q&A pairs for this service.
             </p>
           </div>
         )}
@@ -2315,8 +2757,10 @@ export default function AdminDashboard() {
       : ['moradabad'];
 
     setServiceForm({
-      title: service.title,
+      title: service.title || '',
       slug: service.slug || '',
+      shortDescription: service.shortDescription || '',
+      description: service.description || '',
       categories: service.categories && service.categories.length > 0
         ? service.categories.map(c => (c && c._id ? String(c._id) : String(c)))
         : (service.category ? [String(service.category._id || service.category)] : (categories.length > 0 ? [String(categories[0]._id)] : [])),
@@ -2335,8 +2779,8 @@ export default function AdminDashboard() {
       videoUrl: service.videoUrl || '',
       youtubeUrl: service.youtubeUrl || (service.videoUrl?.includes('youtu') ? service.videoUrl : ''),
       uploadedVideoUrl: service.uploadedVideoUrl || (!service.videoUrl?.includes('youtu') ? service.videoUrl : ''),
-      price: service.price,
-      mrp: service.mrp,
+      price: service.price ?? 0,
+      mrp: service.mrp ?? 0,
       duration: service.duration || '1.5 hrs',
       variantGroupLabel: groupLabel,
       variantGroupKey: groupKey,
@@ -2345,9 +2789,16 @@ export default function AdminDashboard() {
       images: initialImages,
       inclusions: Array.isArray(service.inclusions) ? service.inclusions.join('\n') : (service.inclusions || ''),
       exclusions: Array.isArray(service.exclusions) ? service.exclusions.join('\n') : (service.exclusions || ''),
+      faqs: Array.isArray(service.faqs) && service.faqs.length > 0
+        ? service.faqs.map(f => ({ question: f.question || '', answer: f.answer || '' }))
+        : [],
+      beforeUrl: service.sampleBeforeAfter?.beforeUrl || '',
+      afterUrl: service.sampleBeforeAfter?.afterUrl || '',
       tags: Array.isArray(service.tags) ? service.tags.join(', ') : (service.tags || ''),
       rankingScore: service.rankingScore ?? 100,
-      rankingTier: service.rankingTier || 'standard'
+      rankingTier: service.rankingTier || 'standard',
+      isPopular: Boolean(service.isPopular),
+      isActive: service.isActive !== false
     });
   };
 
@@ -2373,6 +2824,34 @@ export default function AdminDashboard() {
     }
   };
 
+  // Service FAQ Management Helpers
+  const handleAddFaq = (isEdit = false) => {
+    const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+    updateFn(prev => ({
+      ...prev,
+      faqs: [...(Array.isArray(prev.faqs) ? prev.faqs : []), { question: '', answer: '' }]
+    }));
+  };
+
+  const handleUpdateFaq = (index, field, value, isEdit = false) => {
+    const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+    updateFn(prev => {
+      const nextFaqs = Array.isArray(prev.faqs) ? [...prev.faqs] : [];
+      if (!nextFaqs[index]) nextFaqs[index] = { question: '', answer: '' };
+      nextFaqs[index] = { ...nextFaqs[index], [field]: value };
+      return { ...prev, faqs: nextFaqs };
+    });
+  };
+
+  const handleRemoveFaq = (index, isEdit = false) => {
+    const updateFn = isEdit ? setServiceForm : setNewServiceForm;
+    updateFn(prev => {
+      const nextFaqs = Array.isArray(prev.faqs) ? [...prev.faqs] : [];
+      nextFaqs.splice(index, 1);
+      return { ...prev, faqs: nextFaqs };
+    });
+  };
+
   // Save Service Dual-Pricing Updates with Dynamic Variants & Inclusions/Exclusions
   const handleSaveService = async (e) => {
     e.preventDefault();
@@ -2382,7 +2861,13 @@ export default function AdminDashboard() {
       const parseList = (str) => {
         if (!str) return [];
         if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
-        return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        return str.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+      };
+
+      const parseTagsList = (str) => {
+        if (!str) return [];
+        if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
+        return str.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
       };
 
       let selectedCats = (serviceForm.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
@@ -2401,11 +2886,24 @@ export default function AdminDashboard() {
         ? serviceForm.cityAvailability
         : ['moradabad'];
 
+      const parsedFaqs = Array.isArray(serviceForm.faqs)
+        ? serviceForm.faqs.filter(f => f && f.question?.trim() && f.answer?.trim()).map(f => ({
+            question: f.question.trim(),
+            answer: f.answer.trim()
+          }))
+        : [];
+
+      const parsedTags = serviceForm.tags && typeof serviceForm.tags === 'string' && serviceForm.tags.trim()
+        ? parseTagsList(serviceForm.tags)
+        : generateAutoServiceTags(serviceForm.title, selectedCats, serviceForm.moradabadOnly, serviceForm.pricingType);
+
       const payload = {
-        title: serviceForm.title,
-        slug: serviceForm.slug,
+        title: serviceForm.title.trim(),
+        slug: serviceForm.slug ? serviceForm.slug.trim() : undefined,
+        shortDescription: serviceForm.shortDescription ? serviceForm.shortDescription.trim() : '',
+        description: serviceForm.description?.trim() || serviceForm.shortDescription?.trim() || `${serviceForm.title} by Max Housekeeping Service.`,
         categories: selectedCats,
-        icon: serviceForm.icon,
+        icon: serviceForm.icon || 'Sparkles',
         pricingType: serviceForm.pricingType || 'normal',
         pricingUnit: isUnit ? (serviceForm.pricingUnit || 'sq_ft') : 'fixed',
         unitRateMoradabad: mbdRate,
@@ -2418,19 +2916,27 @@ export default function AdminDashboard() {
         moradabadOnly: Boolean(serviceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: serviceForm.uploadedVideoUrl || serviceForm.youtubeUrl || serviceForm.videoUrl || '',
-        youtubeUrl: serviceForm.youtubeUrl || '',
-        uploadedVideoUrl: serviceForm.uploadedVideoUrl || '',
+        youtubeUrl: serviceForm.youtubeUrl ? serviceForm.youtubeUrl.trim() : '',
+        uploadedVideoUrl: serviceForm.uploadedVideoUrl ? serviceForm.uploadedVideoUrl.trim() : '',
         price: isUnit ? mbdRate : Number(serviceForm.price),
         mrp: isUnit ? (Number(serviceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(serviceForm.mrp),
-        duration: serviceForm.duration,
+        duration: serviceForm.duration?.trim() || '1.5 hrs',
         variantGroupLabel: serviceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: serviceForm.variantGroupKey || 'size',
         variants: isUnit ? [] : (serviceForm.variants || []),
         inclusions: parseList(serviceForm.inclusions),
         exclusions: parseList(serviceForm.exclusions),
-        tags: generateAutoServiceTags(serviceForm.title, selectedCats, serviceForm.moradabadOnly, serviceForm.pricingType),
-        rankingScore: 500,
-        rankingTier: 'standard'
+        faqs: parsedFaqs,
+        sampleBeforeAfter: {
+          beforeUrl: serviceForm.beforeUrl ? serviceForm.beforeUrl.trim() : '',
+          afterUrl: serviceForm.afterUrl ? serviceForm.afterUrl.trim() : '',
+          isSample: true
+        },
+        tags: parsedTags,
+        rankingScore: Number(serviceForm.rankingScore) || 100,
+        rankingTier: serviceForm.rankingTier || 'standard',
+        isPopular: Boolean(serviceForm.isPopular),
+        isActive: serviceForm.isActive !== false
       };
 
       const formImages = serviceForm.images && serviceForm.images.length > 0
@@ -2457,12 +2963,12 @@ export default function AdminDashboard() {
       });
 
       if (res.success && res.service) {
-        toast.success(`Updated details, variants and pricing for ${res.service.title}`);
+        toast.success(`Updated details, descriptions, variants and pricing for ${res.service.title}`);
         setServices(prev => prev.map(s => s._id === res.service._id ? res.service : s));
         setEditingService(null);
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to update service pricing.');
+      toast.error(err.message || 'Failed to update service.');
     }
   };
 
@@ -2502,7 +3008,13 @@ export default function AdminDashboard() {
       const parseList = (str) => {
         if (!str) return [];
         if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
-        return str.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        return str.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+      };
+
+      const parseTagsList = (str) => {
+        if (!str) return [];
+        if (Array.isArray(str)) return str.map(s => String(s).trim()).filter(Boolean);
+        return str.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
       };
 
       let selectedCats = (newServiceForm.categories || []).map(c => c && c._id ? String(c._id) : String(c)).filter(Boolean);
@@ -2522,6 +3034,17 @@ export default function AdminDashboard() {
         ? newServiceForm.cityAvailability
         : ['moradabad'];
 
+      const parsedFaqs = Array.isArray(newServiceForm.faqs)
+        ? newServiceForm.faqs.filter(f => f && f.question?.trim() && f.answer?.trim()).map(f => ({
+            question: f.question.trim(),
+            answer: f.answer.trim()
+          }))
+        : [];
+
+      const parsedTags = newServiceForm.tags && typeof newServiceForm.tags === 'string' && newServiceForm.tags.trim()
+        ? parseTagsList(newServiceForm.tags)
+        : generateAutoServiceTags(newServiceForm.title, selectedCats, newServiceForm.moradabadOnly, newServiceForm.pricingType);
+
       const payload = {
         title: newServiceForm.title.trim(),
         slug: newServiceForm.slug.trim() || newServiceForm.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
@@ -2538,22 +3061,30 @@ export default function AdminDashboard() {
         moradabadOnly: Boolean(newServiceForm.moradabadOnly || (activeCities.length === 1 && activeCities[0] === 'moradabad')),
         cityAvailability: activeCities,
         videoUrl: newServiceForm.uploadedVideoUrl || newServiceForm.youtubeUrl || newServiceForm.videoUrl || '',
-        youtubeUrl: newServiceForm.youtubeUrl || '',
-        uploadedVideoUrl: newServiceForm.uploadedVideoUrl || '',
+        youtubeUrl: newServiceForm.youtubeUrl ? newServiceForm.youtubeUrl.trim() : '',
+        uploadedVideoUrl: newServiceForm.uploadedVideoUrl ? newServiceForm.uploadedVideoUrl.trim() : '',
         price: isUnit ? mbdRate : Number(newServiceForm.price),
         mrp: isUnit ? (Number(newServiceForm.mrp) || Math.round(mbdRate * 1.25)) : Number(newServiceForm.mrp),
-        duration: newServiceForm.duration || '1.5 hrs',
+        duration: newServiceForm.duration?.trim() || '1.5 hrs',
         icon: newServiceForm.icon || 'Sparkles',
-        shortDescription: newServiceForm.shortDescription,
-        description: newServiceForm.description || newServiceForm.shortDescription || `${newServiceForm.title} by Max Housekeeping Service.`,
+        shortDescription: newServiceForm.shortDescription ? newServiceForm.shortDescription.trim() : '',
+        description: newServiceForm.description?.trim() || newServiceForm.shortDescription?.trim() || `${newServiceForm.title} by Max Housekeeping Service.`,
         variantGroupLabel: newServiceForm.variantGroupLabel || 'Apartment / House Size',
         variantGroupKey: newServiceForm.variantGroupKey || 'size',
         variants: isUnit ? [] : (newServiceForm.variants || []),
         inclusions: parseList(newServiceForm.inclusions),
         exclusions: parseList(newServiceForm.exclusions),
-        tags: generateAutoServiceTags(newServiceForm.title, selectedCats, newServiceForm.moradabadOnly, newServiceForm.pricingType),
-        rankingScore: 500,
-        rankingTier: 'standard'
+        faqs: parsedFaqs,
+        sampleBeforeAfter: {
+          beforeUrl: newServiceForm.beforeUrl ? newServiceForm.beforeUrl.trim() : '',
+          afterUrl: newServiceForm.afterUrl ? newServiceForm.afterUrl.trim() : '',
+          isSample: true
+        },
+        tags: parsedTags,
+        rankingScore: Number(newServiceForm.rankingScore) || 100,
+        rankingTier: newServiceForm.rankingTier || 'standard',
+        isPopular: Boolean(newServiceForm.isPopular),
+        isActive: newServiceForm.isActive !== false
       };
       const formImages = newServiceForm.images && newServiceForm.images.length > 0
         ? newServiceForm.images
@@ -5007,10 +5538,10 @@ export default function AdminDashboard() {
                       <button
                         type="button"
                         onClick={() => openEditService(svc)}
-                        className="flex-1 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                        className="flex-1 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                       >
                         <LuSquarePen className="w-4 h-4 text-[#E9A23B]" />
-                        <span>Edit Prices & Photo</span>
+                        <span>Manage & Edit Service Details</span>
                       </button>
                       <button
                         type="button"
@@ -6415,29 +6946,19 @@ export default function AdminDashboard() {
         )}
 
         {/* ========================================================
-            MODAL 1: EDIT SERVICE DUAL-PRICING & CLOUDINARY IMAGE
+            MODAL 1: EDIT SERVICE DETAILS, PRICING & CLOUDINARY IMAGE
         ======================================================== */}
         {editingService && (
           <Modal
             isOpen={true}
             onClose={() => setEditingService(null)}
             title={`Edit Service: ${editingService.title}`}
-            subtitle="Update Service Details, Shown Price (MRP), Payable Price, and Dynamic Variants"
-            maxWidth="max-w-2xl"
+            subtitle="Full management: Descriptions, Pricing, Photos, Videos, Inclusions, Exclusions, and FAQs"
+            maxWidth="max-w-4xl"
           >
-            <form onSubmit={handleSaveService} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Title:
-                </label>
-                <input
-                  type="text"
-                  value={serviceForm.title}
-                  onChange={(e) => setServiceForm({ ...serviceForm, title: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D]"
-                  required
-                />
-              </div>
+            <form onSubmit={handleSaveService} className="space-y-5">
+              {/* Service Identity, Duration, Slug, Short & Full Descriptions, Visibility & Ranking */}
+              {renderServiceDetailFields(true)}
 
               {/* Category & Service Classification Section (Primary Dropdown + Multi-Select Cards) */}
               {renderCategorySelectionSection(true)}
@@ -6445,32 +6966,12 @@ export default function AdminDashboard() {
               {/* Cloudinary Service Multi-Image Gallery Upload */}
               {renderImageUploadSection(true)}
 
-              {/* Service Icon (Select-Only) */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Icon:
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
-                    {getServiceIcon(serviceForm.icon, 'w-6 h-6 text-[#E9A23B]')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CustomSelect
-                      value={serviceForm.icon}
-                      onChange={(val) => setServiceForm(prev => ({ ...prev, icon: val }))}
-                      options={ICON_SELECT_OPTIONS}
-                      placeholder="Select Service Icon..."
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Step 1 Service Type, Dynamic Unit Pricing & City Availability */}
               {renderServicePricingConfig(true)}
 
               {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
-              <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
                   <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
                     <LuCheck className="w-4 h-4 text-[#10231D]" />
                     <span>What Is Included & What Is Excluded</span>
@@ -6491,7 +6992,7 @@ export default function AdminDashboard() {
                       placeholder={"Wall tiles descaling and grouting scrub\nWC pot, washbasin, and vanity sanitisation\nTaps, showerheads, and chrome fittings polishing\nMirror and glass partition streak-free wipe\nFloor scrub and drain trap clearing"}
                       value={serviceForm.inclusions || ''}
                       onChange={(e) => setServiceForm({ ...serviceForm, inclusions: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
                     />
                     <p className="text-[10px] text-[#6B8077] mt-1">Enter each included feature or task on a separate line.</p>
                   </div>
@@ -6508,24 +7009,27 @@ export default function AdminDashboard() {
                       placeholder={"Inside locked private storage without supervisor\nShifting of exceptionally heavy architectural stonework\nRepainting or repairing water-seepage cracks"}
                       value={serviceForm.exclusions || ''}
                       onChange={(e) => setServiceForm({ ...serviceForm, exclusions: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
                     />
                     <p className="text-[10px] text-[#6B8077] mt-1">Enter excluded items or limitations on a separate line.</p>
                   </div>
                 </div>
               </div>
 
+              {/* Service FAQs */}
+              {renderServiceFaqsSection(true)}
+
               <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
                 <button
                   type="button"
                   onClick={() => setEditingService(null)}
-                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                  className="px-4 py-2.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-xs font-bold text-[#10231D] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs shadow-md transition-all active:scale-95"
+                  className="px-6 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
                 >
                   Save Service Changes
                 </button>
@@ -7211,80 +7715,25 @@ export default function AdminDashboard() {
             isOpen={true}
             onClose={() => setCreateServiceModalOpen(false)}
             title="Create New Cleaning Service"
-            subtitle="Add a new service offering to the catalogue with dual-pricing, tiered variants and details"
-            maxWidth="max-w-3xl"
+            subtitle="Add a new service offering with dual-pricing, tiered variants, descriptions, photos, videos, and FAQs"
+            maxWidth="max-w-4xl"
           >
-            <form onSubmit={handleCreateService} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Title:
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Kitchen Chimney & Hob Deep Cleaning"
-                  value={newServiceForm.title}
-                  onChange={(e) => setNewServiceForm({ ...newServiceForm, title: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-sm text-[#10231D]"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    URL Slug (optional):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. kitchen-chimney-cleaning"
-                    value={newServiceForm.slug}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, slug: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-mono text-[#10231D]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#10231D] mb-1">
-                    Service Duration:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1.5 hrs"
-                    value={newServiceForm.duration}
-                    onChange={(e) => setNewServiceForm({ ...newServiceForm, duration: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D]"
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleCreateService} className="space-y-5">
+              {/* Service Identity, Duration, Slug, Short & Full Descriptions, Visibility & Ranking */}
+              {renderServiceDetailFields(false)}
 
               {/* Category & Service Classification Section (Primary Dropdown + Multi-Select Cards) */}
               {renderCategorySelectionSection(false)}
 
-              {/* Service Icon (Select-Only) */}
-              <div>
-                <label className="block text-xs font-bold text-[#10231D] mb-1">
-                  Service Icon:
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
-                    {getServiceIcon(newServiceForm.icon, 'w-6 h-6 text-[#E9A23B]')}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CustomSelect
-                      value={newServiceForm.icon}
-                      onChange={(val) => setNewServiceForm(prev => ({ ...prev, icon: val }))}
-                      options={ICON_SELECT_OPTIONS}
-                      placeholder="Select Service Icon..."
-                    />
-                  </div>
-                </div>
-              </div>
+              {/* Cloudinary Service Multi-Image Gallery Upload */}
+              {renderImageUploadSection(false)}
 
               {/* Step 1 Service Type, Dynamic Unit Pricing & City Availability */}
               {renderServicePricingConfig(false)}
 
-              {/* Dynamic Inclusions & Exclusions (Managed from Admin Panel) */}
-              <div className="pt-4 border-t border-[#E2D9C8] space-y-4">
-                <div className="flex items-center justify-between">
+              {/* Dynamic Inclusions & Exclusions */}
+              <div className="p-4 rounded-2xl bg-[#ECE5D8]/90 border border-[#E2D9C8] space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E2D9C8]">
                   <h4 className="font-display font-bold text-sm text-[#10231D] flex items-center gap-1.5">
                     <LuCheck className="w-4 h-4 text-[#10231D]" />
                     <span>What Is Included & What Is Excluded</span>
@@ -7305,7 +7754,7 @@ export default function AdminDashboard() {
                       placeholder={"Wall tiles descaling and grouting scrub\nWC pot, washbasin, and vanity sanitisation\nTaps, showerheads, and chrome fittings polishing\nMirror and glass partition streak-free wipe\nFloor scrub and drain trap clearing"}
                       value={newServiceForm.inclusions || ''}
                       onChange={(e) => setNewServiceForm({ ...newServiceForm, inclusions: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
                     />
                     <p className="text-[10px] text-[#6B8077] mt-1">Enter each included feature or task on a separate line.</p>
                   </div>
@@ -7322,25 +7771,28 @@ export default function AdminDashboard() {
                       placeholder={"Inside locked private storage without supervisor\nShifting of exceptionally heavy architectural stonework\nRepainting or repairing water-seepage cracks"}
                       value={newServiceForm.exclusions || ''}
                       onChange={(e) => setNewServiceForm({ ...newServiceForm, exclusions: e.target.value })}
-                      className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:border-[#E9A23B] focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs text-[#10231D] font-medium leading-relaxed placeholder:text-[#6B8077]/60 focus:ring-2 focus:ring-[#E9A23B] focus:outline-none"
                     />
                     <p className="text-[10px] text-[#6B8077] mt-1">Enter excluded items or limitations on a separate line.</p>
                   </div>
                 </div>
               </div>
 
+              {/* Frequently Asked Questions */}
+              {renderServiceFaqsSection(false)}
+
               <div className="pt-4 flex justify-end gap-3 border-t border-[#E2D9C8]">
                 <button
                   type="button"
                   onClick={() => setCreateServiceModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[#ECE5D8] text-xs font-bold text-[#10231D]"
+                  className="px-4 py-2.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-xs font-bold text-[#10231D] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingNewService}
-                  className="px-5 py-2 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs"
+                  className="px-6 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {savingNewService ? 'Creating Service...' : 'Create Service'}
                 </button>

@@ -497,7 +497,7 @@ function sanitizeStringList(val) {
     return val.map(s => String(s).trim()).filter(Boolean);
   }
   if (typeof val === 'string') {
-    return val.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    return val.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
   }
   return undefined;
 }
@@ -522,6 +522,21 @@ export async function updateService(req, res, next) {
     }
     if (updates.tags !== undefined) {
       updates.tags = sanitizeStringList(updates.tags) || [];
+    }
+    if (updates.faqs !== undefined) {
+      updates.faqs = Array.isArray(updates.faqs)
+        ? updates.faqs.filter(f => f && f.question && f.answer).map(f => ({
+            question: String(f.question).trim(),
+            answer: String(f.answer).trim()
+          }))
+        : [];
+    }
+    if (updates.sampleBeforeAfter !== undefined) {
+      updates.sampleBeforeAfter = {
+        beforeUrl: String(updates.sampleBeforeAfter?.beforeUrl || '').trim(),
+        afterUrl: String(updates.sampleBeforeAfter?.afterUrl || '').trim(),
+        isSample: true
+      };
     }
     if (updates.rankingScore !== undefined) {
       updates.rankingScore = Number(updates.rankingScore) || 100;
@@ -596,6 +611,21 @@ export async function createService(req, res, next) {
     }
     if (serviceData.tags !== undefined) {
       serviceData.tags = sanitizeStringList(serviceData.tags) || [];
+    }
+    if (serviceData.faqs !== undefined) {
+      serviceData.faqs = Array.isArray(serviceData.faqs)
+        ? serviceData.faqs.filter(f => f && f.question && f.answer).map(f => ({
+            question: String(f.question).trim(),
+            answer: String(f.answer).trim()
+          }))
+        : [];
+    }
+    if (serviceData.sampleBeforeAfter !== undefined) {
+      serviceData.sampleBeforeAfter = {
+        beforeUrl: String(serviceData.sampleBeforeAfter?.beforeUrl || '').trim(),
+        afterUrl: String(serviceData.sampleBeforeAfter?.afterUrl || '').trim(),
+        isSample: true
+      };
     }
     if (serviceData.rankingScore !== undefined) {
       serviceData.rankingScore = Number(serviceData.rankingScore) || 100;

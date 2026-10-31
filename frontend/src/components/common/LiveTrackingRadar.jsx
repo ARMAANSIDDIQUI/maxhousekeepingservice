@@ -76,6 +76,7 @@ export default function LiveTrackingRadar({
   const [mapViewMode, setMapViewMode] = useState('roadmap'); // 'roadmap' | 'hybrid' | 'streetview'
   const [streetViewNotice, setStreetViewNotice] = useState('');
   const [updatingLocation, setUpdatingLocation] = useState(false);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [updateNotice, setUpdateNotice] = useState('');
 
   const isCompleted = status === 'completed';
@@ -246,10 +247,13 @@ export default function LiveTrackingRadar({
   // Poll live location endpoint
   const fetchLiveLocation = async () => {
     if (!bookingCode || document.hidden) return;
+    setIsFetchingLocation(true);
 
     try {
       const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
-      const res = await fetch(`${apiBase}/bookings/${encodeURIComponent(bookingCode)}/live-location`);
+      const res = await fetch(`${apiBase}/bookings/${encodeURIComponent(bookingCode)}/live-location?_t=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -337,6 +341,8 @@ export default function LiveTrackingRadar({
       }
     } catch (err) {
       console.warn('[LiveTrackingRadar] Polling notice:', err.message);
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
 
@@ -440,8 +446,9 @@ export default function LiveTrackingRadar({
         mapTypeId: 'roadmap',
         mapTypeControl: false,
         streetViewControl: false,
-        fullscreenControl: true,
-        zoomControl: true
+        fullscreenControl: false,
+        zoomControl: false,
+        gestureHandling: 'greedy'
       });
 
       const panorama = map.getStreetView();
@@ -717,6 +724,12 @@ export default function LiveTrackingRadar({
                       ? 'Not Assigned Yet'
                       : 'Sharing On'}
               </span>
+              {!isFinished && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#10231D] text-[#E9A23B] border border-[#E9A23B]/40 flex items-center gap-1 font-mono shadow-xs">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isFetchingLocation ? 'bg-[#E9A23B] animate-spin' : 'bg-emerald-400 animate-pulse'} shrink-0`} />
+                  <span>Live GPS Sync • 3s</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#A3B8B0] mt-0.5">
               {isCompleted
@@ -735,12 +748,12 @@ export default function LiveTrackingRadar({
         {/* Uber/Rapido Distance & ETA Pill (Active visits only) */}
         <div className="flex items-center gap-2.5">
           {!isFinished && hasSupervisor && distanceKm !== null && etaInfo && (
-            <div className="px-4 py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-3.5 shadow-sm">
+            <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-[#2D453B]/90 border border-[#3E5C4F] flex items-center gap-2.5 sm:gap-3.5 shadow-sm">
               <div>
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">Distance</span>
                 <span className="text-xs sm:text-sm font-black text-[#E9A23B] tnum">{etaInfo.distanceText}</span>
               </div>
-              <div className="border-l border-[#3E5C4F] pl-3">
+              <div className="border-l border-[#3E5C4F] pl-2.5 sm:pl-3">
                 <span className="text-[9px] text-[#A3B8B0] block uppercase font-mono font-bold">ETA</span>
                 <span className="text-xs sm:text-sm font-black text-emerald-300 tnum">{etaInfo.etaText}</span>
               </div>
@@ -751,7 +764,7 @@ export default function LiveTrackingRadar({
             href={navUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3.5 py-2 rounded-2xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
           >
             <span>Open Maps</span>
             <LuExternalLink className="w-3.5 h-3.5" />
@@ -763,74 +776,74 @@ export default function LiveTrackingRadar({
       <div className="relative">
         <div
           ref={mapContainerRef}
-          className="w-full h-72 sm:h-[390px] md:h-[430px] bg-[#E5EAE7] transition-all"
-          style={{ minHeight: '300px' }}
+          className="w-full h-[400px] sm:h-[430px] md:h-[480px] bg-[#E5EAE7] transition-all"
+          style={{ minHeight: '380px' }}
         />
 
         {/* Floating Map View Mode Switcher: Original Map / Satellite / Street View */}
-        <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1 p-1 rounded-xl bg-[#10231D]/95 backdrop-blur-md border border-[#2D453B] shadow-lg">
+        <div className="absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1 p-1 rounded-xl bg-[#10231D]/95 backdrop-blur-md border border-[#2D453B] shadow-lg">
           <button
             type="button"
             onClick={() => handleSelectMapType('roadmap')}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               mapViewMode === 'roadmap'
                 ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
                 : 'text-[#F4EFE6] hover:bg-[#2D453B]'
             }`}
             title="Original Google Map View"
           >
-            <LuLayers className="w-3.5 h-3.5" />
+            <LuLayers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Map</span>
           </button>
           <button
             type="button"
             onClick={() => handleSelectMapType('hybrid')}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               mapViewMode === 'hybrid'
                 ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
                 : 'text-[#F4EFE6] hover:bg-[#2D453B]'
             }`}
             title="Satellite View with Labels"
           >
-            <LuCompass className="w-3.5 h-3.5" />
+            <LuCompass className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Sat View</span>
           </button>
           <button
             type="button"
             onClick={handleToggleStreetView}
-            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               mapViewMode === 'streetview'
                 ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
                 : 'text-[#F4EFE6] hover:bg-[#2D453B]'
             }`}
             title="Toggle 360° Street View"
           >
-            <LuEye className="w-3.5 h-3.5" />
-            <span>{mapViewMode === 'streetview' ? 'Exit Street View' : 'Street View'}</span>
+            <LuEye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span>{mapViewMode === 'streetview' ? 'Exit Street' : 'Street View'}</span>
           </button>
         </div>
 
         {/* Street View Fallback Notice */}
         {streetViewNotice && (
-          <div className="absolute bottom-14 left-3 right-3 sm:right-auto sm:max-w-md z-10 pointer-events-none">
+          <div className="absolute bottom-14 left-2.5 right-2.5 sm:right-auto sm:max-w-md z-10 pointer-events-none">
             <div className="bg-[#10231D]/95 backdrop-blur-md text-[#F4EFE6] border border-[#E9A23B]/60 px-3.5 py-2 rounded-xl text-[11px] font-medium shadow-lg">
               {streetViewNotice}
             </div>
           </div>
         )}
 
-        {/* Floating Map Navigation Controls */}
-        <div className="absolute top-3 right-14 flex flex-col gap-1.5 z-10">
+        {/* Floating Map Navigation Controls (Compact icon buttons on mobile, expanded text on desktop) */}
+        <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1.5 z-10">
           {!isFinished && (
             <button
               type="button"
               onClick={handleTriggerLocationUpdate}
-              disabled={updatingLocation}
-              className="px-2.5 py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
-              title="Update live location & sync GPS"
+              disabled={updatingLocation || isFetchingLocation}
+              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
+              title="Auto-refreshing every 3s · Click to force GPS satellite fix"
             >
-              <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation ? 'animate-spin' : ''}`} />
-              <span>Update Location</span>
+              <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation || isFetchingLocation ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Update Location</span>
             </button>
           )}
 
@@ -838,8 +851,8 @@ export default function LiveTrackingRadar({
             <button
               type="button"
               onClick={handleRecenterSupervisor}
-              className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#E9A23B] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
-              title="Focus on Supervisor"
+              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#E9A23B] border border-[#2D453B] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              title="Focus on Supervisor Position"
             >
               <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B]" />
               <span className="hidden sm:inline">Supervisor</span>
@@ -848,7 +861,7 @@ export default function LiveTrackingRadar({
           <button
             type="button"
             onClick={handleRecenterDestination}
-            className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+            className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
             title="Focus on Destination Doorstep"
           >
             <LuMapPin className="w-3.5 h-3.5 text-emerald-400" />
@@ -858,7 +871,7 @@ export default function LiveTrackingRadar({
             <button
               type="button"
               onClick={handleFitRoute}
-              className="px-2.5 py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#A3B8B0] hover:text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#10231D]/90 hover:bg-[#10231D] backdrop-blur-md text-[#A3B8B0] hover:text-[#F4EFE6] border border-[#2D453B] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
               title="Fit Full Route"
             >
               <LuCompass className="w-3.5 h-3.5" />
@@ -868,26 +881,26 @@ export default function LiveTrackingRadar({
         </div>
 
         {updateNotice && (
-          <div className="absolute top-16 right-14 z-20 pointer-events-none">
+          <div className="absolute top-14 right-2.5 z-20 pointer-events-none max-w-xs">
             <div className="bg-[#10231D]/95 backdrop-blur-md text-[#F4EFE6] border border-[#E9A23B]/60 px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{updateNotice}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <span className="truncate">{updateNotice}</span>
             </div>
           </div>
         )}
 
         {/* Completed Service Notice Banner on Map */}
         {isCompleted && (
-          <div className="absolute top-3 left-3 right-16 sm:max-w-md z-10 pointer-events-none">
-            <div className="backdrop-blur-md bg-[#10231D]/95 border border-emerald-500/60 text-[#F4EFE6] px-4 py-3 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="absolute top-2.5 left-2.5 max-w-[calc(100%-55px)] sm:max-w-md z-10 pointer-events-none">
+            <div className="backdrop-blur-md bg-[#10231D]/95 border border-emerald-500/60 text-[#F4EFE6] px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-xl flex items-start gap-2.5 sm:gap-3 pointer-events-auto">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
                 <LuCircleCheck className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
                 <p className="font-bold text-xs text-emerald-400 uppercase tracking-wide">
                   Service Visit Completed
                 </p>
-                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                   Real-time vehicle and crew tracking has strictly ceased as work has concluded. Thank you for choosing Max HouseKeeping.
                 </p>
               </div>
@@ -897,16 +910,16 @@ export default function LiveTrackingRadar({
 
         {/* Smart Banner on Map when Supervisor is NOT Yet Assigned */}
         {!hasSupervisor && !isFinished && (
-          <div className="absolute top-3 left-3 right-16 sm:max-w-md z-10 pointer-events-none">
-            <div className="backdrop-blur-md bg-[#10231D]/95 border border-[#E9A23B]/60 text-[#F4EFE6] px-4 py-3 rounded-2xl shadow-xl flex items-start gap-3 pointer-events-auto">
-              <div className="w-8 h-8 rounded-xl bg-[#E9A23B]/20 border border-[#E9A23B]/40 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="absolute top-2.5 left-2.5 max-w-[calc(100%-55px)] sm:max-w-md z-10 pointer-events-none">
+            <div className="backdrop-blur-md bg-[#10231D]/95 border border-[#E9A23B]/60 text-[#F4EFE6] px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-xl flex items-start gap-2.5 sm:gap-3 pointer-events-auto">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#E9A23B]/20 border border-[#E9A23B]/40 flex items-center justify-center shrink-0 mt-0.5">
                 <LuClock className="w-4 h-4 text-[#E9A23B]" />
               </div>
               <div>
                 <p className="font-bold text-xs text-[#E9A23B] uppercase tracking-wide">
                   Supervisor Not Yet Assigned
                 </p>
-                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed">
+                <p className="text-[11px] text-[#D7E2DD] mt-0.5 leading-relaxed line-clamp-2 sm:line-clamp-none">
                   Our dispatch team is allocating a field supervisor for your booking. Live route & ETA will start automatically once assigned.
                 </p>
               </div>
@@ -916,8 +929,8 @@ export default function LiveTrackingRadar({
 
         {/* Floating Uber/Rapido Live Arrival Pill on Map */}
         {!isFinished && hasSupervisor && etaInfo && (
-          <div className="absolute top-3 left-3 right-16 sm:right-auto z-10 pointer-events-none">
-            <div className={`backdrop-blur-md px-4 py-2.5 rounded-2xl border shadow-xl flex items-center gap-3 pointer-events-auto ${
+          <div className="absolute top-2.5 left-2.5 max-w-[calc(100%-55px)] sm:max-w-xs z-10 pointer-events-none">
+            <div className={`backdrop-blur-md px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl border shadow-xl flex items-center gap-2.5 sm:gap-3 pointer-events-auto ${
               etaInfo.isArrived
                 ? 'bg-emerald-950/95 border-emerald-400 text-emerald-200'
                 : 'bg-[#10231D]/95 border-[#E9A23B]/60 text-[#F4EFE6]'
@@ -925,16 +938,16 @@ export default function LiveTrackingRadar({
               <span className={`w-2.5 h-2.5 rounded-full ${etaInfo.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B]'} relative flex items-center justify-center shrink-0`}>
                 <span className={`w-2.5 h-2.5 rounded-full ${etaInfo.isArrived ? 'bg-emerald-400' : 'bg-[#E9A23B]'} absolute inset-0 animate-ping opacity-75`} />
               </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-xs uppercase tracking-wide">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="font-black text-xs uppercase tracking-wide truncate">
                     {etaInfo.distanceText}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 text-[#E9A23B] font-bold">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-black/50 text-[#E9A23B] font-bold shrink-0">
                     {etaInfo.etaText}
                   </span>
                 </div>
-                <p className="text-[10px] text-[#A3B8B0] line-clamp-1">
+                <p className="text-[10px] text-[#A3B8B0] truncate">
                   {etaInfo.statusText}
                 </p>
               </div>
@@ -942,12 +955,13 @@ export default function LiveTrackingRadar({
           </div>
         )}
 
-        {/* Live overlay update time */}
+        {/* Live overlay update time & auto-refresh pulse */}
         {!isFinished && (
-          <div className="absolute bottom-3 right-14 pointer-events-none">
-            <div className="bg-[#10231D]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
-              <LuCompass className="w-3 h-3 text-[#E9A23B]" />
-              <span>Updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+          <div className="absolute bottom-2.5 right-2.5 z-10 pointer-events-none">
+            <div className="bg-[#10231D]/95 backdrop-blur-md px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-[#2D453B] flex items-center gap-1.5 text-[10px] text-[#A3B8B0] shadow-sm">
+              <span className={`w-2 h-2 rounded-full ${isFetchingLocation ? 'bg-[#E9A23B] animate-spin' : 'bg-emerald-400 animate-pulse'} shrink-0`} />
+              <span className="font-mono text-[#E9A23B] font-bold">Auto-Sync</span>
+              <span className="hidden sm:inline">· {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
             </div>
           </div>
         )}
