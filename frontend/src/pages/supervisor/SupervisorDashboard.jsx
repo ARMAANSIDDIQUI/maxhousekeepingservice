@@ -562,7 +562,7 @@ export default function SupervisorDashboard() {
     }
   };
 
-  // 1. Verify OTP with Enterprise Urban Company Standards
+  // 1. Verify OTP with Enterprise Standards
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (!isAssignedToMe(selectedBooking)) {
@@ -1734,7 +1734,7 @@ export default function SupervisorDashboard() {
                       )}
                     </div>
 
-                    {/* OTP & Photo Indicators (Urban Company Quality Gates) */}
+                    {/* OTP & Photo Indicators (Quality Gates) */}
                     <div className="pt-3 border-t border-[#E2D9C8] flex flex-wrap items-center justify-between gap-2 text-[11px]">
                       {/* OTP Verification Pill */}
                       {b.otpVerified ? (
@@ -1816,7 +1816,7 @@ export default function SupervisorDashboard() {
       )}
     </div>
 
-      {/* DETAIL & OPERATIONS MODAL (URBAN COMPANY / PRONTO STYLE) */}
+      {/* DETAIL & OPERATIONS MODAL */}
       {selectedBooking && (
         <Modal
           isOpen={modalOpen}

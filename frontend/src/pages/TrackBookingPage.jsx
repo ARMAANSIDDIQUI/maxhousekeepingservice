@@ -159,7 +159,7 @@ export default function TrackBookingPage() {
               </div>
             </div>
 
-            {/* CUSTOMER SERVICE VERIFICATION OTP CARD (URBAN COMPANY / PRONTO SAFETY GATE) */}
+            {/* CUSTOMER SERVICE VERIFICATION OTP CARD */}
             {booking.serviceOtp && (
               <div className="p-5 rounded-2xl bg-[#10231D] text-[#F4EFE6] border-2 border-[#E9A23B] shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="space-y-1 text-center sm:text-left">

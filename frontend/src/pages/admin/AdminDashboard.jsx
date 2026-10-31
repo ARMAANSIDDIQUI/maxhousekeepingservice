@@ -78,7 +78,7 @@ export default function AdminDashboard() {
   const [confirmModalConfig, setConfirmModalConfig] = useState(null);
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
-  // Supervisors State (Urban Company / Pronto supervisor management)
+  // Supervisors State (Field supervisor dispatch & management)
   const [supervisors, setSupervisors] = useState([]);
   const [supervisorModalOpen, setSupervisorModalOpen] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState(null);
@@ -2058,7 +2058,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <p className="text-[10px] text-[#6B8077]">
-                  Urban Company / Pronto standard: Hosted HD field walkthrough video player.
+                  Quality Standard: Hosted HD field walkthrough video player.
                 </p>
               </div>
 
@@ -4513,7 +4513,7 @@ export default function AdminDashboard() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#E9A23B] bg-[#10231D] px-2.5 py-0.5 rounded-full">
-                    URBAN COMPANY / PRONTO DISPATCH
+                    VERIFIED FIELD DISPATCH
                   </span>
                   <span className="text-xs font-mono text-[#6B8077]">
                     {supervisors.length} Field Personnel
@@ -8143,7 +8143,7 @@ export default function AdminDashboard() {
                         Field Supervisor & Arrival Verification OTP
                       </h4>
                       <p className="text-[10px] text-[#6B8077]">
-                        Urban Company / Pronto on-site handshake protocol
+                        Secure on-site arrival verification protocol
                       </p>
                     </div>
                   </div>
@@ -8843,7 +8843,7 @@ export default function AdminDashboard() {
             isOpen={assignModalOpen}
             onClose={() => setAssignModalOpen(false)}
             title={`Assign Supervisor & Slot (Order #${assignBooking.bookingCode})`}
-            subtitle="Urban Company / Pronto style dispatch. Customer is issued a 4-digit OTP for arrival handshake."
+            subtitle="Field supervisor dispatch. Customer is issued a 4-digit OTP for arrival handshake."
             maxWidth="max-w-lg"
           >
             <form onSubmit={handleSaveAssignment} className="space-y-4 text-xs text-[#10231D]">

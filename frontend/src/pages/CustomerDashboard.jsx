@@ -1047,7 +1047,7 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
 
-                    {/* CUSTOMER OTP & SUPERVISOR ASSIGNMENT (URBAN COMPANY / PRONTO STYLE) */}
+                    {/* CUSTOMER OTP & SUPERVISOR ASSIGNMENT */}
                     {b.status !== 'cancelled' && (
                       <div className="space-y-2.5">
                         {/* Assigned Supervisor Card */}
