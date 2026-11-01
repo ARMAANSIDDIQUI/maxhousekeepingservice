@@ -177,7 +177,8 @@ export default function LoginPage() {
     e.preventDefault();
     const { name, phone, email, password: pw } = signupForm;
 
-    if (!signupOtp.trim() || signupOtp.trim().length !== 6) {
+    const cleanOtp = signupOtp.replace(/\D/g, '').trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
       toast.error('Please enter the 6-digit verification code sent to your email.');
       return;
     }
@@ -192,7 +193,7 @@ export default function LoginPage() {
         phone: cleanPhone,
         email: email.trim().toLowerCase(),
         password: pw,
-        otp: signupOtp.trim()
+        otp: cleanOtp
       });
       if (res?.success && res?.user) {
         handlePostLoginRedirect(res.user.role);
@@ -265,7 +266,8 @@ export default function LoginPage() {
   // 7. Reset Password Submit with OTP
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!forgotCode.trim() || forgotCode.trim().length !== 6) {
+    const cleanForgotCode = forgotCode.replace(/\D/g, '').trim();
+    if (!cleanForgotCode || cleanForgotCode.length !== 6) {
       toast.error('Please enter the 6-digit verification code.');
       return;
     }
@@ -285,7 +287,7 @@ export default function LoginPage() {
     try {
       const res = await resetPassword(
         forgotEmail.trim(),
-        forgotCode.trim(),
+        cleanForgotCode,
         forgotNewPassword
       );
       if (res?.success) {
@@ -875,7 +877,7 @@ export default function LoginPage() {
                     maxLength={6}
                     placeholder="123456"
                     value={signupOtp}
-                    onChange={(e) => setSignupOtp(e.target.value)}
+                    onChange={(e) => setSignupOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                     required
                     autoFocus
@@ -976,7 +978,7 @@ export default function LoginPage() {
                     maxLength={6}
                     placeholder="123456"
                     value={forgotCode}
-                    onChange={(e) => setForgotCode(e.target.value)}
+                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full py-3 px-4 rounded-xl bg-[#F4EFE6] border border-[#E2D9C8] text-center font-mono text-2xl tracking-[0.3em] font-bold text-[#10231D] focus:border-[#E9A23B] focus:outline-none disabled:opacity-60"
                     required
                   />

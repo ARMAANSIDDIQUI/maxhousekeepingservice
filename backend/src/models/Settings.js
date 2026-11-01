@@ -44,7 +44,15 @@ const settingsSchema = new mongoose.Schema({
   paymentGatewayProvider: { type: String, default: 'razorpay' },
   razorpayKeyId: { type: String, default: '' },
   razorpayKeySecret: { type: String, default: '', select: false },
-  paymentTestMode: { type: Boolean, default: true }
+  paymentTestMode: { type: Boolean, default: true },
+
+  // Closed Booking Dates Management (Blackout Dates)
+  closedBookingDates: [{
+    date: { type: String, required: true }, // Format: YYYY-MM-DD
+    reason: { type: String, default: 'Sorry, completely booked!' },
+    notes: { type: String, default: '' },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });

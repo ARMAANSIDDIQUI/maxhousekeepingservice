@@ -819,6 +819,25 @@ export async function updateSettings(req, res, next) {
     if (updatePayload.platformChargeLabel !== undefined) {
       updatePayload.platformChargeLabel = String(updatePayload.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges';
     }
+    if (updatePayload.closedBookingDates !== undefined) {
+      if (Array.isArray(updatePayload.closedBookingDates)) {
+        updatePayload.closedBookingDates = updatePayload.closedBookingDates
+          .filter(item => item && item.date && /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(String(item.date).trim()))
+          .map(item => {
+            const rawDate = String(item.date).trim().replace(/\//g, '-');
+            const [y, m, d] = rawDate.split('-');
+            const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            return {
+              date: iso,
+              reason: String(item.reason || 'Sorry, completely booked!').trim() || 'Sorry, completely booked!',
+              notes: String(item.notes || '').trim(),
+              createdAt: item.createdAt || new Date()
+            };
+          });
+      } else {
+        delete updatePayload.closedBookingDates;
+      }
+    }
 
     const settings = await Settings.findOneAndUpdate({}, updatePayload, { new: true, upsert: true });
     res.status(200).json({ success: true, settings });

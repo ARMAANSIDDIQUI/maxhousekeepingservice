@@ -16,6 +16,7 @@ import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
 import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
 import SEO from '../components/common/SEO';
+import FAQSection from '../components/common/FAQSection';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -504,6 +505,13 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Frequently Asked Questions Section on Home Page */}
+      <FAQSection
+        className="bg-[#ECE5D8]/40 border-t border-[#E2D9C8]"
+        title="Doorstep Cleaning FAQs"
+        subtitle="Answers to common questions about booking, live supervisor tracking, transparent pricing, and closed dates."
+      />
 
     </div>
   );

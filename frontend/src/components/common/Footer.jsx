@@ -308,6 +308,7 @@ export default function Footer() {
               </span>
             )}
             <Link to="/track" className="hover:text-[#F4EFE6]">Track Order</Link>
+            <Link to="/guide" className="hover:text-[#F4EFE6]">User Manual & Guide</Link>
             <Link to="/login" className="hover:text-[#F4EFE6]">Login Page</Link>
             <a
               href="https://www.instagram.com/maxhousekeepingservice/"

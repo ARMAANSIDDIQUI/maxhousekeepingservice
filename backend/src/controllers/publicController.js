@@ -59,6 +59,9 @@ export async function getPublicSettings(req, res, next) {
     publicSettings.platformChargeType = publicSettings.platformChargeType === 'percentage' ? 'percentage' : 'flat';
     publicSettings.platformChargeAmount = Number(publicSettings.platformChargeAmount ?? 49);
     publicSettings.platformChargeLabel = publicSettings.platformChargeLabel || 'Platform Charges';
+    publicSettings.closedBookingDates = Array.isArray(publicSettings.closedBookingDates)
+      ? publicSettings.closedBookingDates
+      : [];
 
     // Expose public Google Client ID for OAuth
     publicSettings.googleClientId =

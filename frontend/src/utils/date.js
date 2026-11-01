@@ -99,7 +99,9 @@ export function validateDateMonthDays(dateInput) {
     month,
     day,
     maxDays,
-    formattedDMY: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
+    formattedDMY: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`,
+    formattedISO: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+    displayDate: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
   };
 }
 

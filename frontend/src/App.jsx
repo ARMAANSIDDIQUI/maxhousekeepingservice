@@ -26,6 +26,7 @@ import SupervisorDashboard from './pages/supervisor/SupervisorDashboard';
 import CustomerDashboard from './pages/CustomerDashboard';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import UserManualPage from './pages/UserManualPage';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -93,6 +94,8 @@ export default function App() {
                           <Route path="/book" element={<BookingPage />} />
                           <Route path="/book/:slug" element={<BookingPage />} />
                           <Route path="/about" element={<AboutPage />} />
+                          <Route path="/guide" element={<UserManualPage />} />
+                          <Route path="/user-manual" element={<UserManualPage />} />
                           <Route path="/contact" element={<ContactPage />} />
                           <Route path="/track" element={<TrackBookingPage />} />
                           <Route path="/track/:code" element={<TrackBookingPage />} />

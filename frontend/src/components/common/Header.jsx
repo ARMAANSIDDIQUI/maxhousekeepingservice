@@ -344,6 +344,13 @@ export default function Header() {
             </Link>
 
             <Link
+              to="/guide"
+              className={`hover:text-[#E9A23B] transition-colors py-1 ${location.pathname === '/guide' || location.pathname === '/user-manual' ? 'text-[#E9A23B] font-bold' : ''}`}
+            >
+              Guide
+            </Link>
+
+            <Link
               to="/contact"
               className={`hover:text-[#E9A23B] transition-colors py-1 ${location.pathname === '/contact' ? 'text-[#E9A23B] font-bold' : ''}`}
             >
@@ -553,6 +560,13 @@ export default function Header() {
               className="block py-2 text-sm font-semibold text-[#10231D]"
             >
               About
+            </Link>
+            <Link
+              to="/guide"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-[#10231D]"
+            >
+              User Manual & Guide
             </Link>
             <Link
               to="/contact"

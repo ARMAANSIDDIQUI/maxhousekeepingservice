@@ -20,6 +20,7 @@ import {
   LuCalculator,
   LuSparkles,
   LuTruck,
+  LuBan,
   LuInfo
 } from 'react-icons/lu';
 import confetti from 'canvas-confetti';
@@ -439,36 +440,105 @@ export default function BookingPage() {
     }
   };
 
+  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  // Filter closed booking dates to ONLY today or upcoming dates (do NOT show already gone/past dates!)
+  const upcomingClosedDates = React.useMemo(() => {
+    const rawList = contextSettings?.closedBookingDates;
+    if (!rawList || !Array.isArray(rawList)) return [];
+    return rawList
+      .filter(item => item && item.date && item.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [contextSettings?.closedBookingDates, todayStr]);
+
+  const closedDatesMap = React.useMemo(() => {
+    const map = new Map();
+    const rawList = contextSettings?.closedBookingDates;
+    if (rawList && Array.isArray(rawList)) {
+      rawList.forEach(item => {
+        if (item && item.date) {
+          map.set(item.date, item.reason || 'Sorry, completely booked!');
+        }
+      });
+    }
+    return map;
+  }, [contextSettings?.closedBookingDates]);
+
+  // Generate 14-day upcoming options for the date dropdown selector
+  const upcomingDateOptions = React.useMemo(() => {
+    const list = [];
+    const base = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      const iso = d.toISOString().split('T')[0];
+      const isClosed = closedDatesMap.has(iso);
+      const reason = closedDatesMap.get(iso);
+      const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
+      list.push({
+        iso,
+        dayName,
+        displayDate: formatDateDMY(iso),
+        isClosed,
+        reason,
+        label: isClosed
+          ? `${formatDateDMY(iso)} (${dayName}) — CLOSED: ${reason}`
+          : `${formatDateDMY(iso)} (${dayName})${i === 0 ? ' — Today' : i === 1 ? ' — Tomorrow' : ''}`
+      });
+    }
+    return list;
+  }, [closedDatesMap]);
+
   const handleDateChange = (e) => {
-    const val = e.target.value;
-    setSlot(prev => ({ ...prev, date: val }));
+    const val = typeof e === 'string' ? e : e?.target?.value || '';
     const today = new Date().toISOString().split('T')[0];
 
     if (!val) {
+      setSlot(prev => ({ ...prev, date: '' }));
       setFieldErrors(prev => ({
         ...prev,
         date: 'Please select a date.'
       }));
-    } else {
-      const check = validateDateMonthDays(val);
-      if (!check.valid) {
-        setFieldErrors(prev => ({
-          ...prev,
-          date: check.error
-        }));
-      } else if (val < today) {
-        setFieldErrors(prev => ({
-          ...prev,
-          date: 'Booking date cannot be in the past.'
-        }));
-      } else {
-        setFieldErrors(prev => {
-          const next = { ...prev };
-          delete next.date;
-          return next;
-        });
-      }
+      return;
     }
+
+    const check = validateDateMonthDays(val);
+    if (!check.valid) {
+      setSlot(prev => ({ ...prev, date: val }));
+      setFieldErrors(prev => ({
+        ...prev,
+        date: check.error
+      }));
+      return;
+    }
+
+    if (val < today) {
+      setSlot(prev => ({ ...prev, date: val }));
+      setFieldErrors(prev => ({
+        ...prev,
+        date: 'Booking date cannot be in the past.'
+      }));
+      return;
+    }
+
+    const dateISO = check.formattedISO || val;
+    if (closedDatesMap.has(dateISO)) {
+      const reason = closedDatesMap.get(dateISO);
+      setSlot(prev => ({ ...prev, date: '' }));
+      setFieldErrors(prev => ({
+        ...prev,
+        date: `Bookings closed on ${formatDateDMY(dateISO)}: ${reason}`
+      }));
+      toast.error(`Bookings are closed on this date (${formatDateDMY(dateISO)}): ${reason}`);
+      return;
+    }
+
+    setSlot(prev => ({ ...prev, date: val }));
+    setFieldErrors(prev => {
+      const next = { ...prev };
+      delete next.date;
+      return next;
+    });
   };
 
   // All catalog services for the "Add a service" popover
@@ -914,6 +984,14 @@ export default function BookingPage() {
     if (slot.date < today) {
       toast.error('Booking date cannot be in the past.');
       setFieldErrors(prev => ({ ...prev, date: 'Booking date cannot be in the past.' }));
+      return;
+    }
+
+    const dateISO = checkDate.formattedISO || slot.date;
+    if (closedDatesMap.has(dateISO)) {
+      const reason = closedDatesMap.get(dateISO);
+      toast.error(`Bookings are closed on this date (${formatDateDMY(dateISO)}): ${reason}`);
+      setFieldErrors(prev => ({ ...prev, date: `Closed: ${reason}` }));
       return;
     }
 
@@ -1697,6 +1775,42 @@ export default function BookingPage() {
                 </div>
               )}
 
+              {/* Customer Highlight of Today or Upcoming Closed Dates (Past/Gone dates excluded) */}
+              {upcomingClosedDates.length > 0 && (
+                <div className="p-4 rounded-2xl bg-[#FFF6E5] border border-[#E9A23B]/50 text-[#10231D] mb-5 space-y-2.5 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <LuCircleAlert className="w-5 h-5 text-[#E9A23B] shrink-0" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-[#10231D]">
+                      Service Notice: Bookings Closed on Selected Upcoming Dates
+                    </h4>
+                  </div>
+                  <p className="text-xs text-[#3D524A] leading-relaxed">
+                    Due to scheduled maintenance or peak booking capacity, appointments are temporarily closed on the following upcoming date{upcomingClosedDates.length > 1 ? 's' : ''}. These dates are disabled in the booking date selector:
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    {upcomingClosedDates.map((c) => {
+                      const isToday = c.date === todayStr;
+                      return (
+                        <div
+                          key={c.date}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#E9A23B]/40 text-xs font-bold text-[#10231D] shadow-2xs"
+                        >
+                          <LuBan className="w-3.5 h-3.5 text-[#C2512D] shrink-0" />
+                          <span className="font-mono text-[#C2512D]">
+                            {formatDateDMY(c.date)}
+                            {isToday ? ' (Today)' : ''}
+                          </span>
+                          <span className="text-[#6B8077]">•</span>
+                          <span className="text-[#3D524A] font-medium">
+                            {c.reason || 'Sorry, completely booked!'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1709,6 +1823,30 @@ export default function BookingPage() {
                       </span>
                     )}
                   </div>
+
+                  {/* Quick Select Upcoming Dates Dropdown (With Closed Dates Disabled) */}
+                  {user && upcomingDateOptions.length > 0 && (
+                    <div className="mb-2">
+                      <select
+                        value={slot.date}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      >
+                        <option value="">-- Choose from upcoming dates --</option>
+                        {upcomingDateOptions.map((opt) => (
+                          <option
+                            key={opt.iso}
+                            value={opt.iso}
+                            disabled={opt.isClosed}
+                            className={opt.isClosed ? 'text-stone-400 bg-stone-100 italic' : 'text-[#10231D]'}
+                          >
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <input
                     type="date"
                     min={new Date().toISOString().split('T')[0]}

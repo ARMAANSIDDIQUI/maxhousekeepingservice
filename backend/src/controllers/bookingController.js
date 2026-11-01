@@ -293,6 +293,22 @@ export async function createBooking(req, res, next) {
       return res.status(400).json({ success: false, message: slotDateValidation.error });
     }
 
+    // Verify Date is not closed by Admin in Settings
+    const settingsDoc = await Settings.findOne().lean();
+    if (settingsDoc?.closedBookingDates && Array.isArray(settingsDoc.closedBookingDates)) {
+      const slotISO = slotDateValidation.formattedISO;
+      const closedMatch = settingsDoc.closedBookingDates.find(
+        (c) => c && (c.date === slotISO || c.date === slot.date)
+      );
+      if (closedMatch) {
+        const closureReason = closedMatch.reason || 'Sorry, completely booked!';
+        return res.status(400).json({
+          success: false,
+          message: `Bookings are closed on this date (${slotDateValidation.displayDate || slotDateValidation.formattedDMY || slot.date}): ${closureReason}. Please select an alternative available date.`
+        });
+      }
+    }
+
     // Resolve City
     let cityDoc = null;
     if (cityId) {
@@ -733,6 +749,23 @@ export async function editBookingDetails(req, res, next) {
       if (!slotDateValidation.valid) {
         return res.status(400).json({ success: false, message: slotDateValidation.error });
       }
+
+      // Check if rescheduling to a closed date
+      const settingsDoc = await Settings.findOne().lean();
+      if (settingsDoc?.closedBookingDates && Array.isArray(settingsDoc.closedBookingDates)) {
+        const slotISO = slotDateValidation.formattedISO;
+        const closedMatch = settingsDoc.closedBookingDates.find(
+          (c) => c && (c.date === slotISO || c.date === slot.date)
+        );
+        if (closedMatch) {
+          const closureReason = closedMatch.reason || 'Sorry, completely booked!';
+          return res.status(400).json({
+            success: false,
+            message: `Bookings are closed on this date (${slotDateValidation.displayDate || slotDateValidation.formattedDMY || slot.date}): ${closureReason}. Please select an alternative available date.`
+          });
+        }
+      }
+
       booking.slot.date = slot.date;
     }
     if (slot?.window) booking.slot.window = slot.window;

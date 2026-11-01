@@ -497,6 +497,16 @@ export default function CustomerDashboard() {
       return;
     }
 
+    const dateISO = checkDate.formattedISO || editForm.date;
+    const closedList = settings?.closedBookingDates;
+    if (closedList && Array.isArray(closedList)) {
+      const match = closedList.find(c => c && (c.date === dateISO || c.date === editForm.date));
+      if (match) {
+        toast.error(`Bookings are closed on ${formatDateDMY(dateISO)}: ${match.reason || 'Sorry, completely booked!'}`);
+        return;
+      }
+    }
+
     try {
       const res = await apiRequest(`/bookings/${editingBooking._id}/edit`, {
         method: 'PUT',

@@ -214,7 +214,8 @@ export function BookingProvider({ children }) {
     platformChargeEnabled: false,
     platformChargeType: 'flat',
     platformChargeAmount: 49,
-    platformChargeLabel: 'Platform Charges'
+    platformChargeLabel: 'Platform Charges',
+    closedBookingDates: []
   });
 
   const refreshSettings = useCallback(async () => {
@@ -242,7 +243,8 @@ export function BookingProvider({ children }) {
           platformChargeEnabled: Boolean(res.settings.platformChargeEnabled),
           platformChargeType: res.settings.platformChargeType === 'percentage' ? 'percentage' : 'flat',
           platformChargeAmount: Number(res.settings.platformChargeAmount ?? 49),
-          platformChargeLabel: res.settings.platformChargeLabel || 'Platform Charges'
+          platformChargeLabel: res.settings.platformChargeLabel || 'Platform Charges',
+          closedBookingDates: Array.isArray(res.settings.closedBookingDates) ? res.settings.closedBookingDates : []
         }));
       }
     } catch (err) {

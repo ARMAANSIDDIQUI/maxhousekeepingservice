@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   LuLayoutDashboard,
   LuCalendar,
+  LuCalendarOff,
+  LuCircleAlert,
+  LuBan,
   LuSparkles,
   LuDollarSign,
   LuUsers,
@@ -169,9 +172,17 @@ export default function AdminDashboard() {
     platformChargeEnabled: false,
     platformChargeType: 'flat',
     platformChargeAmount: 49,
-    platformChargeLabel: 'Platform Charges'
+    platformChargeLabel: 'Platform Charges',
+    closedBookingDates: []
   });
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Closed Dates Management State
+  const [closingDate, setClosingDate] = useState('');
+  const [closingReasonType, setClosingReasonType] = useState('Sorry, completely booked!');
+  const [customClosingReason, setCustomClosingReason] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
+  const [savingClosedDates, setSavingClosedDates] = useState(false);
 
   const [createServiceModalOpen, setCreateServiceModalOpen] = useState(false);
   const [newServiceForm, setNewServiceForm] = useState({
@@ -3517,6 +3528,158 @@ export default function AdminDashboard() {
       toast.error(err.message || 'Failed to save settings.');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  // Closed Booking Dates Management Handlers
+  const handleAddClosedDate = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (!closingDate) {
+      toast.error('Please pick a date to close bookings.');
+      return;
+    }
+
+    const check = validateDateMonthDays(closingDate);
+    if (!check.valid) {
+      toast.error(check.error);
+      return;
+    }
+
+    const resolvedReason =
+      closingReasonType === 'Other / Custom Reason...'
+        ? (customClosingReason.trim() || 'Sorry, completely booked!')
+        : (closingReasonType || 'Sorry, completely booked!');
+
+    const existingList = Array.isArray(settingsForm.closedBookingDates)
+      ? [...settingsForm.closedBookingDates]
+      : [];
+    const dateISO = check.formattedISO || closingDate;
+
+    // Check if date already exists
+    const existingIndex = existingList.findIndex(c => c.date === dateISO);
+    let updatedList;
+    if (existingIndex >= 0) {
+      existingList[existingIndex] = {
+        ...existingList[existingIndex],
+        reason: resolvedReason,
+        notes: closingNotes.trim(),
+        createdAt: new Date()
+      };
+      updatedList = existingList;
+    } else {
+      updatedList = [
+        ...existingList,
+        {
+          date: dateISO,
+          reason: resolvedReason,
+          notes: closingNotes.trim(),
+          createdAt: new Date()
+        }
+      ];
+    }
+
+    // Sort by date ascending
+    updatedList.sort((a, b) => a.date.localeCompare(b.date));
+
+    setSavingClosedDates(true);
+    try {
+      const payload = {
+        ...settingsForm,
+        closedBookingDates: updatedList
+      };
+      const res = await adminAPI.updateSettings(payload);
+      if (res && res.success !== false) {
+        setSettingsForm(prev => ({
+          ...prev,
+          closedBookingDates: updatedList
+        }));
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(`Bookings closed for ${formatDateDMY(dateISO)}: "${resolvedReason}"`);
+        setClosingDate('');
+        setClosingReasonType('Sorry, completely booked!');
+        setCustomClosingReason('');
+        setClosingNotes('');
+      } else {
+        throw new Error(res?.message || 'Failed to update closed dates');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to close date.');
+    } finally {
+      setSavingClosedDates(false);
+    }
+  };
+
+  const handleRemoveClosedDate = async (dateToRemove) => {
+    const existingList = Array.isArray(settingsForm.closedBookingDates)
+      ? [...settingsForm.closedBookingDates]
+      : [];
+    const updatedList = existingList.filter(c => c.date !== dateToRemove);
+
+    setSavingClosedDates(true);
+    try {
+      const payload = {
+        ...settingsForm,
+        closedBookingDates: updatedList
+      };
+      const res = await adminAPI.updateSettings(payload);
+      if (res && res.success !== false) {
+        setSettingsForm(prev => ({
+          ...prev,
+          closedBookingDates: updatedList
+        }));
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(`Date ${formatDateDMY(dateToRemove)} re-opened for customer bookings!`);
+      } else {
+        throw new Error(res?.message || 'Failed to remove closed date');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to re-open date.');
+    } finally {
+      setSavingClosedDates(false);
+    }
+  };
+
+  const handlePruneExpiredDates = async () => {
+    const todayISO = new Date().toISOString().split('T')[0];
+    const existingList = Array.isArray(settingsForm.closedBookingDates)
+      ? [...settingsForm.closedBookingDates]
+      : [];
+    const updatedList = existingList.filter(c => c.date >= todayISO);
+
+    const removedCount = existingList.length - updatedList.length;
+    if (removedCount === 0) {
+      toast.info('No past expired dates found.');
+      return;
+    }
+
+    setSavingClosedDates(true);
+    try {
+      const payload = {
+        ...settingsForm,
+        closedBookingDates: updatedList
+      };
+      const res = await adminAPI.updateSettings(payload);
+      if (res && res.success !== false) {
+        setSettingsForm(prev => ({
+          ...prev,
+          closedBookingDates: updatedList
+        }));
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(`Cleared ${removedCount} expired past date${removedCount > 1 ? 's' : ''}!`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to prune expired dates.');
+    } finally {
+      setSavingClosedDates(false);
     }
   };
 
@@ -6930,6 +7093,202 @@ export default function AdminDashboard() {
                   </div>
                 );
               })()}
+
+              {/* 5. Closed Booking Dates Management (Blackout Dates) */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LuCalendarOff className="w-5 h-5 text-[#C2512D]" />
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Closed Booking Dates Management (Blackout Dates)
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Select specific dates to close customer bookings. Upcoming & today closed dates are highlighted on the booking page and automatically disabled in booking date dropdowns.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                    {(settingsForm.closedBookingDates || []).filter(c => c && c.date >= new Date().toISOString().split('T')[0]).length} Active Upcoming Closed Date{(settingsForm.closedBookingDates || []).filter(c => c && c.date >= new Date().toISOString().split('T')[0]).length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                {/* Form to Close a New Date */}
+                <div className="p-4 bg-white/80 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <span className="text-xs font-bold text-[#10231D] block">
+                    Close a Specific Date for Bookings:
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                        Select Date to Close: <span className="text-[#C2512D]">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={closingDate}
+                        onChange={(e) => setClosingDate(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                        Closure Reason Suggestion: <span className="text-[#C2512D]">*</span>
+                      </label>
+                      <select
+                        value={closingReasonType}
+                        onChange={(e) => setClosingReasonType(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      >
+                        <option value="Sorry, completely booked!">Sorry, completely booked! (Default)</option>
+                        <option value="Public Holiday / Festival">Public Holiday / Festival</option>
+                        <option value="Staff Training & Maintenance">Staff Training & Maintenance</option>
+                        <option value="Severe Weather / Heavy Rains">Severe Weather / Heavy Rains</option>
+                        <option value="Operational Break / Weekly Off">Operational Break / Weekly Off</option>
+                        <option value="Other / Custom Reason...">Other / Custom Reason... (Type below)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                        Internal Notes / Memo (Optional):
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Diwali staff bonus & team holiday"
+                        value={closingNotes}
+                        onChange={(e) => setClosingNotes(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      />
+                    </div>
+                  </div>
+
+                  {closingReasonType === 'Other / Custom Reason...' && (
+                    <div className="pt-1">
+                      <label className="text-[11px] font-bold text-[#C2512D] block mb-1">
+                        Type Custom Reason Shown to Customer: <span className="text-[#C2512D]">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Annual inventory audit & machine sterilization"
+                        value={customClosingReason}
+                        onChange={(e) => setCustomClosingReason(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#C2512D]/40 bg-[#FFF7F5] text-xs font-semibold text-[#10231D] focus:outline-none focus:border-[#C2512D]"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-[11px] text-[#6B8077]">
+                      Reason shown to customers: <strong className="text-[#10231D]">{closingReasonType === 'Other / Custom Reason...' ? (customClosingReason || 'Type custom reason...') : closingReasonType}</strong>
+                    </p>
+                    <button
+                      type="button"
+                      disabled={savingClosedDates || !closingDate}
+                      onClick={handleAddClosedDate}
+                      className="px-4 py-2 rounded-xl bg-[#C2512D] hover:bg-[#A33F20] text-white text-xs font-bold cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                    >
+                      <LuBan className="w-3.5 h-3.5" />
+                      <span>{savingClosedDates ? 'Saving Date...' : 'Close This Date'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table of Configured Closed Dates */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#10231D]">
+                      Configured Blackout & Closed Dates List:
+                    </span>
+                    {(settingsForm.closedBookingDates || []).some(c => c && c.date < new Date().toISOString().split('T')[0]) && (
+                      <button
+                        type="button"
+                        disabled={savingClosedDates}
+                        onClick={handlePruneExpiredDates}
+                        className="text-[11px] font-bold text-[#6B8077] hover:text-[#C2512D] transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Remove past dates that are already gone"
+                      >
+                        <LuTrash2 className="w-3 h-3" />
+                        <span>Prune Past Expired Dates</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {(!settingsForm.closedBookingDates || settingsForm.closedBookingDates.length === 0) ? (
+                    <div className="p-4 rounded-xl bg-white/50 border border-dashed border-[#D2C8B8] text-center text-xs text-[#6B8077]">
+                      No dates are currently marked closed. Bookings are open every day according to standard hours.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[#E2D9C8] border border-[#E2D9C8] rounded-xl overflow-hidden bg-white/70 text-xs">
+                      {settingsForm.closedBookingDates.map((item) => {
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        const isToday = item.date === todayStr;
+                        const isUpcoming = item.date > todayStr;
+                        const isExpired = item.date < todayStr;
+
+                        return (
+                          <div
+                            key={item.date}
+                            className={`p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors ${
+                              isToday
+                                ? 'bg-amber-50/70'
+                                : isUpcoming
+                                ? 'bg-white hover:bg-stone-50'
+                                : 'bg-stone-100/60 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono font-bold text-sm text-[#10231D] bg-[#F4EFE6] px-2.5 py-1 rounded-lg border border-[#E2D9C8]">
+                                {formatDateDMY(item.date)}
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-[#10231D]">
+                                    {item.reason || 'Sorry, completely booked!'}
+                                  </span>
+                                  {isToday && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                                      Today (Active)
+                                    </span>
+                                  )}
+                                  {isUpcoming && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                      Upcoming (Active)
+                                    </span>
+                                  )}
+                                  {isExpired && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-200 text-stone-600">
+                                      Expired (Hidden from Users)
+                                    </span>
+                                  )}
+                                </div>
+                                {item.notes && (
+                                  <p className="text-[11px] text-[#6B8077] italic mt-0.5">
+                                    Note: {item.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={savingClosedDates}
+                              onClick={() => handleRemoveClosedDate(item.date)}
+                              className="px-2.5 py-1.5 rounded-lg border border-[#D2C8B8] hover:border-[#C2512D] text-[#C2512D] hover:bg-[#FFF7F5] font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors self-end sm:self-auto"
+                              title="Reopen this date for customer bookings"
+                            >
+                              <LuRotateCcw className="w-3 h-3" />
+                              <span>Re-open Date</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="pt-2">
                 <button

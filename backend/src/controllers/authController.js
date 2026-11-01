@@ -92,7 +92,16 @@ export async function sendSignupOtp(req, res, next) {
       { upsert: true, new: true }
     );
 
-    await sendOtpEmail(cleanEmail, otp, name || 'Customer', 'signup');
+    try {
+      await sendOtpEmail(cleanEmail, otp, name || 'Customer', 'signup');
+    } catch (emailErr) {
+      console.error('[Signup OTP Email Error]:', emailErr.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV OTP SIMULATION] Email: ${cleanEmail} | Signup Code: ${otp}`);
+      } else {
+        throw emailErr;
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -118,10 +127,11 @@ export async function register(req, res, next) {
       });
     }
 
-    if (!otp || !otp.trim() || otp.trim().length !== 6) {
+    const cleanOtp = String(otp || '').replace(/\D/g, '').trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide the 6-digit email verification code.'
+        message: 'Please provide the valid 6-digit email verification code.'
       });
     }
 
@@ -159,7 +169,7 @@ export async function register(req, res, next) {
       });
     }
 
-    if (otpRecord.code !== otp.trim()) {
+    if (otpRecord.code !== cleanOtp) {
       otpRecord.attempts = (otpRecord.attempts || 0) + 1;
       if (otpRecord.attempts >= 5) {
         await OtpVerification.deleteOne({ _id: otpRecord._id });
@@ -842,7 +852,16 @@ export async function forgotPassword(req, res, next) {
     };
     await user.save();
 
-    await sendOtpEmail(cleanEmail, otp, user.name || 'Valued Customer', 'password_reset');
+    try {
+      await sendOtpEmail(cleanEmail, otp, user.name || 'Valued Customer', 'password_reset');
+    } catch (emailErr) {
+      console.error('[Forgot Password OTP Email Error]:', emailErr.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV OTP SIMULATION] Reset OTP for ${cleanEmail}: ${otp}`);
+      } else {
+        throw emailErr;
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -861,10 +880,19 @@ export async function resetPassword(req, res, next) {
   try {
     const { email, code, newPassword } = req.body;
 
-    if (!email || !code || !newPassword) {
+    const cleanCode = String(code || '').replace(/\D/g, '').trim();
+
+    if (!email || !cleanCode || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Email, verification code, and new password are required.'
+        message: 'Email, 6-digit verification code, and new password are required.'
+      });
+    }
+
+    if (cleanCode.length !== 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter the complete 6-digit verification code.'
       });
     }
 
@@ -892,7 +920,7 @@ export async function resetPassword(req, res, next) {
       });
     }
 
-    if (user.otpSecret.code !== code.trim()) {
+    if (user.otpSecret.code !== cleanCode) {
       user.otpSecret.attempts = (user.otpSecret.attempts || 0) + 1;
       if (user.otpSecret.attempts >= 5) {
         user.otpSecret = { code: null, expiresAt: null, attempts: 0 };

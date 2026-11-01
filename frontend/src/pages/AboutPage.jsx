@@ -22,6 +22,7 @@ import { FaInstagram, FaWhatsapp } from 'react-icons/fa6';
 import { useBooking } from '../context/BookingContext';
 import { apiRequest } from '../api';
 import SEO from '../components/common/SEO';
+import FAQSection from '../components/common/FAQSection';
 
 const EQUIPMENT_INVENTORY = [
   {
@@ -806,6 +807,13 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
+
+        {/* Frequently Asked Questions Section on About Page */}
+        <FAQSection
+          className="border-t border-[#E2D9C8] pt-10"
+          title="About Max Housekeeping — FAQs"
+          subtitle="Learn more about our standards, industrial Diversey chemicals, supervisor accompaniment, and operations policies."
+        />
       </div>
     </div>
   );
