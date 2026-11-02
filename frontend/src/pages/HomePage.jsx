@@ -14,7 +14,7 @@ import {
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
-import DirtyCleanReveal from '../components/home/DirtyCleanReveal';
+import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
 import SEO from '../components/common/SEO';
 import FAQSection from '../components/common/FAQSection';
 
@@ -27,18 +27,6 @@ export default function HomePage() {
   const [testimonials, setTestimonials] = useState([]);
   const { addItem, selectedCity, settings } = useBooking();
 
-  const nextOpenDateLabel = React.useMemo(() => {
-    const closed = new Set((settings?.closedBookingDates || []).map(c => c.date));
-    const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      const iso = d.toISOString().split('T')[0];
-      if (!closed.has(iso)) {
-        return i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-      }
-      d.setDate(d.getDate() + 1);
-    }
-    return 'Check booking page';
-  }, [settings?.closedBookingDates]);
 
   useEffect(() => {
     async function loadData() {
@@ -95,134 +83,92 @@ export default function HomePage() {
         title="Max Housekeeping Service | Professional Cleaning in Western UP"
         description="Top-rated home deep cleaning, bathroom sanitisation, kitchen degreasing, sofa shampooing & commercial cleaning across Moradabad, Rampur, Amroha, Sambhal, and Western Uttar Pradesh."
       />
-      {/* 1. Hero — editorial layout with interactive dirty→clean reveal */}
-      <section className="relative bg-[#F4EFE6] border-b-2 border-[#10231D] overflow-hidden">
-        {/* blueprint grid backdrop */}
-        <div
-          className="absolute inset-0 opacity-[0.07] pointer-events-none"
-          style={{
-            backgroundImage:
-              'linear-gradient(#10231D 1px, transparent 1px), linear-gradient(90deg, #10231D 1px, transparent 1px)',
-            backgroundSize: '44px 44px'
-          }}
-        />
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#E9A23B]/25 blur-3xl pointer-events-none" />
-
-        <div className="container mx-auto px-4 relative py-10 sm:py-14 lg:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-
-            <div className="lg:col-span-6 order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#10231D] text-[#F4EFE6] text-[11px] font-mono font-bold uppercase tracking-widest mb-5">
+      {/* 1. Hero Section - Dynamic Screen Height & Reduced Top Padding */}
+      <section className="relative bg-[#F4EFE6] min-h-[calc(100vh-68px)] lg:min-h-[calc(100dvh-68px)] flex flex-col justify-center pt-2 sm:pt-4 pb-6 sm:pb-10 border-b border-[#E2D9C8] overflow-hidden">
+        <div className="container mx-auto px-4 my-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
+            
+            {/* Left Column: Exact Headline, Description & Value Props */}
+            <div className="lg:col-span-7">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] mb-4 sm:mb-6">
                 <span className="w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
-                <span>Moradabad · Rampur · Sambhal · Amroha</span>
+                <span>{settings?.ratingClaim || 'Rated 4.9/5 by 10,000+ happy homes'}</span>
               </div>
 
-              <h1 className="font-display font-black text-[2.6rem] sm:text-6xl lg:text-7xl text-[#10231D] leading-[0.98] tracking-tighter mb-5">
-                We turn
-                <span className="block text-transparent [-webkit-text-stroke:2px_#10231D] italic">grime</span>
-                into <span className="relative inline-block">
-                  <span className="relative z-10">glow.</span>
-                  <span className="absolute left-0 right-0 bottom-1 sm:bottom-2 h-3 sm:h-4 bg-[#E9A23B] -z-0 -rotate-1" />
+              <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#10231D] leading-[1.08] tracking-tight mb-4 sm:mb-6">
+                A spotless home,<br />
+                <span className="text-[#E9A23B] font-black italic">
+                  without lifting a finger.
                 </span>
               </h1>
 
-              <p className="text-base sm:text-lg text-[#3D524A] leading-relaxed max-w-lg mb-7">
-                A supervised crew, real machines, and a live GPS radar — so you can
-                watch your cleaning team roll up to your door.
+              <p className="text-base sm:text-lg text-[#3D524A] leading-relaxed max-w-xl mb-6 sm:mb-8 font-sans">
+                Book trained, uniformed cleaning professionals for your home or office. Full home deep cleaning, sofa & carpet shampooing, bathroom tile descaling, kitchen degreasing, and water tank cleaning — all in one place.
               </p>
 
-              <div className="flex flex-wrap items-center gap-3 mb-8">
+              {/* CTAs */}
+              <div className="flex flex-wrap items-center gap-4 mb-6 sm:mb-8">
                 <Link
                   to="/book"
-                  className="px-6 py-3.5 rounded-xl bg-[#10231D] hover:bg-[#E9A23B] hover:text-[#10231D] text-[#F4EFE6] font-black text-sm transition-colors flex items-center gap-2 shadow-[4px_4px_0_0_#E9A23B]"
+                  className="px-6 py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-sm tracking-wide transition-all shadow-md flex items-center gap-2"
                 >
                   <LuCalendar className="w-4 h-4" />
-                  <span>Book a clean</span>
+                  <span>Book a service</span>
                 </Link>
                 <Link
                   to="/services"
-                  className="px-6 py-3.5 rounded-xl border-2 border-[#10231D] text-[#10231D] font-bold text-sm hover:bg-[#10231D] hover:text-[#F4EFE6] transition-colors flex items-center gap-2"
+                  className="px-6 py-3.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-sm border border-[#E2D9C8] transition-all flex items-center gap-2"
                 >
-                  <span>Browse services</span>
-                  <LuArrowRight className="w-4 h-4" />
+                  <span>Explore services</span>
+                  <LuArrowRight className="w-4 h-4 text-[#E9A23B]" />
                 </Link>
               </div>
 
-              {/* Stat strip */}
-              <div className="grid grid-cols-3 border-2 border-[#10231D] rounded-2xl overflow-hidden bg-white/60 max-w-md">
-                {[
-                  { n: '4.9★', l: 'Avg rating' },
-                  { n: '3 hr', l: 'Arrival windows' },
-                  { n: 'Live', l: 'GPS tracking' }
-                ].map((s, i) => (
-                  <div key={s.l} className={`px-3 py-3 text-center ${i < 2 ? 'border-r-2 border-[#10231D]' : ''}`}>
-                    <div className="font-display font-black text-xl text-[#10231D] leading-none">{s.n}</div>
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-[#6B8077] mt-1">{s.l}</div>
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-4 text-xs font-mono text-[#3D524A]">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 align-middle" />
-                Next open date: <strong className="text-[#10231D]">{nextOpenDateLabel}</strong>
-              </p>
-            </div>
-
-            <div className="lg:col-span-6 order-1 lg:order-2 relative">
-              <DirtyCleanReveal className="aspect-[4/3] sm:aspect-[5/4] w-full" />
-              <div className="hidden sm:flex absolute -bottom-5 -left-4 items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#E9A23B] border-2 border-[#10231D] text-[#10231D] text-xs font-black rotate-[-3deg] shadow-[4px_4px_0_0_#10231D]">
-                <LuShieldCheck className="w-4 h-4" /> Verified crew · Eco-safe
+              {/* 3 Value Badges */}
+              <div className="flex flex-wrap items-center gap-6 pt-4 sm:pt-6 border-t border-[#E2D9C8] text-xs font-semibold text-[#10231D]">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
+                    <LuCheck className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Background-verified pros</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
+                    <LuCheck className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Eco-safe products</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
+                    <LuCheck className="w-3.5 h-3.5" />
+                  </span>
+                  <span>Transparent pricing</span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Ticker */}
-        <div className="border-t-2 border-[#10231D] bg-[#10231D] text-[#F4EFE6] overflow-hidden py-2.5">
-          <div className="animate-marquee flex items-center gap-8 whitespace-nowrap text-xs font-mono uppercase tracking-widest w-max">
-            {[...Array(2)].flatMap((_, k) =>
-              ['Deep cleaning', 'Sofa extraction', 'Kitchen degreasing', 'Bathroom descaling', 'Marble buffing', 'Water tank cleaning', 'Office housekeeping'].map((t) => (
-                <span key={`${k}-${t}`} className="flex items-center gap-8">
-                  <span>{t}</span>
-                  <span className="text-[#E9A23B]">✦</span>
-                </span>
-              ))
-            )}
+            {/* Right Column: Vertical Services Carousel (Top-to-Bottom as sketched by user) */}
+            <div className="lg:col-span-5 relative flex justify-center">
+              <VerticalHeroCarousel services={allServices.length > 0 ? allServices : featuredServices} />
+            </div>
+
           </div>
         </div>
       </section>
 
-      {/* How it works — numbered editorial steps */}
-      <section className="py-16 bg-[#F4EFE6] border-b border-[#E2D9C8]">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-10">
-            <h2 className="font-display font-black text-3xl sm:text-5xl text-[#10231D] tracking-tighter leading-none">
-              Four steps.<br className="hidden sm:block" /> Zero chasing.
-            </h2>
-            <p className="text-sm text-[#3D524A] max-w-sm">
-              From tapping “book” to a signed-off quality check — you see every stage.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              { n: '01', t: 'Pick & pin', d: 'Choose a service, drop a map pin or tap Locate Me.' },
-              { n: '02', t: 'Choose a slot', d: 'Open dates only — sold-out days are clearly marked.' },
-              { n: '03', t: 'Track the crew', d: 'Live GPS radar with your supervisor’s ETA and call button.' },
-              { n: '04', t: 'Inspect & pay', d: 'Walk the 20-point check, then pay online or on completion.' }
-            ].map((s, i) => (
-              <div
-                key={s.n}
-                className={`relative p-6 rounded-3xl border-2 border-[#10231D] bg-white transition-transform hover:-translate-y-1 ${i % 2 ? 'lg:translate-y-6' : ''}`}
-              >
-                <div className="font-display font-black text-6xl text-transparent [-webkit-text-stroke:1.5px_#E9A23B] leading-none mb-3">{s.n}</div>
-                <h3 className="font-display font-extrabold text-lg text-[#10231D] mb-1">{s.t}</h3>
-                <p className="text-xs text-[#3D524A] leading-relaxed">{s.d}</p>
-              </div>
-            ))}
-          </div>
-          <div className="hidden lg:block h-6" />
+      {/* Service Ticker Strip */}
+      <div className="border-y-2 border-[#10231D] bg-[#10231D] text-[#F4EFE6] overflow-hidden py-2.5">
+        <div className="animate-marquee flex items-center gap-8 whitespace-nowrap text-xs font-mono uppercase tracking-widest w-max">
+          {[...Array(2)].flatMap((_, k) =>
+            ['Office Housekeeping', 'Deep Cleaning', 'Sofa Extraction', 'Kitchen Degreasing', 'Bathroom Descaling', 'Marble Buffing', 'Water Tank Cleaning'].map((t) => (
+              <span key={`${k}-${t}`} className="flex items-center gap-8">
+                <span>{t}</span>
+                <span className="text-[#E9A23B]">✦</span>
+              </span>
+            ))
+          )}
         </div>
-      </section>
+      </div>
 
 
       {/* 2. All 15 Enterprise Brand Partners Infinite Marquee */}
