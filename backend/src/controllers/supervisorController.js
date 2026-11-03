@@ -3,7 +3,6 @@ import Booking from '../models/Booking.js';
 import User from '../models/User.js';
 import Service from '../models/Service.js';
 import City from '../models/City.js';
-import Settings from '../models/Settings.js';
 import cloudinary, { deleteCloudinaryAsset } from '../config/cloudinary.js';
 
 function getTodayString() {
@@ -937,15 +936,6 @@ export async function createQuickTestBooking(req, res, next) {
  */
 export async function updateSupervisorLiveLocation(req, res, next) {
   try {
-    const settings = await Settings.findOne().lean();
-    if (settings && settings.liveTrackingEnabled === false) {
-      return res.status(200).json({
-        success: false,
-        liveTrackingEnabled: false,
-        message: 'Supervisor live location broadcast is currently disabled globally by administration.'
-      });
-    }
-
     const { id } = req.params;
     const { lat, lng, heading = 0, speed = 0, accuracy = 0, isSharing = true } = req.body;
 
@@ -1072,15 +1062,6 @@ export async function updateSupervisorLiveLocation(req, res, next) {
  */
 export async function broadcastSupervisorLiveLocation(req, res, next) {
   try {
-    const settings = await Settings.findOne().lean();
-    if (settings && settings.liveTrackingEnabled === false) {
-      return res.status(200).json({
-        success: false,
-        liveTrackingEnabled: false,
-        message: 'Supervisor live location broadcast is currently disabled globally by administration.'
-      });
-    }
-
     const { lat, lng, heading = 0, speed = 0, accuracy = 0 } = req.body;
 
     if (typeof lat !== 'number' || typeof lng !== 'number' || lat < -90 || lat > 90 || lng < -180 || lng > 180) {

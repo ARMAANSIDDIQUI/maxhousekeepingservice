@@ -11,6 +11,7 @@ import { calculateQuote } from '../services/pricing/engine.js';
 import { sendBookingConfirmationEmail, sendAdminNewBookingNotification } from '../services/emailService.js';
 import { validateDateMonthDays, formatDateDMY } from '../utils/dateValidation.js';
 import { geocodeAddressText } from '../services/location/locationService.js';
+import { isLiveTrackingEnabled } from '../middleware/liveTracking.js';
 
 /**
  * Guaranteed Unique, Non-Repeating Sequential Booking Code Generator
@@ -616,8 +617,7 @@ export async function trackBooking(req, res, next) {
       delete bookingObj.serviceOtp;
     }
 
-    const settings = await Settings.findOne().lean();
-    const liveTrackingEnabled = settings?.liveTrackingEnabled !== false;
+    const liveTrackingEnabled = await isLiveTrackingEnabled();
     bookingObj.liveTrackingEnabled = liveTrackingEnabled;
     if (!liveTrackingEnabled && bookingObj.supervisorLiveLocation) {
       bookingObj.supervisorLiveLocation = null;
@@ -1043,10 +1043,8 @@ export async function getBookingLiveLocation(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
     }
 
-    const settings = await Settings.findOne().lean();
-    const liveTrackingEnabled = settings?.liveTrackingEnabled !== false;
-
-    // GLOBAL TOGGLE CHECK: If admin disabled supervisor live tracking globally
+    // GLOBAL TOGGLE CHECK (defensive; route guard normally short-circuits first)
+    const liveTrackingEnabled = await isLiveTrackingEnabled();
     if (!liveTrackingEnabled) {
       let supervisorUser = null;
       if (booking.supervisor) {

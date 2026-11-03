@@ -20,6 +20,7 @@ import supervisorRoutes from './routes/supervisorRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
+import { cdnCache } from './middleware/cdnCache.js';
 
 const app = express();
 
@@ -127,13 +128,14 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Serve extracted partner assets and generated media statically
+// Serve extracted partner assets and generated media statically (1-day cache; files are static)
 const workspaceRoot = path.resolve(process.cwd(), '..');
-app.use('/media', express.static(path.join(workspaceRoot, 'docs', 'generated-media')));
-app.use('/assets', express.static(path.join(workspaceRoot, 'docs', 'extracted', 'assets')));
+const staticOpts = { maxAge: '1d' };
+app.use('/media', express.static(path.join(workspaceRoot, 'docs', 'generated-media'), staticOpts));
+app.use('/assets', express.static(path.join(workspaceRoot, 'docs', 'extracted', 'assets'), staticOpts));
 // Also fallback to local docs if running from workspace root
-app.use('/media', express.static(path.join(process.cwd(), 'docs', 'generated-media')));
-app.use('/assets', express.static(path.join(process.cwd(), 'docs', 'extracted', 'assets')));
+app.use('/media', express.static(path.join(process.cwd(), 'docs', 'generated-media'), staticOpts));
+app.use('/assets', express.static(path.join(process.cwd(), 'docs', 'extracted', 'assets'), staticOpts));
 
 // Health Check & Root API Status
 app.get(['/api', '/api/health', '/api/v1/health'], (req, res) => {
@@ -146,6 +148,11 @@ app.get(['/api', '/api/health', '/api/v1/health'], (req, res) => {
 });
 
 // API Routes
+// Edge caching for public catalog / geocoding GETs (cuts function invocations, DB reads and Google Maps API calls)
+app.get(['/api/v1/services', '/api/v1/categories', '/api/v1/public/brands', '/api/v1/public/testimonials', '/api/v1/locations/cities'], cdnCache(60, 300));
+app.get('/api/v1/locations/autocomplete', cdnCache(600, 3600));
+app.get(['/api/v1/locations/geocode', '/api/v1/locations/reverse'], cdnCache(86400, 604800));
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1', serviceRoutes);
 app.use('/api/v1/bookings', bookingRoutes);

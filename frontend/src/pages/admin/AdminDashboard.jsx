@@ -5189,7 +5189,7 @@ export default function AdminDashboard() {
                               <LuEye className="w-3.5 h-3.5" />
                               <span>View Details</span>
                             </button>
-                            {(b.assignedSupervisor?.name || b.supervisor?.name || b.assignedSupervisor || b.supervisor) && (
+                            {settingsForm.liveTrackingEnabled !== false && (b.assignedSupervisor?.name || b.supervisor?.name || b.assignedSupervisor || b.supervisor) && (
                               <button
                                 type="button"
                                 onClick={() => setTrackingBookingAdmin(b)}
@@ -9138,7 +9138,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Control Room Live Field Radar */}
-              {(viewBookingDetails.assignedSupervisor || viewBookingDetails.supervisor) && (
+              {settingsForm.liveTrackingEnabled !== false && (viewBookingDetails.assignedSupervisor || viewBookingDetails.supervisor) && (
                 <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -9932,7 +9932,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Admin Live Tracking Modal */}
-        {trackingBookingAdmin && (() => {
+        {trackingBookingAdmin && settingsForm.liveTrackingEnabled !== false && (() => {
           const supName = (trackingBookingAdmin.assignedSupervisor?.name || trackingBookingAdmin.supervisor?.name || '').trim();
           const hasAssignedSup = Boolean(
             supName ||

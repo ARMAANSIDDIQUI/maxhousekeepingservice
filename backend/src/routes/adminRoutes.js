@@ -43,6 +43,7 @@ import {
 import { uploadImage, uploadMultipleImages, uploadVideo, deleteImage } from '../controllers/uploadController.js';
 import { upload, uploadVideo as multerUploadVideo } from '../middleware/upload.js';
 import { verifyAuth, roleGuard } from '../middleware/auth.js';
+import { requireLiveTracking } from '../middleware/liveTracking.js';
 
 const router = express.Router();
 
@@ -56,7 +57,7 @@ router.get('/stats', getStats);
 router.get('/bookings', getAdminBookings);
 router.put('/bookings/:id', updateBooking);
 router.put('/bookings/:id/assign', assignSupervisorToBooking);
-router.put('/bookings/:id/supervisor-location', updateBookingSupervisorLocation);
+router.put('/bookings/:id/supervisor-location', requireLiveTracking, updateBookingSupervisorLocation);
 router.delete('/bookings/:id', deleteBooking);
 
 // Supervisor ID Management (Created & Managed by Admins)

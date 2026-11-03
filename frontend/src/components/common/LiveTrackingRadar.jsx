@@ -47,7 +47,7 @@ export default function LiveTrackingRadar({
   destinationAddress = '',
   supervisorInfo = null,
   isSupervisorAssigned: initialAssignedProp = undefined,
-  pollIntervalMs = 3000
+  pollIntervalMs = 5000
 }) {
   const [status, setStatus] = useState(bookingStatus);
   const initialHasSupervisor =
@@ -756,7 +756,7 @@ export default function LiveTrackingRadar({
               {!isFinished && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#10231D] text-[#E9A23B] border border-[#E9A23B]/40 flex items-center gap-1 font-mono shadow-xs">
                   <span className={`w-1.5 h-1.5 rounded-full ${isFetchingLocation ? 'bg-[#E9A23B] animate-spin' : 'bg-emerald-400 animate-pulse'} shrink-0`} />
-                  <span>Live GPS Sync • 3s</span>
+                  <span>Live GPS Sync • {Math.round(pollIntervalMs / 1000)}s</span>
                 </span>
               )}
             </div>
@@ -869,7 +869,7 @@ export default function LiveTrackingRadar({
               onClick={handleTriggerLocationUpdate}
               disabled={updatingLocation || isFetchingLocation}
               className="p-2 sm:px-2.5 sm:py-1.5 rounded-xl bg-[#E9A23B] hover:bg-[#d4902f] text-[#10231D] text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 disabled:opacity-60"
-              title="Auto-refreshing every 3s · Click to force GPS satellite fix"
+              title="Auto-refreshing every 5s · Click to force GPS satellite fix"
             >
               <LuRotateCcw className={`w-3.5 h-3.5 text-[#10231D] ${updatingLocation || isFetchingLocation ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Update Location</span>

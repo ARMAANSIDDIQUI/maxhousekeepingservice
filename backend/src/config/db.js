@@ -11,6 +11,9 @@ export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 5000,
+      // Serverless-friendly: small pool per instance keeps Atlas connection count (and tier cost) low
+      maxPoolSize: 5,
+      maxIdleTimeMS: 60000
     });
     isConnected = true;
     console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);

@@ -167,6 +167,7 @@ export default function SupervisorDashboard() {
 
   // Background device location fix for zero-cost distance calculation (Requires high accuracy)
   useEffect(() => {
+    if (!isLiveTrackingGloballyEnabled) return;
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -182,9 +183,26 @@ export default function SupervisorDashboard() {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     }
-  }, []);
+  }, [isLiveTrackingGloballyEnabled]);
 
-  const effectiveSupervisorCoords = lastGpsCoords || deviceGpsCoords;
+  // Admin disabled live tracking: stop GPS watch + heartbeat immediately (no more device/API load)
+  useEffect(() => {
+    if (isLiveTrackingGloballyEnabled) return;
+    setActiveModalTab(prev => (prev === 'live_radar' ? 'otp' : prev));
+    if (locationWatchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      locationWatchIdRef.current = null;
+    }
+    if (heartbeatTimerRef.current !== null) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
+    setSharingBookingId(null);
+    setLastGpsCoords(null);
+    setDeviceGpsCoords(null);
+  }, [isLiveTrackingGloballyEnabled]);
+
+  const effectiveSupervisorCoords = isLiveTrackingGloballyEnabled ? (lastGpsCoords || deviceGpsCoords) : null;
 
   const getBookingDistanceEta = (bookingItem) => {
     if (!effectiveSupervisorCoords || !bookingItem?.address?.coordinates?.lat) return null;
@@ -199,10 +217,7 @@ export default function SupervisorDashboard() {
 
   // Auto-broadcast supervisor GPS telemetry indefinitely without prompting
   const startBroadcastingGps = (booking = null) => {
-    if (!isLiveTrackingGloballyEnabled) {
-      toast.info('Live GPS broadcasting is currently paused globally by administration.');
-      return;
-    }
+    if (!isLiveTrackingGloballyEnabled) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     if (booking && (booking.status === 'completed' || booking.status === 'cancelled')) {
@@ -313,7 +328,7 @@ export default function SupervisorDashboard() {
 
   // Auto-start GPS broadcasting on load without asking supervisor
   useEffect(() => {
-    if (!isSupervisor || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (!isSupervisor || !isLiveTrackingGloballyEnabled || typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
@@ -331,16 +346,17 @@ export default function SupervisorDashboard() {
     } else {
       startBroadcastingGps();
     }
-  }, [isSupervisor]);
+  }, [isSupervisor, isLiveTrackingGloballyEnabled]);
 
   // When active bookings load, ensure tracking is bound to active booking
   useEffect(() => {
+    if (!isLiveTrackingGloballyEnabled) return;
     if (!bookings || bookings.length === 0) return;
     const activeBooking = bookings.find(b => isAssignedToMe(b) && !['completed', 'cancelled'].includes(b.status));
     if (activeBooking) {
       startBroadcastingGps(activeBooking);
     }
-  }, [bookings]);
+  }, [bookings, isLiveTrackingGloballyEnabled]);
 
   const stopBroadcastingGps = (bookingId, notify = true, reason = 'manually') => {
     // Only if completed do we formally cease live tracking for that booking
@@ -1890,6 +1906,7 @@ export default function SupervisorDashboard() {
                 <span>Job Details</span>
               </button>
 
+              {isLiveTrackingGloballyEnabled && (
               <button
                 type="button"
                 onClick={() => setActiveModalTab('live_radar')}
@@ -1905,6 +1922,7 @@ export default function SupervisorDashboard() {
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 )}
               </button>
+              )}
             </div>
 
             {/* TAB 1: OTP VERIFICATION ON VISIT */}
@@ -2283,7 +2301,7 @@ export default function SupervisorDashboard() {
             )}
 
             {/* TAB 5: LIVE ROUTE & LOCATION MAP */}
-            {activeModalTab === 'live_radar' && (
+            {activeModalTab === 'live_radar' && isLiveTrackingGloballyEnabled && (
               <div className="space-y-4">
                 {/* Supervisor GPS Broadcast Action Banner */}
                 <div className="p-4 rounded-2xl bg-stone-900 text-[#F4EFE6] border border-[#E2D9C8]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { apiRequest } from '../api';
+import { clearCacheByPrefix } from '../utils/cache.js';
 import { useToast } from './ToastContext';
 
 const BookingContext = createContext(null);
@@ -257,20 +258,50 @@ export function BookingProvider({ children }) {
   useEffect(() => {
     refreshSettings();
 
+    // Throttle focus/storage-triggered refetches (max once / 60s); explicit admin updates always refresh
+    let lastSync = Date.now();
     const handleSync = () => {
+      lastSync = Date.now();
       refreshSettings();
+    };
+    const handleThrottledSync = () => {
+      if (Date.now() - lastSync < 60000) return;
+      handleSync();
     };
 
     window.addEventListener('max_settings_updated', handleSync);
-    window.addEventListener('storage', handleSync);
-    window.addEventListener('focus', handleSync);
+    window.addEventListener('storage', handleThrottledSync);
+    window.addEventListener('focus', handleThrottledSync);
 
     return () => {
       window.removeEventListener('max_settings_updated', handleSync);
-      window.removeEventListener('storage', handleSync);
-      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('storage', handleThrottledSync);
+      window.removeEventListener('focus', handleThrottledSync);
     };
   }, [refreshSettings]);
+
+  // Optional server push (SSE). OFF by default: on serverless hosting every open stream keeps a
+  // function invocation alive and costs money. Enable with VITE_ENABLE_LIVE_TRACKING_PUSH=true
+  // only when the backend runs on a persistent server.
+  useEffect(() => {
+    if (import.meta.env.VITE_ENABLE_LIVE_TRACKING_PUSH !== 'true') return undefined;
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return undefined;
+    const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
+    let source;
+    try {
+      source = new EventSource(`${base}/public/live-tracking/stream`);
+      source.addEventListener('live-tracking', (e) => {
+        try {
+          const { liveTrackingEnabled } = JSON.parse(e.data);
+          setSettings(prev => (
+            prev.liveTrackingEnabled === liveTrackingEnabled ? prev : { ...prev, liveTrackingEnabled }
+          ));
+          clearCacheByPrefix('/public/settings');
+        } catch { /* ignore malformed ping */ }
+      });
+    } catch { /* SSE unsupported: focus-based refresh still applies */ }
+    return () => source?.close();
+  }, []);
 
   useEffect(() => {
     if (selectedCity) {

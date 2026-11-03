@@ -6,8 +6,11 @@ import {
   submitContact,
   joinWaitlist
 } from '../controllers/publicController.js';
+import { liveTrackingStream } from '../middleware/liveTracking.js';
 
 const router = express.Router();
+
+router.get('/live-tracking/stream', liveTrackingStream);
 
 router.get('/brands', getBrands);
 router.get('/testimonials', getTestimonials);

@@ -18,6 +18,7 @@ import {
 } from '../controllers/supervisorController.js';
 import { uploadPhoto } from '../middleware/upload.js';
 import { verifyAuth, roleGuard } from '../middleware/auth.js';
+import { requireLiveTracking } from '../middleware/liveTracking.js';
 
 const router = express.Router();
 
@@ -47,8 +48,8 @@ router.delete('/bookings/:id/photos/:photoId', deleteBookingPhoto);
 
 // Status & Communication & Live GPS
 router.put('/bookings/:id/status', updateSupervisorBookingStatus);
-router.post('/location/broadcast', broadcastSupervisorLiveLocation);
-router.post('/bookings/:id/location', updateSupervisorLiveLocation);
+router.post('/location/broadcast', requireLiveTracking, broadcastSupervisorLiveLocation);
+router.post('/bookings/:id/location', requireLiveTracking, updateSupervisorLiveLocation);
 router.post('/bookings/:id/message', addSupervisorBookingMessage);
 
 export default router;

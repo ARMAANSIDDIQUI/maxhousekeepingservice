@@ -13,6 +13,7 @@ import {
   deleteBooking
 } from '../controllers/bookingController.js';
 import { verifyAuth, optionalAuth } from '../middleware/auth.js';
+import { requireLiveTracking } from '../middleware/liveTracking.js';
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.get('/coupons', optionalAuth, getPublicCoupons);
 router.post('/quote', optionalAuth, getQuote);
 router.post('/', verifyAuth, createBooking);
 router.get('/track/:code', optionalAuth, trackBooking);
+router.get('/:code/live-location', requireLiveTracking, getBookingLiveLocation);
 router.get('/my', verifyAuth, getMyBookings);
 router.put('/:id/edit', verifyAuth, editBookingDetails);
 router.put('/:id/cancel', verifyAuth, cancelBooking);

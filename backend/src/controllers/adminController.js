@@ -11,6 +11,7 @@ import Testimonial from '../models/Testimonial.js';
 import { ContactMessage } from '../models/Supporting.js';
 import { deleteCloudinaryAsset } from '../config/cloudinary.js';
 import { sendBookingStatusUpdateEmail } from '../services/emailService.js';
+import { setLiveTrackingCache } from '../middleware/liveTracking.js';
 import { validateDateMonthDays, formatDateDMY } from '../utils/dateValidation.js';
 
 /**
@@ -843,6 +844,17 @@ export async function updateSettings(req, res, next) {
     }
 
     const settings = await Settings.findOneAndUpdate({}, updatePayload, { new: true, upsert: true });
+
+    // Apply live-tracking toggle instantly (bypass route-guard cache) and stop active sharing flags when disabled
+    if (updatePayload.liveTrackingEnabled !== undefined) {
+      setLiveTrackingCache(settings.liveTrackingEnabled);
+      if (settings.liveTrackingEnabled === false) {
+        await Booking.updateMany(
+          { 'supervisorLiveLocation.isSharing': true },
+          { $set: { 'supervisorLiveLocation.isSharing': false, 'supervisorLiveLocation.speed': 0 } }
+        ).catch(() => {});
+      }
+    }
     res.status(200).json({ success: true, settings });
   } catch (err) {
     next(err);

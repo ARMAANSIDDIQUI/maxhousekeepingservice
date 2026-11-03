@@ -1323,7 +1323,8 @@ export default function CustomerDashboard() {
                           <span>WhatsApp</span>
                         </a>
 
-                        {/* Track Location Button */}
+                        {/* Track Location Button (hidden when admin disables live tracking) */}
+                        {settings?.liveTrackingEnabled !== false && (
                         <button
                           type="button"
                           onClick={() => setTrackingModalBooking(b)}
@@ -1333,6 +1334,7 @@ export default function CustomerDashboard() {
                           <LuNavigation className="w-3.5 h-3.5 text-[#E9A23B] animate-pulse" />
                           <span>Track Location</span>
                         </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2369,7 +2371,7 @@ export default function CustomerDashboard() {
 
 
         {/* Track Live Location Modal */}
-        {trackingModalBooking && (() => {
+        {trackingModalBooking && settings?.liveTrackingEnabled !== false && (() => {
           const supName = (trackingModalBooking.assignedSupervisor?.name || trackingModalBooking.supervisor?.name || '').trim();
           const hasAssignedSup = Boolean(
             supName ||
