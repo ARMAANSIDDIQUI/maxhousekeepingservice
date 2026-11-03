@@ -70,11 +70,14 @@ export default function ServiceCarousel({
   autoPlay = false,
   autoPlayInterval = 4000
 }) {
+  const effectiveCategory = service?.categorySlug || categorySlug || 'home-deep-cleaning';
+  const fallbackUrl = `/media/categories/${effectiveCategory}.jpg`;
+
   const imageList = React.useMemo(() => {
-    if (images) return normalizeServiceImages(images, title, categorySlug);
-    if (service) return normalizeServiceImages(service, service.title, service.categorySlug);
-    return normalizeServiceImages(null, title, categorySlug);
-  }, [images, service, title, categorySlug]);
+    if (images) return normalizeServiceImages(images, title, effectiveCategory);
+    if (service) return normalizeServiceImages(service, service.title, effectiveCategory);
+    return normalizeServiceImages(null, title, effectiveCategory);
+  }, [images, service, title, effectiveCategory]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -183,7 +186,11 @@ export default function ServiceCarousel({
           alt={currentImg.alt || title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
-            e.currentTarget.src = '/media/site/hero-clean-home.jpg';
+            if (e.currentTarget.src !== fallbackUrl) {
+              e.currentTarget.src = fallbackUrl;
+            } else {
+              e.currentTarget.src = '/media/categories/home-deep-cleaning.jpg';
+            }
           }}
         />
 
@@ -261,7 +268,11 @@ export default function ServiceCarousel({
           alt={currentImg.alt || title}
           className="w-full h-full object-cover transition-all duration-300"
           onError={(e) => {
-            e.currentTarget.src = '/media/site/hero-clean-home.jpg';
+            if (e.currentTarget.src !== fallbackUrl) {
+              e.currentTarget.src = fallbackUrl;
+            } else {
+              e.currentTarget.src = '/media/categories/home-deep-cleaning.jpg';
+            }
           }}
         />
 
@@ -354,7 +365,11 @@ export default function ServiceCarousel({
                   alt={img.alt || `Thumbnail ${idx + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = '/media/site/hero-clean-home.jpg';
+                    if (e.currentTarget.src !== fallbackUrl) {
+                      e.currentTarget.src = fallbackUrl;
+                    } else {
+                      e.currentTarget.src = '/media/categories/home-deep-cleaning.jpg';
+                    }
                   }}
                 />
                 {isSelected && (
