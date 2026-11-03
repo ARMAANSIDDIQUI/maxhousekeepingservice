@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'services' | 'categories' | 'cities' | ...
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [bookingSearch, setBookingSearch] = useState('');
-  const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('upcoming');
   const [confirmModalConfig, setConfirmModalConfig] = useState(null);
   const [stats, setStats] = useState({ totalBookings: 0, pendingBookings: 0, totalRevenue: 0, totalCustomerSavings: 0 });
   const [bookings, setBookings] = useState([]);
@@ -4335,6 +4335,14 @@ export default function AdminDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  const todayISO = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
+
   const filteredBookings = bookings.filter((b) => {
     const q = bookingSearch.trim().toLowerCase();
     const matchesSearch = !q || (
@@ -4344,7 +4352,32 @@ export default function AdminDashboard() {
       b.customer?.email?.toLowerCase().includes(q) ||
       b.cityName?.toLowerCase().includes(q)
     );
-    const matchesStatus = bookingStatusFilter === 'all' || b.status === bookingStatusFilter;
+
+    let matchesStatus = true;
+    if (bookingStatusFilter === 'upcoming') {
+      const rawDate = b.assignedSlot?.date || b.slot?.date || '';
+      let bDateISO = '';
+      if (rawDate) {
+        const m1 = String(rawDate).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m1) {
+          bDateISO = `${m1[1]}-${m1[2].padStart(2, '0')}-${m1[3].padStart(2, '0')}`;
+        } else {
+          const m2 = String(rawDate).match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+          if (m2) {
+            bDateISO = `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}`;
+          } else {
+            bDateISO = String(rawDate).slice(0, 10);
+          }
+        }
+      }
+      // Upcoming: not completed or cancelled, and scheduled for today or future (or active/pending)
+      const isNotFinished = !['completed', 'cancelled'].includes(b.status);
+      const isTodayOrFuture = !bDateISO || bDateISO >= todayISO || ['in_progress', 'pending', 'confirmed'].includes(b.status);
+      matchesStatus = isNotFinished && isTodayOrFuture;
+    } else if (bookingStatusFilter !== 'all') {
+      matchesStatus = b.status === bookingStatusFilter;
+    }
+
     const matchesCity = bookingCityFilter === 'all' || (
       (b.citySlug && b.citySlug.toLowerCase() === bookingCityFilter.toLowerCase()) ||
       (b.cityName && b.cityName.toLowerCase() === bookingCityFilter.toLowerCase())
@@ -4353,6 +4386,15 @@ export default function AdminDashboard() {
       b.paymentStatus === bookingPaymentFilter || b.paymentMode === bookingPaymentFilter
     );
     return matchesSearch && matchesStatus && matchesCity && matchesPayment;
+  }).sort((a, b) => {
+    if (bookingStatusFilter === 'upcoming') {
+      const dateA = a.assignedSlot?.date || a.slot?.date || '';
+      const dateB = b.assignedSlot?.date || b.slot?.date || '';
+      if (dateA && dateB && dateA !== dateB) {
+        return dateA.localeCompare(dateB);
+      }
+    }
+    return 0;
   });
 
   const filteredServices = services.filter((s) => {
@@ -4988,10 +5030,10 @@ export default function AdminDashboard() {
           <div className="p-6 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
               <h3 className="font-display font-bold text-xl text-[#10231D]">
-                All Cleaning Reservations ({bookings.length})
+                {bookingStatusFilter === 'upcoming' ? 'Upcoming Cleaning Reservations' : 'All Cleaning Reservations'} ({bookings.length})
               </h3>
               <span className="text-xs font-mono text-[#6B8077]">
-                Showing {filteredBookings.length} of {bookings.length} reservations
+                Showing {filteredBookings.length} {bookingStatusFilter === 'upcoming' ? 'upcoming' : ''} of {bookings.length} reservations
               </span>
             </div>
 
@@ -5022,6 +5064,7 @@ export default function AdminDashboard() {
                 {/* Status Filter Buttons */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {[
+                    { val: 'upcoming', label: 'Upcoming Only' },
                     { val: 'all', label: 'All Status' },
                     { val: 'pending', label: 'Pending' },
                     { val: 'confirmed', label: 'Confirmed' },
@@ -5069,12 +5112,12 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              {(bookingSearch || bookingStatusFilter !== 'all' || bookingCityFilter !== 'all' || bookingPaymentFilter !== 'all') && (
+              {(bookingSearch || bookingStatusFilter !== 'upcoming' || bookingCityFilter !== 'all' || bookingPaymentFilter !== 'all') && (
                 <button
                   type="button"
                   onClick={() => {
                     setBookingSearch('');
-                    setBookingStatusFilter('all');
+                    setBookingStatusFilter('upcoming');
                     setBookingCityFilter('all');
                     setBookingPaymentFilter('all');
                   }}
@@ -5103,7 +5146,9 @@ export default function AdminDashboard() {
                   {filteredBookings.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-10 text-center text-xs text-[#6B8077]">
-                        No bookings match your current search criteria.
+                        {bookingStatusFilter === 'upcoming'
+                          ? 'No upcoming bookings scheduled at the moment. Switch to "All Status" to view past history.'
+                          : 'No bookings match your current search criteria.'}
                       </td>
                     </tr>
                   ) : (
