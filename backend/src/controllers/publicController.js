@@ -47,12 +47,16 @@ export async function getPublicSettings(req, res, next) {
         platformChargeEnabled: false,
         platformChargeType: 'flat',
         platformChargeAmount: 49,
-        platformChargeLabel: 'Platform Charges'
+        platformChargeLabel: 'Platform Charges',
+        liveTrackingEnabled: true
       };
     }
     const publicSettings = settings.toObject ? settings.toObject() : { ...settings };
     delete publicSettings.razorpayKeySecret; // Never leak secret key
 
+    publicSettings.liveTrackingEnabled = publicSettings.liveTrackingEnabled !== undefined
+      ? Boolean(publicSettings.liveTrackingEnabled)
+      : true;
     publicSettings.gstEnabled = Boolean(publicSettings.gstEnabled);
     publicSettings.gstPercentage = Number(publicSettings.gstPercentage ?? 18);
     publicSettings.platformChargeEnabled = Boolean(publicSettings.platformChargeEnabled);

@@ -262,6 +262,35 @@ export default function LiveTrackingRadar({
             setStatus(data.status);
           }
 
+          // GLOBAL TOGGLE CHECK: If admin disabled live tracking globally
+          if (data.liveTrackingEnabled === false) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
+            setIsSharing(false);
+            setLiveLocation(null);
+            setDistanceKm(null);
+            if (supervisorMarkerRef.current) {
+              supervisorMarkerRef.current.setVisible(false);
+            }
+            if (routePolylineRef.current) {
+              routePolylineRef.current.setMap(null);
+              routePolylineRef.current = null;
+            }
+            if (directionsRendererRef.current) {
+              directionsRendererRef.current.setMap(null);
+              directionsRendererRef.current = null;
+            }
+            if (data.customerLocation) {
+              setResolvedCustomerLoc(data.customerLocation);
+            }
+            if (data.supervisor) {
+              setResolvedSupervisor(prev => ({ ...(prev || {}), ...data.supervisor }));
+            }
+            return;
+          }
+
           // STRICT CESSATION: If completed or cancelled, all live location tracking MUST be ceased strictly
           if (['completed', 'cancelled'].includes(effectiveStatus)) {
             if (pollTimerRef.current) {

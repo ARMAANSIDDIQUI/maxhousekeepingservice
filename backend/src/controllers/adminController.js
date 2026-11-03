@@ -801,6 +801,9 @@ export async function updateSettings(req, res, next) {
     res.set('Expires', '0');
 
     const updatePayload = { ...req.body };
+    if (updatePayload.liveTrackingEnabled !== undefined) {
+      updatePayload.liveTrackingEnabled = Boolean(updatePayload.liveTrackingEnabled);
+    }
     if (updatePayload.gstEnabled !== undefined) {
       updatePayload.gstEnabled = Boolean(updatePayload.gstEnabled);
     }

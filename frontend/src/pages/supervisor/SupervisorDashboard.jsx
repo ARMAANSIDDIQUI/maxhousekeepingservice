@@ -37,6 +37,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa6';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useBooking } from '../../context/BookingContext';
 import { supervisorAPI } from '../../api';
 import SEO from '../../components/common/SEO';
 import Modal from '../../components/common/Modal';
@@ -85,7 +86,9 @@ function getMapsUrl(address, cityName) {
 export default function SupervisorDashboard() {
   const { user, isSupervisor, isAdmin, logout } = useAuth();
   const { toast } = useToast();
+  const { settings } = useBooking();
   const navigate = useNavigate();
+  const isLiveTrackingGloballyEnabled = settings?.liveTrackingEnabled !== false;
 
   // Admins are not supervisors - redirect admins to Admin Panel
   if (isAdmin) {
@@ -196,6 +199,10 @@ export default function SupervisorDashboard() {
 
   // Auto-broadcast supervisor GPS telemetry indefinitely without prompting
   const startBroadcastingGps = (booking = null) => {
+    if (!isLiveTrackingGloballyEnabled) {
+      toast.info('Live GPS broadcasting is currently paused globally by administration.');
+      return;
+    }
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     if (booking && (booking.status === 'completed' || booking.status === 'cancelled')) {
@@ -2512,7 +2519,7 @@ export default function SupervisorDashboard() {
       />
 
       {/* PERSISTENT FLOATING LOCATION SHARING SIDE BADGE FOR SUPERVISOR */}
-      {sharingBookingId && (
+      {sharingBookingId && isLiveTrackingGloballyEnabled && (
         <aside
           aria-label="Active Location Sharing Status"
           className="fixed bottom-6 right-6 z-50 max-w-sm"

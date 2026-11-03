@@ -616,6 +616,13 @@ export async function trackBooking(req, res, next) {
       delete bookingObj.serviceOtp;
     }
 
+    const settings = await Settings.findOne().lean();
+    const liveTrackingEnabled = settings?.liveTrackingEnabled !== false;
+    bookingObj.liveTrackingEnabled = liveTrackingEnabled;
+    if (!liveTrackingEnabled && bookingObj.supervisorLiveLocation) {
+      bookingObj.supervisorLiveLocation = null;
+    }
+
     res.status(200).json({
       success: true,
       booking: bookingObj
@@ -1036,6 +1043,46 @@ export async function getBookingLiveLocation(req, res, next) {
       return res.status(404).json({ success: false, message: 'Booking not found with this code.' });
     }
 
+    const settings = await Settings.findOne().lean();
+    const liveTrackingEnabled = settings?.liveTrackingEnabled !== false;
+
+    // GLOBAL TOGGLE CHECK: If admin disabled supervisor live tracking globally
+    if (!liveTrackingEnabled) {
+      let supervisorUser = null;
+      if (booking.supervisor) {
+        supervisorUser = await User.findById(booking.supervisor).select('name phone avatar avatarUrl');
+      }
+
+      const assignedName = (booking.assignedSupervisor?.name || supervisorUser?.name || '').trim();
+      const assignedPhone = (booking.assignedSupervisor?.phone || supervisorUser?.phone || '').trim();
+      const assignedAvatar = booking.assignedSupervisor?.avatarUrl || booking.assignedSupervisor?.avatar || supervisorUser?.avatarUrl || supervisorUser?.avatar || '';
+
+      const isSupervisorAssigned = Boolean(
+        booking.supervisor ||
+        booking.assignedSupervisor?.id ||
+        assignedName
+      );
+
+      return res.status(200).json({
+        success: true,
+        bookingCode: booking.bookingCode,
+        status: booking.status,
+        liveTrackingEnabled: false,
+        isSupervisorAssigned,
+        isSharing: false,
+        supervisor: isSupervisorAssigned ? {
+          name: assignedName || 'Assigned Supervisor',
+          phone: assignedPhone,
+          avatar: assignedAvatar,
+          avatarUrl: assignedAvatar
+        } : null,
+        supervisorLocation: null,
+        customerLocation: booking.address?.coordinates || null,
+        destinationAddress: `${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.address?.cityText || booking.cityName || ''}`.trim(),
+        message: 'Supervisor live GPS tracking is temporarily disabled by admin operations.'
+      });
+    }
+
     // STRICT CESSATION: If booking is completed or cancelled, all live location tracking MUST be ceased strictly
     if (['completed', 'cancelled'].includes(booking.status)) {
       if (booking.supervisorLiveLocation?.isSharing) {
@@ -1201,6 +1248,7 @@ export async function getBookingLiveLocation(req, res, next) {
       success: true,
       bookingCode: booking.bookingCode,
       status: booking.status,
+      liveTrackingEnabled: true,
       isSupervisorAssigned,
       isSharing: isLive,
       supervisor: isSupervisorAssigned ? {

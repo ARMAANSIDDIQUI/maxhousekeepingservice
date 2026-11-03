@@ -2390,24 +2390,53 @@ export default function CustomerDashboard() {
               maxWidth="max-w-4xl"
             >
               <div className="space-y-4">
-                <LiveTrackingRadar
-                  bookingCode={trackingModalBooking.bookingCode}
-                  bookingStatus={trackingModalBooking.status}
-                  isSupervisorAssigned={hasAssignedSup}
-                  initialSupervisorLocation={hasAssignedSup ? trackingModalBooking.supervisorLiveLocation : null}
-                  customerLocation={trackingModalBooking.address?.coordinates}
-                  destinationAddress={`${trackingModalBooking.address?.houseOrFlat ? trackingModalBooking.address.houseOrFlat + ', ' : ''}${trackingModalBooking.address?.line1 || ''}, ${trackingModalBooking.cityName || ''}`}
-                  supervisorInfo={
-                    hasAssignedSup
-                      ? {
-                          name: supName || 'Assigned Supervisor',
-                          phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
-                          avatar: trackingModalBooking.assignedSupervisor?.avatarUrl || trackingModalBooking.assignedSupervisor?.avatar || trackingModalBooking.supervisor?.avatarUrl || trackingModalBooking.supervisor?.avatar || '',
-                          role: 'Supervisor'
-                        }
-                      : null
-                  }
-                />
+                {settings?.liveTrackingEnabled !== false ? (
+                  <LiveTrackingRadar
+                    bookingCode={trackingModalBooking.bookingCode}
+                    bookingStatus={trackingModalBooking.status}
+                    isSupervisorAssigned={hasAssignedSup}
+                    initialSupervisorLocation={hasAssignedSup ? trackingModalBooking.supervisorLiveLocation : null}
+                    customerLocation={trackingModalBooking.address?.coordinates}
+                    destinationAddress={`${trackingModalBooking.address?.houseOrFlat ? trackingModalBooking.address.houseOrFlat + ', ' : ''}${trackingModalBooking.address?.line1 || ''}, ${trackingModalBooking.cityName || ''}`}
+                    supervisorInfo={
+                      hasAssignedSup
+                        ? {
+                            name: supName || 'Assigned Supervisor',
+                            phone: trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone || '',
+                            avatar: trackingModalBooking.assignedSupervisor?.avatarUrl || trackingModalBooking.assignedSupervisor?.avatar || trackingModalBooking.supervisor?.avatarUrl || trackingModalBooking.supervisor?.avatar || '',
+                            role: 'Supervisor'
+                          }
+                        : null
+                    }
+                  />
+                ) : (
+                  <div className="p-6 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-[#10231D] text-[#E9A23B] flex items-center justify-center mx-auto shadow-sm">
+                      <LuMapPin className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-base text-[#10231D]">
+                        Supervisor Live Radar Offline
+                      </h4>
+                      <p className="text-xs text-[#6B8077] max-w-md mx-auto mt-1">
+                        Real-time GPS vehicle tracking has been temporarily paused by operations. Your allocated supervisor will arrive directly at your location during the confirmed slot.
+                      </p>
+                    </div>
+                    {hasAssignedSup && (
+                      <div className="pt-3 border-t border-[#E2D9C8] flex items-center justify-center gap-3">
+                        <span className="text-xs font-bold text-[#10231D]">{supName}</span>
+                        {(trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone) && (
+                          <a
+                            href={`tel:${trackingModalBooking.assignedSupervisor?.phone || trackingModalBooking.supervisor?.phone}`}
+                            className="text-xs text-[#E9A23B] font-bold hover:underline"
+                          >
+                            Call Direct
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-2">
                   <Link
                     to={`/track/${trackingModalBooking.bookingCode}`}

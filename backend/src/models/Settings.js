@@ -39,6 +39,9 @@ const settingsSchema = new mongoose.Schema({
   agencyCreditUrl: { type: String, default: '' },
   ratingClaim: { type: String, default: 'Rated 4.9/5 by 10,000+ happy homes' },
 
+  // Supervisor Live GPS Tracking (Global Control)
+  liveTrackingEnabled: { type: Boolean, default: true },
+
   // Payment Gateway Settings (Online Website Payments)
   acceptOnlinePayments: { type: Boolean, default: false }, // Default: false (Cash on Service)
   paymentGatewayProvider: { type: String, default: 'razorpay' },

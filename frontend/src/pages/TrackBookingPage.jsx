@@ -301,17 +301,36 @@ export default function TrackBookingPage() {
               )
             )}
 
-            {/* REAL-TIME SUPERVISOR LIVE TRACKING RADAR */}
+            {/* REAL-TIME SUPERVISOR LIVE TRACKING RADAR OR PAUSED NOTICE */}
             {booking.status !== 'cancelled' && (
-              <LiveTrackingRadar
-                bookingCode={booking.bookingCode}
-                bookingStatus={booking.status}
-                isSupervisorAssigned={Boolean(booking.supervisor || booking.assignedSupervisor?.name || booking.assignedSupervisor?.id)}
-                initialSupervisorLocation={booking.supervisorLiveLocation}
-                customerLocation={booking.address?.coordinates}
-                destinationAddress={`${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.cityName || ''}`}
-                supervisorInfo={booking.assignedSupervisor || (typeof booking.supervisor === 'object' ? booking.supervisor : null)}
-              />
+              (settings?.liveTrackingEnabled !== false && booking.liveTrackingEnabled !== false) ? (
+                <LiveTrackingRadar
+                  bookingCode={booking.bookingCode}
+                  bookingStatus={booking.status}
+                  isSupervisorAssigned={Boolean(booking.supervisor || booking.assignedSupervisor?.name || booking.assignedSupervisor?.id)}
+                  initialSupervisorLocation={booking.supervisorLiveLocation}
+                  customerLocation={booking.address?.coordinates}
+                  destinationAddress={`${booking.address?.houseOrFlat ? booking.address.houseOrFlat + ', ' : ''}${booking.address?.line1 || ''}, ${booking.cityName || ''}`}
+                  supervisorInfo={booking.assignedSupervisor || (typeof booking.supervisor === 'object' ? booking.supervisor : null)}
+                />
+              ) : (
+                <div className="p-4 rounded-2xl bg-white border border-[#E2D9C8] flex items-center gap-3.5 shadow-xs">
+                  <div className="w-10 h-10 rounded-xl bg-[#ECE5D8] text-[#10231D] flex items-center justify-center shrink-0">
+                    <LuMapPin className="w-5 h-5 text-[#E9A23B]" />
+                  </div>
+                  <div className="text-xs">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-bold text-[#10231D]">Doorstep Supervisor Dispatch</span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-amber-100 text-amber-800 uppercase">
+                        Scheduled
+                      </span>
+                    </div>
+                    <p className="text-[#6B8077] text-[11px] leading-relaxed">
+                      Live GPS route radar is currently offline. Your assigned field supervisor will arrive directly at your confirmed address during your booked service window.
+                    </p>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Cancelled Notice Banner */}

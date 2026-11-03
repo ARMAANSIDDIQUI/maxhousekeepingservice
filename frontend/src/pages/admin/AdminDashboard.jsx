@@ -173,6 +173,7 @@ export default function AdminDashboard() {
     platformChargeType: 'flat',
     platformChargeAmount: 49,
     platformChargeLabel: 'Platform Charges',
+    liveTrackingEnabled: true,
     closedBookingDates: []
   });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -3390,9 +3391,42 @@ export default function AdminDashboard() {
   };
 
   // Settings Handlers
+  const [togglingLiveTracking, setTogglingLiveTracking] = useState(false);
   const [togglingOnlinePayments, setTogglingOnlinePayments] = useState(false);
   const [togglingGst, setTogglingGst] = useState(false);
   const [togglingPlatformCharge, setTogglingPlatformCharge] = useState(false);
+
+  const handleToggleLiveTracking = async (nextVal) => {
+    setTogglingLiveTracking(true);
+    const updated = { ...settingsForm, liveTrackingEnabled: nextVal };
+    setSettingsForm(updated);
+
+    try {
+      const res = await adminAPI.updateSettings(updated);
+      if (res && res.success !== false) {
+        if (res.settings) {
+          setSettingsForm(prev => ({ ...prev, ...res.settings }));
+        }
+        if (typeof refreshSettings === 'function') {
+          await refreshSettings();
+        }
+        window.dispatchEvent(new Event('max_settings_updated'));
+        toast.success(
+          nextVal
+            ? 'Supervisor Live GPS Tracking ENABLED globally! Customers can track supervisor radar & live ETA.'
+            : 'Supervisor Live GPS Tracking DISABLED globally! Live radar and GPS broadcast have been paused.'
+        );
+      } else {
+        throw new Error(res?.message || 'Failed to update live tracking setting');
+      }
+    } catch (err) {
+      console.error('Failed toggling live tracking:', err);
+      toast.error('Failed to update live tracking setting. Please check your connection.');
+      setSettingsForm(prev => ({ ...prev, liveTrackingEnabled: !nextVal }));
+    } finally {
+      setTogglingLiveTracking(false);
+    }
+  };
 
   const handleToggleOnlinePayments = async (nextVal) => {
     setTogglingOnlinePayments(true);
@@ -6726,6 +6760,65 @@ export default function AdminDashboard() {
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-6 max-w-3xl">
+
+              {/* 0. Supervisor Live Tracking Global Control */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shadow-xs shrink-0">
+                      <LuNavigation className={`w-5 h-5 ${settingsForm.liveTrackingEnabled !== false ? 'animate-pulse' : ''}`} />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Supervisor Live GPS Tracking
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Global switch: Enable or disable real-time supervisor location tracking and vehicle radar across the entire website at will.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                    settingsForm.liveTrackingEnabled !== false
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-rose-100 text-rose-800 border border-rose-300'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${settingsForm.liveTrackingEnabled !== false ? 'bg-emerald-500 animate-ping' : 'bg-rose-500'}`} />
+                    {settingsForm.liveTrackingEnabled !== false ? 'Live Radar Active' : 'Tracking Disabled'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 bg-white/70 rounded-xl border border-[#E2D9C8]">
+                  <div className="space-y-0.5 max-w-xl">
+                    <span className="text-xs font-bold text-[#10231D] block">
+                      Real-Time GPS Tracking & Live Vehicle Radar
+                    </span>
+                    <p className="text-[11px] text-[#6B8077]">
+                      {settingsForm.liveTrackingEnabled !== false
+                        ? 'Active: Field supervisors broadcast live vehicle coordinates during active service visits. Customers can view turn-by-turn vehicle movements, live distance, and estimated arrival ETA in real time.'
+                        : 'Disabled: Live GPS broadcasting and radar maps are turned off. Customers will only see the assigned supervisor\'s name and direct call button without live location sharing.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    id="liveTrackingEnabledToggle"
+                    aria-checked={Boolean(settingsForm.liveTrackingEnabled !== false)}
+                    disabled={togglingLiveTracking}
+                    onClick={() => handleToggleLiveTracking(settingsForm.liveTrackingEnabled === false)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#E9A23B] focus:ring-offset-2 ${
+                      settingsForm.liveTrackingEnabled !== false ? 'bg-emerald-600' : 'bg-stone-300'
+                    } ${togglingLiveTracking ? 'opacity-50 cursor-wait' : ''}`}
+                    title={settingsForm.liveTrackingEnabled !== false ? 'Click to disable live supervisor tracking globally' : 'Click to enable live supervisor tracking globally'}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        settingsForm.liveTrackingEnabled !== false ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
 
               {/* 1. Online Payment Settings */}
               <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">

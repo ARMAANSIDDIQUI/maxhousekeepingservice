@@ -215,6 +215,7 @@ export function BookingProvider({ children }) {
     platformChargeType: 'flat',
     platformChargeAmount: 49,
     platformChargeLabel: 'Platform Charges',
+    liveTrackingEnabled: true,
     closedBookingDates: []
   });
 
@@ -244,6 +245,7 @@ export function BookingProvider({ children }) {
           platformChargeType: res.settings.platformChargeType === 'percentage' ? 'percentage' : 'flat',
           platformChargeAmount: Number(res.settings.platformChargeAmount ?? 49),
           platformChargeLabel: res.settings.platformChargeLabel || 'Platform Charges',
+          liveTrackingEnabled: res.settings.liveTrackingEnabled !== undefined ? Boolean(res.settings.liveTrackingEnabled) : true,
           closedBookingDates: Array.isArray(res.settings.closedBookingDates) ? res.settings.closedBookingDates : []
         }));
       }
