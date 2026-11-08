@@ -116,15 +116,23 @@ self.addEventListener('fetch', (event) => {
       }
 
       // If not in cache, fetch from network and cache for subsequent hits
-      return fetch(req).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, responseToCache);
-          }).catch(() => {});
-        }
-        return networkResponse;
-      });
+      return fetch(req)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(req, responseToCache);
+            }).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(req);
+          if (cached) return cached;
+          const cachedIndex = (await caches.match('/index.html')) || (await caches.match('/'));
+          if (cachedIndex) return cachedIndex;
+          return new Response('', { status: 408, statusText: 'Request Timeout' });
+        });
     })
   );
 });

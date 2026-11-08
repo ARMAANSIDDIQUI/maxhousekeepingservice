@@ -24,6 +24,18 @@ import { cdnCache } from './middleware/cdnCache.js';
 
 const app = express();
 
+// ========================================================
+// FAST HEALTH CHECK & MONITOR PING (Ultra-Lightweight)
+// ========================================================
+// Placed before DB auto-connect and heavy middleware so uptime monitors
+// (Cloud Scheduler, cron-job.org, UptimeRobot) receive an instant 2-byte "OK" response (<2ms),
+// preventing "output too large" errors and avoiding serverless DB cold-start blocks.
+app.all(['/health', '/ping', '/api/health', '/api/v1/health'], (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  return res.status(200).send('OK');
+});
+
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 

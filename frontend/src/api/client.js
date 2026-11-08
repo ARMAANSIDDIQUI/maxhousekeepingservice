@@ -8,10 +8,10 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
 
-// Create single Axios instance
+// Create single Axios instance (60s timeout accommodates Render free-tier cold starts)
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 25000,
+  timeout: 60000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -35,10 +35,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: unwraps data and catches formatted errors
+// Response interceptor: unwraps data and catches formatted errors, with automatic retry for cold-start timeouts
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+    // Automatic 1-time retry on GET cold-start timeouts
+    if (config && config.method === 'get' && !config._retry && (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('Network Error'))) {
+      config._retry = true;
+      console.warn(`[Axios API] Cold start detected for ${config.url}. Retrying as server spins up...`);
+      await new Promise(r => setTimeout(r, 2000));
+      return api(config);
+    }
+
     // If backend returns a formatted error response with message
     if (error.response && error.response.data) {
       const serverMsg = error.response.data.message || error.response.data.error;
