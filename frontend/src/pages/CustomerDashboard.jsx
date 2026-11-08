@@ -42,6 +42,7 @@ import UserAvatar from '../components/common/UserAvatar';
 import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
 import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../utils/date';
+import { getServiceIcon } from '../utils/iconHelper';
 
 export default function CustomerDashboard() {
   const { user, updateProfile, changePassword, addAddress, updateAddress, deleteAddress, setDefaultAddress, isLoading: isAuthLoading } = useAuth();
@@ -1225,22 +1226,32 @@ export default function CustomerDashboard() {
                         <h4 className="text-xs font-mono font-bold text-[#6B8077] uppercase mb-2">
                           Booked Services ({b.items?.length || 0})
                         </h4>
-                        <ul className="space-y-1.5">
-                          {b.items?.map((it, idx) => (
-                            <li key={idx} className="text-xs text-[#10231D] flex items-start gap-2">
-                              <span className="text-[#E9A23B] font-bold">•</span>
-                              <div>
-                                <span className="font-semibold">{it.titleSnapshot || it.title}</span>
-                                {it.variantSnapshot && (
-                                  <span className="text-[#6B8077] ml-1">({it.variantSnapshot})</span>
-                                )}
-                                {it.qty > 1 && (
-                                  <span className="text-[#10231D] font-mono font-bold ml-1">×{it.qty}</span>
+                        <div className="space-y-2">
+                          {b.items?.map((it, idx) => {
+                            const itIcon = it.iconSnapshot || it.icon || it.service?.icon || it.service?.iconKey || it.titleSnapshot || it.title;
+                            return (
+                              <div key={idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-white/70 border border-[#E2D9C8]/80 shadow-2xs">
+                                <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/20">
+                                  {getServiceIcon(itIcon, 'w-4 h-4')}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-xs text-[#10231D] truncate leading-tight">
+                                    {it.titleSnapshot || it.title}
+                                  </p>
+                                  <p className="text-[11px] text-[#6B8077] mt-0.5 truncate">
+                                    {it.variantSnapshot ? `${it.variantSnapshot}` : 'Standard'}
+                                    {it.qty > 1 && <span className="font-mono font-bold text-[#10231D] ml-1.5">×{it.qty}</span>}
+                                  </p>
+                                </div>
+                                {(it.priceSnapshot || it.price) && (
+                                  <span className="text-xs font-bold text-[#10231D] tnum shrink-0 pr-1">
+                                    ₹{((it.priceSnapshot || it.price) * (it.qty || 1)).toLocaleString('en-IN')}
+                                  </span>
                                 )}
                               </div>
-                            </li>
-                          ))}
-                        </ul>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       {/* Right: Slot & Address Details */}

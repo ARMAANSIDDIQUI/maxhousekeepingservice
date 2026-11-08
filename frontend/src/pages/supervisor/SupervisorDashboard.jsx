@@ -46,6 +46,7 @@ import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
 import UserAvatar from '../../components/common/UserAvatar';
 import { formatDateDMY } from '../../utils/date';
 import { calculateDistanceKm, getEtaInfo } from '../../utils/geoUtils';
+import { getServiceIcon } from '../../utils/iconHelper';
 
 function formatToday() {
   const d = new Date();
@@ -2263,12 +2264,17 @@ export default function SupervisorDashboard() {
                   </span>
                   <div className="space-y-2">
                     {(selectedBooking.items || []).map((it, idx) => (
-                      <div key={idx} className="flex items-center justify-between pb-1.5 border-b border-[#E2D9C8]/40 last:border-0 last:pb-0">
-                        <div>
-                          <p className="font-bold text-[#10231D]">{it.titleSnapshot}</p>
-                          <p className="text-[11px] text-[#6B8077]">Variant: {it.variantSnapshot || 'Standard'}</p>
+                      <div key={idx} className="flex items-center justify-between pb-1.5 border-b border-[#E2D9C8]/40 last:border-0 last:pb-0 gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 border border-[#E9A23B]/30">
+                            {getServiceIcon(it.iconSnapshot || it.service?.icon || it.service?.iconKey || it.titleSnapshot, 'w-3.5 h-3.5')}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-[#10231D] truncate leading-tight">{it.titleSnapshot}</p>
+                            <p className="text-[11px] text-[#6B8077] truncate">Variant: {it.variantSnapshot || 'Standard'}</p>
+                          </div>
                         </div>
-                        <span className="font-mono font-bold text-[#10231D]">Qty: {it.qty}</span>
+                        <span className="font-mono font-bold text-[#10231D] shrink-0">Qty: {it.qty}</span>
                       </div>
                     ))}
                   </div>

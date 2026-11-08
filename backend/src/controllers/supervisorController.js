@@ -321,6 +321,7 @@ export async function getSupervisorBookings(req, res, next) {
     const total = await Booking.countDocuments(query);
     const bookings = await Booking.find(query)
       .populate('supervisor', 'name phone email avatar avatarUrl status')
+      .populate('items.service', 'title slug icon iconKey image')
       .sort({ 'assignedSlot.date': 1, 'slot.date': 1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -344,7 +345,9 @@ export async function getSupervisorBookings(req, res, next) {
 export async function getSupervisorBookingById(req, res, next) {
   try {
     const { id } = req.params;
-    const booking = await Booking.findById(id).populate('city', 'name contactOverrides');
+    const booking = await Booking.findById(id)
+      .populate('city', 'name contactOverrides')
+      .populate('items.service', 'title slug icon iconKey image');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });

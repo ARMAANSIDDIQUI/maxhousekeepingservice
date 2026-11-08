@@ -412,7 +412,8 @@ export async function createBooking(req, res, next) {
       selections: i.selections,
       priceSnapshot: i.unitPrice,
       mrpSnapshot: i.unitMrp,
-      qty: i.qty
+      qty: i.qty,
+      iconSnapshot: i.icon || serviceMap.get(String(i.serviceId))?.icon || serviceMap.get(String(i.serviceId))?.iconKey || 'Sparkles'
     }));
 
     // Check temporary address logic
@@ -565,7 +566,8 @@ export async function trackBooking(req, res, next) {
     const { code } = req.params;
     const booking = await Booking.findOne({ bookingCode: code.toUpperCase() })
       .populate('city', 'name contactOverrides')
-      .populate('supervisor', 'name phone email avatar avatarUrl role status');
+      .populate('supervisor', 'name phone email avatar avatarUrl role status')
+      .populate('items.service', 'title slug icon iconKey image');
 
     if (!booking) {
       return res.status(404).json({
@@ -644,6 +646,7 @@ export async function getMyBookings(req, res, next) {
         { 'customer.phone': req.user.phone }
       ]
     }).populate('supervisor', 'name phone email avatar avatarUrl role status')
+      .populate('items.service', 'title slug icon iconKey image')
       .sort({ createdAt: -1 });
 
     // Ensure each booking has a serviceOtp

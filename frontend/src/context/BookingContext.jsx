@@ -527,6 +527,7 @@ export function BookingProvider({ children }) {
         return {
           serviceId: i.service._id,
           title: i.service.title,
+          icon: i.service.icon || i.service.iconKey || 'Sparkles',
           unitPrice: p,
           unitMrp: m,
           outstationSurcharge: outstationExtra,

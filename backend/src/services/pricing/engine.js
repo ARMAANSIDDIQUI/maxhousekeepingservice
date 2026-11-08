@@ -287,6 +287,7 @@ export function calculateQuote(items = [], citySlug = null, coupon = null, billi
       serviceId: service._id || service.id,
       title: service.title,
       slug: service.slug,
+      icon: service.icon || service.iconKey || 'Sparkles',
       selections,
       duration: itemCalc.duration,
       unitPrice: itemCalc.unitPrice,

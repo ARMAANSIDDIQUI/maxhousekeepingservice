@@ -17,6 +17,7 @@ import RoomMap from '../components/home/RoomMap';
 import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
 import SEO from '../components/common/SEO';
 import FAQSection from '../components/common/FAQSection';
+import { getServiceIcon } from '../utils/iconHelper';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -337,9 +338,14 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug">
-                      {service.title}
-                    </h3>
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/30 group-hover:scale-110 transition-transform">
+                        {getServiceIcon(service.icon || service.iconKey || service.title, 'w-4 h-4')}
+                      </div>
+                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors leading-snug">
+                        {service.title}
+                      </h3>
+                    </div>
 
                     <p className="text-xs text-[#3D524A] leading-relaxed mb-6 line-clamp-2">
                       {service.shortDescription || service.description}

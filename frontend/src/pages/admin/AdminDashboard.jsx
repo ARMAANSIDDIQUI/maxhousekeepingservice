@@ -9327,7 +9327,12 @@ export default function AdminDashboard() {
                       {(viewBookingDetails.items || []).map((it, idx) => (
                         <tr key={idx}>
                           <td className="py-2.5 px-2 font-bold text-[#10231D]">
-                            {it.titleSnapshot || 'Cleaning Service'}
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-md bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 border border-[#E9A23B]/30">
+                                {getServiceIcon(it.iconSnapshot || it.service?.icon || it.service?.iconKey || it.titleSnapshot, 'w-3.5 h-3.5')}
+                              </span>
+                              <span>{it.titleSnapshot || 'Cleaning Service'}</span>
+                            </div>
                           </td>
                           <td className="py-2.5 px-2 text-[#3D524A] font-mono">
                             {it.variantSnapshot || 'Standard'}

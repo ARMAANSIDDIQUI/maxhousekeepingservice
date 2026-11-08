@@ -24,6 +24,7 @@ import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
 import { calculateDistanceKm, getEtaInfo } from '../utils/geoUtils';
 
 import { formatDateDMY } from '../utils/date';
+import { getServiceIcon } from '../utils/iconHelper';
 
 export default function TrackBookingPage() {
   const { settings } = useBooking();
@@ -398,21 +399,37 @@ export default function TrackBookingPage() {
             </div>
 
             {/* Items Snapshot */}
-            <div className="space-y-2 pt-2 border-t border-[#E2D9C8]">
-              <p className="text-xs font-bold text-[#10231D]">RESERVED SERVICES:</p>
-              {booking.items?.map((item, i) => (
-                <div key={i} className="flex justify-between items-center text-xs py-2 border-b border-[#E2D9C8]/60">
-                  <div>
-                    <span className="font-bold text-[#10231D]">{item.titleSnapshot}</span>
-                    <span className="text-[#6B8077] ml-2">
-                      ({item.variantSnapshot || 'Standard'} · Qty {item.qty})
-                    </span>
-                  </div>
-                  <span className="font-bold text-[#10231D] tnum">
-                    ₹{(item.priceSnapshot * item.qty).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-3 pt-4 border-t border-[#E2D9C8]">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-mono font-bold text-[#6B8077] uppercase tracking-wider">
+                  RESERVED SERVICES ({booking.items?.length || 0})
+                </p>
+              </div>
+              <div className="divide-y divide-[#E2D9C8]/70">
+                {booking.items?.map((item, i) => {
+                  const iconKey = item.iconSnapshot || item.icon || item.service?.icon || item.service?.iconKey || item.titleSnapshot;
+                  return (
+                    <div key={i} className="flex items-center justify-between py-3 gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs border border-[#E9A23B]/30">
+                          {getServiceIcon(iconKey, 'w-5 h-5')}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-[#10231D] truncate leading-tight">
+                            {item.titleSnapshot}
+                          </p>
+                          <p className="text-xs text-[#6B8077] mt-0.5">
+                            {item.variantSnapshot ? `${item.variantSnapshot} · ` : ''}Qty {item.qty}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-display font-bold text-sm text-[#10231D] tnum shrink-0">
+                        ₹{(item.priceSnapshot * item.qty).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
               {booking.totals?.platformChargeAmount > 0 && (
                 <div className="flex justify-between items-center text-xs text-[#3D524A] pt-1">
                   <span>{booking.totals.platformChargeLabel || 'Platform Charges'}</span>

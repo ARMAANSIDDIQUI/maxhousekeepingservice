@@ -33,6 +33,7 @@ import Modal from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
 import { formatDateDMY, validateDateMonthDays } from '../utils/date';
+import { getServiceIcon } from '../utils/iconHelper';
 
 // Central Dynamic Helper: Check if a service is available in the target city
 export function isServiceAvailableInCity(service, citySlug) {
@@ -1349,14 +1350,23 @@ export default function BookingPage() {
 
                         {/* Top Row: Service Title & Header Actions (Stepper + Remove) */}
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="font-display font-bold text-base text-[#10231D] leading-snug">
-                                {svc.title}
-                              </h4>
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#10231D]/10 text-[#3D524A]">
-                                {svc.categoryName || 'Cleaning Service'}
-                              </span>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-sm border border-[#E9A23B]/30 group-hover:scale-105 transition-transform">
+                              {getServiceIcon(svc.icon || svc.iconKey || svc.title, 'w-5 h-5 sm:w-6 sm:h-6')}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-display font-bold text-base sm:text-lg text-[#10231D] leading-snug">
+                                  {svc.title}
+                                </h4>
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#10231D]/10 text-[#3D524A]">
+                                  {svc.categoryName || 'Cleaning Service'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#6B8077] mt-0.5 flex items-center gap-1.5">
+                                <LuClock className="w-3 h-3 text-[#E9A23B]" />
+                                <span>Estimated: {svc.duration || '1-2 hrs'}</span>
+                              </p>
                             </div>
                           </div>
 
@@ -2000,24 +2010,33 @@ export default function BookingPage() {
                 {/* Items Line Breakdown */}
                 <div className="divide-y divide-[#E2D9C8]">
                   {quote?.items && quote.items.length > 0 ? (
-                    quote.items.map((it, i) => (
-                      <div key={i} className="py-2.5 flex items-baseline justify-between text-xs">
-                        <div>
-                          <p className="font-bold text-[#10231D]">{it.title}</p>
-                          <p className="text-[#6B8077]">{it.selections?.size || it.duration || ''} · Qty {it.qty}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-bold text-[#10231D] tnum">
-                            ₹{it.totalPrice?.toLocaleString('en-IN')}
-                          </span>
-                          {it.totalMrp > it.totalPrice && (
-                            <span className="block text-[10px] text-[#6B8077] line-through tnum">
-                              ₹{it.totalMrp?.toLocaleString('en-IN')}
+                    quote.items.map((it, i) => {
+                      const itService = allServices.find(s => s._id === it.serviceId || s.slug === it.slug) || items[i]?.service;
+                      const itIcon = it.icon || itService?.icon || itService?.iconKey || it.title;
+                      return (
+                        <div key={i} className="py-2.5 flex items-start justify-between gap-2.5 text-xs">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-[#E9A23B]/20">
+                              {getServiceIcon(itIcon, 'w-3.5 h-3.5')}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-[#10231D] leading-tight truncate">{it.title}</p>
+                              <p className="text-[#6B8077] text-[11px] mt-0.5">{it.selections?.size || it.duration || ''} · Qty {it.qty}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-[#10231D] tnum">
+                              ₹{it.totalPrice?.toLocaleString('en-IN')}
                             </span>
-                          )}
+                            {it.totalMrp > it.totalPrice && (
+                              <span className="block text-[10px] text-[#6B8077] line-through tnum">
+                                ₹{it.totalMrp?.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="py-4 text-xs text-center text-[#6B8077]">
                       Add services above to see itemized breakdown.
@@ -2282,21 +2301,26 @@ export default function BookingPage() {
               return (
               <div
                 key={s._id}
-                className="p-3 rounded-xl bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between gap-3 transition-colors"
+                className="p-3 sm:p-3.5 rounded-xl bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between gap-3 transition-colors group"
               >
-                <div>
-                  <p className="font-bold text-sm text-[#10231D]">{s.title}</p>
-                  <p className="text-xs text-[#6B8077]">{s.categoryName} · {s.duration || '1 hr'}</p>
-                  <p className="text-xs font-bold text-[#10231D] mt-1 tnum">
-                    {s.pricingType === 'unit'
-                      ? `₹${startPriceInfo.activeRate || s.price} / ${s.pricingUnit === 'sq_ft' ? 'Sq. Ft.' : (s.unitLabel || 'unit')}`
-                      : `From ₹${startPriceInfo.price.toLocaleString('en-IN')}`}
-                    {startPriceInfo.mrp > startPriceInfo.price && s.pricingType !== 'unit' && (
-                      <span className="ml-1.5 text-[11px] text-[#6B8077] line-through">
-                        ₹{startPriceInfo.mrp.toLocaleString('en-IN')}
-                      </span>
-                    )}
-                  </p>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#10231D]/20 group-hover:scale-105 transition-transform">
+                    {getServiceIcon(s.icon || s.iconKey || s.title, 'w-5 h-5')}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-[#10231D] truncate">{s.title}</p>
+                    <p className="text-xs text-[#6B8077] truncate">{s.categoryName} · {s.duration || '1 hr'}</p>
+                    <p className="text-xs font-bold text-[#10231D] mt-0.5 tnum">
+                      {s.pricingType === 'unit'
+                        ? `₹${startPriceInfo.activeRate || s.price} / ${s.pricingUnit === 'sq_ft' ? 'Sq. Ft.' : (s.unitLabel || 'unit')}`
+                        : `From ₹${startPriceInfo.price.toLocaleString('en-IN')}`}
+                      {startPriceInfo.mrp > startPriceInfo.price && s.pricingType !== 'unit' && (
+                        <span className="ml-1.5 text-[11px] text-[#6B8077] line-through">
+                          ₹{startPriceInfo.mrp.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 <button
