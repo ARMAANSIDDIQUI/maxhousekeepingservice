@@ -268,17 +268,22 @@ export default function UniqueHeroSection({ services = [] }) {
                   onClick={() => {
                     setSelectedServiceId(item.id);
                   }}
-                  className={`p-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-between gap-2 group ${
+                  className={`p-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-between gap-2.5 group ${
                     isSelected
-                      ? 'bg-[#E9A23B] text-[#181511] border-[#E9A23B] shadow-lg scale-[1.05]'
-                      : 'bg-[#F8F5EE] hover:bg-[#EFE8DA] text-[#10231D] border-[#E2D9C8] hover:border-[#D4C8B4]'
+                      ? 'bg-[#E9A23B] text-[#181511] border-[#E9A23B] shadow-xl scale-[1.05]'
+                      : 'bg-[#F8F5EE] hover:bg-[#EFE8DA] text-[#10231D] border-[#E2D9C8] hover:border-[#D4C8B4] hover:shadow-md'
                   }`}
                 >
-                  {/* Realistic 3D Miniature Object Icon on Clean Background */}
-                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center p-1.5 transition-transform group-hover:scale-110 ${
-                    isSelected ? 'bg-white/30 shadow-xs' : 'bg-white shadow-2xs border border-[#E2D9C8]/60'
+                  {/* Realistic 3D Miniature Object Icon on Clean Background with 3D Depth */}
+                  <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center p-2 sm:p-2.5 transition-all duration-300 group-hover:scale-110 ${
+                    isSelected
+                      ? 'bg-white/40 shadow-[0_4px_14px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,0.8)] border border-white/50'
+                      : 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.95)] border border-[#E2D9C8]'
                   }`}>
-                    {getServiceIcon(item.realisticIconKey, 'w-full h-full object-contain drop-shadow-sm')}
+                    {getServiceIcon(
+                      item.rawService || item,
+                      'w-full h-full object-contain filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.18)] transition-all duration-300 group-hover:scale-115 group-hover:-translate-y-1 group-hover:drop-shadow-[0_14px_20px_rgba(0,0,0,0.25)]'
+                    )}
                   </div>
 
                   <div>
@@ -298,8 +303,11 @@ export default function UniqueHeroSection({ services = [] }) {
           {selectedService && (
             <div className="pt-4 border-t border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-[#F8F5EE] p-1.5 border border-[#E2D9C8] shrink-0 flex items-center justify-center shadow-xs">
-                  {getServiceIcon(selectedService.realisticIconKey, 'w-full h-full object-contain drop-shadow-xs')}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-2 sm:p-2.5 border border-[#E2D9C8] shrink-0 flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.95)]">
+                  {getServiceIcon(
+                    selectedService.rawService || selectedService,
+                    'w-full h-full object-contain filter drop-shadow-[0_6px_12px_rgba(0,0,0,0.18)]'
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

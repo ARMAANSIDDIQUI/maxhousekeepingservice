@@ -3,7 +3,7 @@
  * Western UP, India
  */
 
-const CACHE_NAME = 'max-housekeeping-v1.2';
+const CACHE_NAME = 'max-housekeeping-v2.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

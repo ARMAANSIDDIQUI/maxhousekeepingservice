@@ -47,6 +47,11 @@ export const REALISTIC_ICONS = {
   armchair: '/icons/realistic/sofa.png',
   couch: '/icons/realistic/sofa.png',
   upholstery: '/icons/realistic/sofa.png',
+  chair: '/icons/realistic/chair.png',
+  chairs: '/icons/realistic/chair.png',
+  diningchair: '/icons/realistic/chair.png',
+  officechair: '/icons/realistic/chair.png',
+  chairdrycleaning: '/icons/realistic/chair.png',
 
   // 2. Carpet & Rugs
   carpet: '/icons/realistic/carpet.png',
@@ -172,6 +177,8 @@ const ICON_MAP = {
   chimney: LuCookingPot,
   sofa: LuArmchair,
   armchair: LuArmchair,
+  chair: LuArmchair,
+  chairs: LuArmchair,
   carpet: LuArmchair,
   sparkles: LuSparkles,
   cleaning: LuSparkles,
@@ -221,39 +228,39 @@ const ICON_MAP = {
 // Curated list for Admin service icon dropdown
 export const AVAILABLE_ICONS = [
   // Realistic 3D Icons
-  { key: 'Sofa', label: '🛋️ 3D Sofa & Upholstery Spa' },
-  { key: 'Bed', label: '🛏️ 3D Luxury Bed & Mattress' },
-  { key: 'CookingPot', label: '🍳 3D Gas Stove & Kitchen' },
-  { key: 'Chimney', label: '💨 3D Kitchen Electric Chimney' },
-  { key: 'Bath', label: '🚽 3D Ceramic Toilet & Bathroom' },
-  { key: 'Window', label: '🪟 3D Wooden Window & Glass' },
-  { key: 'Carpet', label: '🧶 3D Ornate Woven Carpet & Rug' },
-  { key: 'House', label: '🏡 3D Full Home Living Room Scene' },
-  { key: 'Waves', label: '💧 3D Overhead Water Storage Tank' },
-  { key: 'Shirt', label: '🧵 3D Pleated Luxury Curtains' },
-  { key: 'Car', label: '🚗 3D Glossy Car Wash & Detailing' },
-  { key: 'Bug', label: '🌿 3D Garden Pest Control Canister' },
-  { key: 'Wind', label: '❄️ 3D Split AC & Air Filter Care' },
-  { key: 'Layers', label: '🏛️ 3D Marble Polishing & Rotary Scrubber' },
-  { key: 'Sun', label: '☀️ 3D Rooftop Solar Panel Cleaning' },
-  { key: 'ShowerHead', label: '🚿 3D Chrome Tap & Shower Descaling' },
-  { key: 'Fan', label: '🌀 3D Modern Ceiling Fan & Fixtures' },
-  { key: 'TreePine', label: '🪴 3D Balcony Garden & Planters' },
-  { key: 'Building', label: '🏢 3D Commercial Office Tower' },
-  { key: 'UtensilsCrossed', label: '🍽️ 3D Dining Table & Cutlery Care' },
-  { key: 'ShieldCheck', label: '🛡️ 3D Anti-Viral Disinfection Shield' },
-  { key: 'Package', label: '📦 3D Move-In / Move-Out Vacancy Pack' },
-  { key: 'Trash2', label: '🗑️ 3D Post-Construction Industrial Vacuum' },
+  { key: 'Sofa', label: 'Sofa & Upholstery' },
+  { key: 'chair', label: 'Chairs (Dining & Office)' },
+  { key: 'Bed', label: 'Bed & Mattress' },
+  { key: 'CookingPot', label: 'Kitchen & Stove' },
+  { key: 'Chimney', label: 'Kitchen Chimney' },
+  { key: 'Bath', label: 'Bathroom & Toilet' },
+  { key: 'fridge', label: 'Refrigerator' },
+  { key: 'Carpet', label: 'Carpet & Rugs' },
+  { key: 'House', label: 'Full Home' },
+  { key: 'Waves', label: 'Water Tank' },
+  { key: 'Layers', label: 'Marble Polishing' },
+  { key: 'Fan', label: 'Ceiling Fan' },
+  { key: 'office', label: 'Commercial Office' },
+  { key: 'pool', label: 'Swimming Pool' },
+  { key: 'Window', label: 'Window & Glass' },
+  { key: 'Shirt', label: 'Curtains' },
+  { key: 'Car', label: 'Car Wash' },
+  { key: 'Bug', label: 'Pest Control' },
+  { key: 'Wind', label: 'AC Cleaning' },
+  { key: 'TreePine', label: 'Balcony & Plants' },
+  { key: 'ShieldCheck', label: 'Disinfection Shield' },
+  { key: 'Package', label: 'Move-In / Vacancy' },
+  { key: 'Trash2', label: 'Post-Construction' },
 
   // Supplementary Icons
-  { key: 'Sparkles', label: '✨ Sparkles / General Intensive Clean' },
-  { key: 'Brush', label: '🧹 Brush / Heavy Floor Grout Cleaning' },
-  { key: 'Paintbrush', label: '🎨 Paintbrush / Wall Stain Touchup' },
-  { key: 'Wrench', label: '🔧 Wrench / Plumbing & Fixture Repair' },
-  { key: 'Hammer', label: '🔨 Hammer / Minor Carpentry Fitting' },
-  { key: 'Zap', label: '⚡ Zap / Electrical Switchboards & Lights' },
-  { key: 'Gem', label: '💎 Gem / VIP Luxury White-Glove Care' },
-  { key: 'HeartHandshake', label: '🤝 Care / Recurring Maid Assistance' }
+  { key: 'Sparkles', label: 'General Clean' },
+  { key: 'Brush', label: 'Floor Scrubbing' },
+  { key: 'Paintbrush', label: 'Stain Treatment' },
+  { key: 'Wrench', label: 'Plumbing Repair' },
+  { key: 'Hammer', label: 'Carpentry Repair' },
+  { key: 'Zap', label: 'Electrical Work' },
+  { key: 'Gem', label: 'VIP White-Glove' },
+  { key: 'HeartHandshake', label: 'Maid Care' }
 ];
 
 /**
@@ -265,6 +272,7 @@ export function getRealisticIconUrl(key) {
   if (REALISTIC_ICONS[clean]) return REALISTIC_ICONS[clean];
 
   // Heuristic substring matching
+  if (clean.includes('chair') || clean.includes('seat')) return REALISTIC_ICONS.chair;
   if (clean.includes('sofa') || clean.includes('armchair') || clean.includes('couch') || clean.includes('upholster')) return REALISTIC_ICONS.sofa;
   if (clean.includes('bed') || clean.includes('mattress') || clean.includes('bedhead')) return REALISTIC_ICONS.bed;
   if (clean.includes('carpet') || clean.includes('rug') || clean.includes('mat')) return REALISTIC_ICONS.carpet;
@@ -283,7 +291,7 @@ export function getRealisticIconUrl(key) {
   if (clean.includes('fridge') || clean.includes('refrigerat') || clean.includes('freezer')) return REALISTIC_ICONS.fridge;
   if (clean.includes('office') || clean.includes('commercial') || clean.includes('build') || clean.includes('workplace') || clean.includes('tower')) return REALISTIC_ICONS.office;
   if (clean.includes('pool') || clean.includes('swim')) return REALISTIC_ICONS.pool;
-  if (clean.includes('dining') || clean.includes('table') || clean.includes('crockery') || clean.includes('cutlery')) return REALISTIC_ICONS.dining;
+  if (clean.includes('dining') || clean.includes('table') || clean.includes('crockery') || clean.includes('cutlery')) return REALISTIC_ICONS.chair || REALISTIC_ICONS.dining;
   if (clean.includes('home') || clean.includes('house') || clean.includes('flat') || clean.includes('villa') || clean.includes('apartment') || clean.includes('deepclean')) return REALISTIC_ICONS.fullhome;
 
   return null;

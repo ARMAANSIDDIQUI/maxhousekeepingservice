@@ -70,8 +70,8 @@ import SEO from '../../components/common/SEO';
 
 const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
   value: ic.key,
-  label: `${ic.key} (${ic.label})`,
-  icon: getServiceIcon(ic.key, 'w-4 h-4 text-[#E9A23B]')
+  label: ic.label,
+  icon: getServiceIcon(ic.key, 'w-5 h-5 object-contain')
 }));
 
 export default function AdminDashboard() {
