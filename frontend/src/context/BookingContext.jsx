@@ -333,7 +333,7 @@ export function BookingProvider({ children }) {
   // Slot State
   const [slot, setSlot] = useState({
     date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
-    window: 'Morning (8:00 AM – 11:00 AM)'
+    window: '9:30 AM'
   });
 
   // Customer Contact Details

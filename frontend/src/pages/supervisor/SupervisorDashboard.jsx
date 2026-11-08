@@ -58,13 +58,13 @@ function formatToday() {
 
 function getCurrentSlotWindow(dateObj = new Date()) {
   const h = dateObj.getHours();
-  if (h >= 8 && h < 10) return '08:00 AM - 10:00 AM';
-  if (h >= 10 && h < 12) return '10:00 AM - 12:00 PM';
-  if (h >= 12 && h < 14) return '12:00 PM - 02:00 PM';
-  if (h >= 14 && h < 16) return '02:00 PM - 04:00 PM';
-  if (h >= 16 && h < 18) return '04:00 PM - 06:00 PM';
-  if (h >= 18 && h < 20) return '06:00 PM - 08:00 PM';
-  return null;
+  const m = dateObj.getMinutes();
+  const totalMin = h * 60 + m;
+  if (totalMin < 11 * 60) return 'Slot 1 (9:30 AM)';
+  if (totalMin < 13 * 60 + 30) return 'Slot 2 (12:30 PM)';
+  if (totalMin < 16 * 60) return 'Slot 3 (2:30 PM)';
+  if (totalMin < 18 * 60) return 'Slot 4 (5:30 PM)';
+  return 'Slot 5 (6:30 PM)';
 }
 
 function getWhatsAppUrl(phone, customerName, bookingCode, serviceTitle) {
@@ -1382,11 +1382,11 @@ export default function SupervisorDashboard() {
                               {slotItem.timeWindow}
                             </span>
                             <span className="text-[11px] text-[#6B8077] ml-2 font-medium">
-                              {slotItem.timeWindow.includes('08:00 AM') ? 'Early Morning Slot' :
-                               slotItem.timeWindow.includes('10:00 AM') ? 'Morning Slot' :
-                               slotItem.timeWindow.includes('12:00 PM') ? 'Noon Slot' :
-                               slotItem.timeWindow.includes('02:00 PM') ? 'Afternoon Slot' :
-                               slotItem.timeWindow.includes('04:00 PM') ? 'Late Afternoon Slot' : 'Evening Slot'}
+                              {slotItem.timeWindow.includes('9:30') ? 'Morning Slot 1' :
+                               slotItem.timeWindow.includes('12:30') ? 'Midday Slot 2' :
+                               slotItem.timeWindow.includes('2:30') ? 'Afternoon Slot 3' :
+                               slotItem.timeWindow.includes('5:30') ? 'Evening Slot 4' :
+                               slotItem.timeWindow.includes('6:30') ? 'Twilight Slot 5' : 'Scheduled Window'}
                             </span>
                           </div>
                         </div>

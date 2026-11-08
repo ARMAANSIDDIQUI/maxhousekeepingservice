@@ -67,6 +67,7 @@ const serviceSchema = new mongoose.Schema({
   description: { type: String, required: true, trim: true },
   duration: { type: String, default: '1 hr' },
   icon: { type: String, default: 'Sparkles', trim: true },
+  realisticIcon: { type: String, trim: true, default: '' }, // e.g. "sofa", "bed", "stove", "bathroom", "carpet", "window", "watertank"
 
   // Pricing Type (Normal / Tiered vs. Dynamic Per Sq Ft / Unit Calculation)
   pricingType: { type: String, enum: ['normal', 'unit'], default: 'normal' },

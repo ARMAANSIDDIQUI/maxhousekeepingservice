@@ -444,8 +444,8 @@ export default function ServicesPage() {
           </div>
 
           {/* Category Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2 border-t border-[#E2D9C8]/70">
-            <span className="text-[11px] font-mono font-bold uppercase text-[#6B8077] shrink-0 mr-1">
+          <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-2.5 border-t border-[#E2D9C8]/70">
+            <span className="text-xs font-mono font-bold uppercase text-[#6B8077] shrink-0 mr-1">
               Category:
             </span>
             <button
@@ -455,10 +455,10 @@ export default function ServicesPage() {
                 next.delete('category');
                 setSearchParams(next);
               }}
-              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
                 !selectedCategory
-                  ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
-                  : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
+                  ? 'bg-[#E9A23B] text-[#10231D] shadow-sm'
+                  : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
               }`}
             >
               All Categories
@@ -472,14 +472,14 @@ export default function ServicesPage() {
                   next.set('category', c.slug);
                   setSearchParams(next);
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2.5 cursor-pointer ${
                   selectedCategory === c.slug
-                    ? 'bg-[#E9A23B] text-[#10231D] shadow-xs'
-                    : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8]'
+                    ? 'bg-[#E9A23B] text-[#10231D] shadow-sm border border-[#E9A23B]'
+                    : 'bg-[#F4EFE6] text-[#10231D] hover:bg-[#E2D9C8] border border-[#E2D9C8]'
                 }`}
               >
-                <span className={selectedCategory === c.slug ? 'text-[#10231D]' : 'text-[#6B8077]'}>
-                  {getServiceIcon(c.iconKey || c.slug, 'w-3.5 h-3.5')}
+                <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white flex items-center justify-center shrink-0 p-1 shadow-xs border border-[#E2D9C8]/80">
+                  {getServiceIcon(c.iconKey || c.slug, 'w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow-xs')}
                 </span>
                 <span>{c.name}</span>
               </button>
@@ -589,8 +589,8 @@ export default function ServicesPage() {
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/30 group-hover:scale-110 transition-transform">
-                          {getServiceIcon(service.icon || service.iconKey || service.title, 'w-5 h-5')}
+                        <div className="w-16 h-16 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-md border border-[#E2D9C8] p-2 group-hover:scale-105 transition-transform">
+                          {getServiceIcon(service, 'w-12 h-12 object-contain drop-shadow-sm')}
                         </div>
                         <h3 className="font-display font-bold text-lg sm:text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors leading-snug truncate">
                           {service.title}

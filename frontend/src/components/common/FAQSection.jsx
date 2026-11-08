@@ -28,7 +28,7 @@ export const FAQ_DATA = [
     id: 'time-windows',
     category: 'Booking & Slots',
     question: 'What time slots are available for doorstep cleaning arrival?',
-    answer: 'We operate 7 days a week from 8:00 AM to 8:00 PM across 4 standard arrival windows: Morning (8:00 AM – 11:00 AM), Midday (11:00 AM – 2:00 PM), Afternoon (2:00 PM – 5:00 PM), and Evening (5:00 PM – 8:00 PM). Your allocated supervisor will coordinate 15–30 minutes before arrival.'
+    answer: 'We operate 7 days a week across 5 daily appointment slots: Slot 1 (9:30 AM), Slot 2 (12:30 PM), Slot 3 (2:30 PM), Slot 4 (5:30 PM), and Slot 5 (6:30 PM). Your allocated supervisor will coordinate 15–30 minutes before arrival.'
   },
   {
     id: 'reschedule-policy',

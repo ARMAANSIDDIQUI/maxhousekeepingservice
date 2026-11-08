@@ -14,7 +14,7 @@ import {
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
 import RoomMap from '../components/home/RoomMap';
-import VerticalHeroCarousel from '../components/home/VerticalHeroCarousel';
+import UniqueHeroSection from '../components/home/UniqueHeroSection';
 import SEO from '../components/common/SEO';
 import FAQSection from '../components/common/FAQSection';
 import { getServiceIcon } from '../utils/iconHelper';
@@ -84,78 +84,8 @@ export default function HomePage() {
         title="Max Housekeeping Service | Professional Cleaning in Western UP"
         description="Top-rated home deep cleaning, bathroom sanitisation, kitchen degreasing, sofa shampooing & commercial cleaning across Moradabad, Rampur, Amroha, Sambhal, and Western Uttar Pradesh."
       />
-      {/* 1. Hero Section - Dynamic Screen Height & Reduced Top Padding */}
-      <section className="relative bg-[#F4EFE6] min-h-[calc(100vh-68px)] lg:min-h-[calc(100dvh-68px)] flex flex-col justify-center pt-2 sm:pt-4 pb-6 sm:pb-10 border-b border-[#E2D9C8] overflow-hidden">
-        <div className="container mx-auto px-4 my-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
-            
-            {/* Left Column: Exact Headline, Description & Value Props */}
-            <div className="lg:col-span-7">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ECE5D8] border border-[#E2D9C8] text-xs font-bold text-[#10231D] mb-4 sm:mb-6">
-                <span className="w-2 h-2 rounded-full bg-[#E9A23B] animate-pulse" />
-                <span>{settings?.ratingClaim || 'Rated 4.9/5 by 10,000+ happy homes'}</span>
-              </div>
-
-              <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#10231D] leading-[1.08] tracking-tight mb-4 sm:mb-6">
-                A spotless home,<br />
-                <span className="text-[#E9A23B] font-black italic">
-                  without lifting a finger.
-                </span>
-              </h1>
-
-              <p className="text-base sm:text-lg text-[#3D524A] leading-relaxed max-w-xl mb-6 sm:mb-8 font-sans">
-                Book trained, uniformed cleaning professionals for your home or office. Full home deep cleaning, sofa & carpet shampooing, bathroom tile descaling, kitchen degreasing, and water tank cleaning — all in one place.
-              </p>
-
-              {/* CTAs */}
-              <div className="flex flex-wrap items-center gap-4 mb-6 sm:mb-8">
-                <Link
-                  to="/book"
-                  className="px-6 py-3.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-sm tracking-wide transition-all shadow-md flex items-center gap-2"
-                >
-                  <LuCalendar className="w-4 h-4" />
-                  <span>Book a service</span>
-                </Link>
-                <Link
-                  to="/services"
-                  className="px-6 py-3.5 rounded-xl bg-[#ECE5D8] hover:bg-[#E2D9C8] text-[#10231D] font-bold text-sm border border-[#E2D9C8] transition-all flex items-center gap-2"
-                >
-                  <span>Explore services</span>
-                  <LuArrowRight className="w-4 h-4 text-[#E9A23B]" />
-                </Link>
-              </div>
-
-              {/* 3 Value Badges */}
-              <div className="flex flex-wrap items-center gap-6 pt-4 sm:pt-6 border-t border-[#E2D9C8] text-xs font-semibold text-[#10231D]">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
-                    <LuCheck className="w-3.5 h-3.5" />
-                  </span>
-                  <span>Background-verified pros</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
-                    <LuCheck className="w-3.5 h-3.5" />
-                  </span>
-                  <span>Eco-safe products</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-[#ECE5D8] text-[#E9A23B] flex items-center justify-center">
-                    <LuCheck className="w-3.5 h-3.5" />
-                  </span>
-                  <span>Transparent pricing</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Vertical Services Carousel (Top-to-Bottom as sketched by user) */}
-            <div className="lg:col-span-5 relative flex justify-center">
-              <VerticalHeroCarousel services={allServices.length > 0 ? allServices : featuredServices} />
-            </div>
-
-          </div>
-        </div>
-      </section>
+      {/* 1. Master Unique Hero Section with Video Background & 3D Realistic Icons */}
+      <UniqueHeroSection services={allServices.length > 0 ? allServices : featuredServices} />
 
       {/* Service Ticker Strip */}
       <div className="border-y-2 border-[#10231D] bg-[#10231D] text-[#F4EFE6] overflow-hidden py-2.5">
@@ -259,9 +189,9 @@ export default function HomePage() {
 
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center gap-2.5 mb-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border border-[#E9A23B]/20">
-                          {getServiceIcon(cat.iconKey || cat.slug || cat.name, 'w-4 h-4')}
+                      <div className="flex items-center gap-3 mb-2.5">
+                        <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform border border-[#E2D9C8] p-1.5">
+                          {getServiceIcon(cat.iconKey || cat.slug || cat.name, 'w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs')}
                         </div>
                         <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors leading-tight">
                           {cat.name}
@@ -344,8 +274,8 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-3 mb-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/30 group-hover:scale-110 transition-transform">
-                        {getServiceIcon(service.icon || service.iconKey || service.title, 'w-4 h-4')}
+                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5 group-hover:scale-105 transition-transform">
+                        {getServiceIcon(service, 'w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs')}
                       </div>
                       <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors leading-snug">
                         {service.title}

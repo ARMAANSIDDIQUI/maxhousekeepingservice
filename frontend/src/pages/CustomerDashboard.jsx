@@ -484,7 +484,7 @@ export default function CustomerDashboard() {
       line1: b.address?.line1 || '',
       pincode: b.address?.pincode || '',
       date: b.slot?.date || '',
-      window: b.slot?.window || 'Morning (8:00 AM – 11:00 AM)',
+      window: b.slot?.window || '9:30 AM',
       notes: b.notes || ''
     });
   };
@@ -1273,8 +1273,8 @@ export default function CustomerDashboard() {
                             const itIcon = resolveServiceIcon(it);
                             return (
                               <div key={idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-white/70 border border-[#E2D9C8]/80 shadow-2xs">
-                                <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/20">
-                                  {getServiceIcon(itIcon, 'w-4 h-4')}
+                                <div className="w-10 h-10 rounded-xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-2xs border border-[#E2D9C8] p-1">
+                                  {getServiceIcon(it.realisticIconSnapshot || it.service?.realisticIcon || itIcon, 'w-7 h-7 object-contain drop-shadow-xs')}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="font-semibold text-xs text-[#10231D] truncate leading-tight">
@@ -2158,10 +2158,11 @@ export default function CustomerDashboard() {
                   onChange={(e) => setEditForm({ ...editForm, window: e.target.value })}
                   className="w-full p-2.5 rounded-xl bg-[#ECE5D8] border border-[#E2D9C8] text-xs text-[#10231D] focus:border-[#E9A23B] focus:outline-none"
                 >
-                  <option value="Morning (8:00 AM – 11:00 AM)">Morning (8:00 AM – 11:00 AM)</option>
-                  <option value="Afternoon (11:00 AM – 2:00 PM)">Afternoon (11:00 AM – 2:00 PM)</option>
-                  <option value="Late Afternoon (2:00 PM – 5:00 PM)">Late Afternoon (2:00 PM – 5:00 PM)</option>
-                  <option value="Evening (5:00 PM – 8:00 PM)">Evening (5:00 PM – 8:00 PM)</option>
+                  <option value="9:30 AM">Slot 1 · 9:30 AM</option>
+                  <option value="12:30 PM">Slot 2 · 12:30 PM</option>
+                  <option value="2:30 PM">Slot 3 · 2:30 PM</option>
+                  <option value="5:30 PM">Slot 4 · 5:30 PM</option>
+                  <option value="6:30 PM">Slot 5 · 6:30 PM</option>
                 </select>
               </div>
 

@@ -181,12 +181,11 @@ export async function getSupervisorSchedule(req, res, next) {
     const scheduleFilter = { $and: andConditions };
 
     const STANDARD_SLOTS = [
-      '08:00 AM - 10:00 AM',
-      '10:00 AM - 12:00 PM',
-      '12:00 PM - 02:00 PM',
-      '02:00 PM - 04:00 PM',
-      '04:00 PM - 06:00 PM',
-      '06:00 PM - 08:00 PM'
+      'Slot 1 (9:30 AM)',
+      'Slot 2 (12:30 PM)',
+      'Slot 3 (2:30 PM)',
+      'Slot 4 (5:30 PM)',
+      'Slot 5 (6:30 PM)'
     ];
 
     const bookings = await Booking.find(scheduleFilter)
@@ -202,8 +201,21 @@ export async function getSupervisorSchedule(req, res, next) {
     const customSlots = [];
 
     bookings.forEach(b => {
-      const windowStr = b.assignedSlot?.timeWindow || b.slot?.window || 'Unspecified';
-      const matched = STANDARD_SLOTS.find(s => s.toLowerCase() === windowStr.trim().toLowerCase());
+      const windowStr = (b.assignedSlot?.timeWindow || b.slot?.window || 'Unspecified').trim();
+      const matched = STANDARD_SLOTS.find(s => {
+        if (s.toLowerCase() === windowStr.toLowerCase()) return true;
+        if (s.includes('9:30') && windowStr.includes('9:30')) return true;
+        if (s.includes('12:30') && windowStr.includes('12:30')) return true;
+        if (s.includes('2:30') && windowStr.includes('2:30')) return true;
+        if (s.includes('5:30') && windowStr.includes('5:30')) return true;
+        if (s.includes('6:30') && windowStr.includes('6:30')) return true;
+        if (s.includes('9:30') && (windowStr.includes('08:00') || windowStr.includes('Morning') || windowStr.includes('10:00'))) return true;
+        if (s.includes('12:30') && (windowStr.includes('11:00') || windowStr.includes('Midday') || windowStr.includes('12:00'))) return true;
+        if (s.includes('2:30') && (windowStr.includes('02:00') || windowStr.includes('Afternoon'))) return true;
+        if (s.includes('5:30') && (windowStr.includes('04:00') || windowStr.includes('Late Afternoon'))) return true;
+        if (s.includes('6:30') && (windowStr.includes('06:00') || windowStr.includes('Evening'))) return true;
+        return false;
+      });
       if (matched) {
         slotMap[matched].push(b);
       } else {
@@ -321,7 +333,7 @@ export async function getSupervisorBookings(req, res, next) {
     const total = await Booking.countDocuments(query);
     const bookings = await Booking.find(query)
       .populate('supervisor', 'name phone email avatar avatarUrl status')
-      .populate('items.service', 'title slug icon iconKey image')
+      .populate('items.service', 'title slug icon iconKey realisticIcon image')
       .sort({ 'assignedSlot.date': 1, 'slot.date': 1, createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -347,7 +359,7 @@ export async function getSupervisorBookingById(req, res, next) {
     const { id } = req.params;
     const booking = await Booking.findById(id)
       .populate('city', 'name contactOverrides')
-      .populate('items.service', 'title slug icon iconKey image');
+      .populate('items.service', 'title slug icon iconKey realisticIcon image');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found.' });

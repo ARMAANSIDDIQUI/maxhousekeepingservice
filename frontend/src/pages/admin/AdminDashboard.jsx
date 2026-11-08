@@ -163,6 +163,7 @@ export default function AdminDashboard() {
     address: 'Kanth road Behind, Asian Vivekanand Hospital, Moradabad, Uttar Pradesh 244001',
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
+    heroVideoUrl: '/media/site/home_hero.mp4',
     acceptOnlinePayments: false,
     paymentGatewayProvider: 'razorpay',
     razorpayKeyId: '',
@@ -7428,6 +7429,74 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* 5. Home Hero Video Background Setting */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shadow-xs shrink-0">
+                      <LuPlay className="w-5 h-5 text-[#E9A23B]" />
+                    </div>
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-[#10231D]">
+                        Home Page Hero Video Background
+                      </h4>
+                      <p className="text-[11px] text-[#6B8077]">
+                        Change the looping cinematic video playing behind the Home Page hero section. Default is the official cleaning video.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Active Video
+                  </span>
+                </div>
+
+                <div className="p-4 bg-white/80 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                      Hero Video URL or Local Path:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="/media/site/home_hero.mp4"
+                        value={settingsForm.heroVideoUrl || ''}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, heroVideoUrl: e.target.value }))}
+                        className="flex-1 p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSettingsForm(prev => ({ ...prev, heroVideoUrl: '/media/site/home_hero.mp4' }))}
+                        className="px-3 py-2 rounded-xl border border-[#D2C8B8] hover:bg-[#ECE5D8] text-[11px] font-bold text-[#10231D] transition-colors"
+                      >
+                        Reset Default
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[#6B8077] mt-1">
+                      Default: <code className="font-mono text-[#10231D]">/media/site/home_hero.mp4</code> (Initial video added in root). You can also paste any MP4 video URL.
+                    </p>
+                  </div>
+
+                  {/* Video Live Preview */}
+                  {settingsForm.heroVideoUrl && (
+                    <div className="pt-2">
+                      <span className="text-[11px] font-bold text-[#3D524A] block mb-1.5">
+                        Live Hero Video Preview:
+                      </span>
+                      <div className="relative h-36 max-w-sm rounded-xl overflow-hidden border border-[#D2C8B8] bg-black">
+                        <video
+                          src={settingsForm.heroVideoUrl}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-2">
                 <button
                   type="submit"
@@ -9910,12 +9979,11 @@ export default function AdminDashboard() {
                     onChange={(e) => setAssignTimeWindow(e.target.value)}
                     className="w-full p-2.5 rounded-xl bg-white border border-[#E2D9C8] text-xs font-bold text-[#10231D]"
                   >
-                    <option value="08:00 AM - 10:00 AM">08:00 AM - 10:00 AM (Early Morning)</option>
-                    <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM (Morning)</option>
-                    <option value="12:00 PM - 02:00 PM">12:00 PM - 02:00 PM (Noon)</option>
-                    <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM (Afternoon)</option>
-                    <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM (Late Afternoon)</option>
-                    <option value="06:00 PM - 08:00 PM">06:00 PM - 08:00 PM (Evening)</option>
+                    <option value="9:30 AM">Slot 1 · 9:30 AM</option>
+                    <option value="12:30 PM">Slot 2 · 12:30 PM</option>
+                    <option value="2:30 PM">Slot 3 · 2:30 PM</option>
+                    <option value="5:30 PM">Slot 4 · 5:30 PM</option>
+                    <option value="6:30 PM">Slot 5 · 6:30 PM</option>
                   </select>
                 </div>
               </div>

@@ -451,8 +451,8 @@ export default function TrackBookingPage() {
                   return (
                     <div key={i} className="flex items-center justify-between py-3 gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-xs border border-[#E9A23B]/30">
-                          {getServiceIcon(iconKey, 'w-5 h-5')}
+                        <div className="w-12 h-12 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5">
+                          {getServiceIcon(item.realisticIconSnapshot || item.service?.realisticIcon || iconKey, 'w-8 h-8 object-contain drop-shadow-xs')}
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-sm text-[#10231D] truncate leading-tight">

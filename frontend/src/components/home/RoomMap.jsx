@@ -40,7 +40,7 @@ export default function RoomMap({ services = [] }) {
     living: {
       name: 'Living Room',
       categorySlug: 'sofa-carpet-cleaning',
-      icon: livingSvc?.icon || 'armchair',
+      icon: livingSvc?.realisticIcon || 'sofa',
       service: livingSvc?.title || 'Sofa & Carpet Cleaning',
       slug: livingSvc?.slug || 'sofa-carpet-cleaning',
       priceText: livingSvc ? `From ₹${livingSvc.price.toLocaleString('en-IN')}` : 'From ₹299 / seat',
@@ -49,7 +49,7 @@ export default function RoomMap({ services = [] }) {
     kitchen: {
       name: 'Kitchen & Chimney',
       categorySlug: 'kitchen-cleaning',
-      icon: kitchenSvc?.icon || 'cookingpot',
+      icon: kitchenSvc?.realisticIcon || 'stove',
       service: kitchenSvc?.title || 'Kitchen Deep Cleaning',
       slug: kitchenSvc?.slug || 'kitchen-deep-cleaning',
       priceText: kitchenSvc ? `From ₹${kitchenSvc.price.toLocaleString('en-IN')}` : 'From ₹1,499',
@@ -58,7 +58,7 @@ export default function RoomMap({ services = [] }) {
     bathroom: {
       name: 'Bathroom & Washroom',
       categorySlug: 'bathroom-cleaning',
-      icon: bathroomSvc?.icon || 'bathtub',
+      icon: bathroomSvc?.realisticIcon || 'bathroom',
       service: bathroomSvc?.title || 'Bathroom Deep Cleaning',
       slug: bathroomSvc?.slug || 'bathroom-deep-cleaning',
       priceText: bathroomSvc ? `From ₹${bathroomSvc.price.toLocaleString('en-IN')}` : 'From ₹799',
@@ -67,7 +67,7 @@ export default function RoomMap({ services = [] }) {
     bedroom: {
       name: 'Master Bedroom',
       categorySlug: 'home-deep-cleaning',
-      icon: bedroomSvc?.icon || 'houseline',
+      icon: bedroomSvc?.realisticIcon || 'fullhome',
       service: bedroomSvc?.title || 'Full Home Deep Cleaning',
       slug: bedroomSvc?.slug || 'full-home-deep-cleaning',
       priceText: bedroomSvc ? `From ₹${bedroomSvc.price.toLocaleString('en-IN')}` : 'From ₹3,499 (1 BHK)',
@@ -209,9 +209,9 @@ export default function RoomMap({ services = [] }) {
                 </span>
               </div>
 
-              <h3 className="font-display font-black text-2xl text-[#10231D] mb-2 flex items-center gap-2.5">
-                <span className="p-1.5 rounded-xl bg-[#ECE5D8] text-[#E9A23B] shrink-0 inline-flex shadow-xs border border-[#E2D9C8]">
-                  {getServiceIcon(current.icon || current.categorySlug, 'w-5 h-5')}
+              <h3 className="font-display font-black text-2xl sm:text-3xl text-[#10231D] mb-2 flex items-center gap-3.5">
+                <span className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-white text-[#10231D] shrink-0 inline-flex items-center justify-center shadow-md border border-[#E2D9C8] p-2">
+                  {getServiceIcon(current.icon || current.service || current.categorySlug, 'w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-sm')}
                 </span>
                 <span>{current.service}</span>
               </h3>

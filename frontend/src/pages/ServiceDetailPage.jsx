@@ -364,8 +364,8 @@ export default function ServiceDetailPage() {
                 {service.categoryName}
               </span>
               <h1 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] leading-tight mt-1 flex items-center gap-3.5">
-                <span className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#10231D] text-[#E9A23B] shrink-0 inline-flex items-center justify-center shadow-md border border-[#E9A23B]/30">
-                  {getServiceIcon(service.icon || service.iconKey || service.title, 'w-6 h-6 sm:w-8 sm:h-8')}
+                <span className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white text-[#10231D] shrink-0 inline-flex items-center justify-center shadow-md border border-[#E2D9C8] p-2">
+                  {getServiceIcon(service, 'w-12 h-12 sm:w-16 sm:h-16 object-contain drop-shadow-sm')}
                 </span>
                 <span>{service.title}</span>
               </h1>

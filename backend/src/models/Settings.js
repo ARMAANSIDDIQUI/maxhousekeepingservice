@@ -39,6 +39,9 @@ const settingsSchema = new mongoose.Schema({
   agencyCreditUrl: { type: String, default: '' },
   ratingClaim: { type: String, default: 'Rated 4.9/5 by 10,000+ happy homes' },
 
+  // Home Hero Video Background
+  heroVideoUrl: { type: String, default: '/media/site/home_hero.mp4', trim: true },
+
   // Supervisor Live GPS Tracking (Global Control)
   liveTrackingEnabled: { type: Boolean, default: true },
 

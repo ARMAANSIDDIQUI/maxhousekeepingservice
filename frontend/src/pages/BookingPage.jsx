@@ -1351,8 +1351,8 @@ export default function BookingPage() {
                         {/* Top Row: Service Title & Header Actions (Stepper + Remove) */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-sm border border-[#E9A23B]/30 group-hover:scale-105 transition-transform">
-                              {getServiceIcon(svc.icon || svc.iconKey || svc.title, 'w-5 h-5 sm:w-6 sm:h-6')}
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5 group-hover:scale-105 transition-transform">
+                              {getServiceIcon(svc.realisticIcon || svc.icon || svc.iconKey || svc.title, 'w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-xs')}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
@@ -1888,10 +1888,11 @@ export default function BookingPage() {
                       value={slot.window}
                       onChange={(val) => setSlot({ ...slot, window: val })}
                       options={[
-                        { value: 'Morning (8:00 AM – 11:00 AM)', label: 'Morning (8:00 AM – 11:00 AM)' },
-                        { value: 'Midday (11:00 AM – 2:00 PM)', label: 'Midday (11:00 AM – 2:00 PM)' },
-                        { value: 'Afternoon (2:00 PM – 5:00 PM)', label: 'Afternoon (2:00 PM – 5:00 PM)' },
-                        { value: 'Evening (5:00 PM – 8:00 PM)', label: 'Evening (5:00 PM – 8:00 PM)' }
+                        { value: '9:30 AM', label: 'Slot 1 · 9:30 AM' },
+                        { value: '12:30 PM', label: 'Slot 2 · 12:30 PM' },
+                        { value: '2:30 PM', label: 'Slot 3 · 2:30 PM' },
+                        { value: '5:30 PM', label: 'Slot 4 · 5:30 PM' },
+                        { value: '6:30 PM', label: 'Slot 5 · 6:30 PM' }
                       ]}
                       placeholder="Select Time Window..."
                     />
@@ -2016,8 +2017,8 @@ export default function BookingPage() {
                       return (
                         <div key={i} className="py-2.5 flex items-start justify-between gap-2.5 text-xs">
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-[#E9A23B]/20">
-                              {getServiceIcon(itIcon, 'w-3.5 h-3.5')}
+                            <div className="w-9 h-9 rounded-xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-xs mt-0.5 border border-[#E2D9C8] p-1">
+                              {getServiceIcon(it.realisticIcon || itService?.realisticIcon || itIcon, 'w-6 h-6 object-contain drop-shadow-xs')}
                             </div>
                             <div className="min-w-0">
                               <p className="font-bold text-[#10231D] leading-tight truncate">{it.title}</p>
@@ -2304,8 +2305,8 @@ export default function BookingPage() {
                 className="p-3 sm:p-3.5 rounded-xl bg-[#ECE5D8]/70 hover:bg-[#ECE5D8] border border-[#E2D9C8] flex items-center justify-between gap-3 transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#10231D]/20 group-hover:scale-105 transition-transform">
-                    {getServiceIcon(s.icon || s.iconKey || s.title, 'w-5 h-5')}
+                  <div className="w-12 h-12 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5 group-hover:scale-105 transition-transform">
+                    {getServiceIcon(s.realisticIcon || s.icon || s.iconKey || s.title, 'w-9 h-9 object-contain drop-shadow-xs')}
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-[#10231D] truncate">{s.title}</p>

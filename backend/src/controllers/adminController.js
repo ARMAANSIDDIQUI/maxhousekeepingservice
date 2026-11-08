@@ -38,7 +38,7 @@ export async function getStats(req, res, next) {
 
     // Recent 5 bookings
     const recentBookings = await Booking.find()
-      .populate('items.service', 'title slug icon iconKey image')
+      .populate('items.service', 'title slug icon iconKey realisticIcon image')
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -91,7 +91,7 @@ function escapeRegex(str) {
     const skip = (Number(page) - 1) * Number(limit);
     const total = await Booking.countDocuments(query);
     const bookings = await Booking.find(query)
-      .populate('items.service', 'title slug icon iconKey image')
+      .populate('items.service', 'title slug icon iconKey realisticIcon image')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));

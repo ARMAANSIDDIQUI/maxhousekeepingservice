@@ -8,7 +8,8 @@ const bookingItemSchema = new mongoose.Schema({
   priceSnapshot: { type: Number, required: true }, // Offered price charged
   mrpSnapshot: { type: Number, required: true },   // Shown price baseline
   qty: { type: Number, default: 1 },
-  iconSnapshot: { type: String, trim: true }
+  iconSnapshot: { type: String, trim: true },
+  realisticIconSnapshot: { type: String, trim: true }
 }, { _id: false });
 
 const bookingSchema = new mongoose.Schema({
