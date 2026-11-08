@@ -87,6 +87,48 @@ export default function CustomerDashboard() {
     isDefault: false
   });
 
+  // Services Catalog from Mongo for 100% accurate icon & metadata resolution
+  const [servicesCatalog, setServicesCatalog] = useState([]);
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await apiRequest('/services');
+        if (res?.success && Array.isArray(res.services)) {
+          setServicesCatalog(res.services);
+        }
+      } catch (err) {
+        console.warn('Could not fetch services catalog for icon resolution:', err);
+      }
+    }
+    loadCatalog();
+  }, []);
+
+  const resolveServiceIcon = (it) => {
+    if (!it) return 'Sparkles';
+    if (it.service && typeof it.service === 'object' && it.service.icon) {
+      return it.service.icon;
+    }
+    const serviceId = typeof it.service === 'string' ? it.service : (it.service?._id || it.serviceId);
+    if (serviceId && servicesCatalog.length > 0) {
+      const matchById = servicesCatalog.find(s => String(s._id) === String(serviceId));
+      if (matchById?.icon) return matchById.icon;
+    }
+    const title = it.titleSnapshot || it.title || '';
+    if (title && servicesCatalog.length > 0) {
+      const normTitle = title.toLowerCase().trim();
+      const matchByTitle = servicesCatalog.find(s =>
+        (s.title && s.title.toLowerCase().trim() === normTitle) ||
+        (s.slug && s.slug.toLowerCase().trim() === normTitle) ||
+        (s.title && (normTitle.includes(s.title.toLowerCase().trim()) || s.title.toLowerCase().trim().includes(normTitle)))
+      );
+      if (matchByTitle?.icon) return matchByTitle.icon;
+    }
+    if (it.iconSnapshot && it.iconSnapshot !== 'Sparkles') return it.iconSnapshot;
+    if (it.icon) return it.icon;
+    return title || 'Sparkles';
+  };
+
   // Edit Modal State
   const [editingBooking, setEditingBooking] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -1228,7 +1270,7 @@ export default function CustomerDashboard() {
                         </h4>
                         <div className="space-y-2">
                           {b.items?.map((it, idx) => {
-                            const itIcon = it.iconSnapshot || it.icon || it.service?.icon || it.service?.iconKey || it.titleSnapshot || it.title;
+                            const itIcon = resolveServiceIcon(it);
                             return (
                               <div key={idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-white/70 border border-[#E2D9C8]/80 shadow-2xs">
                                 <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/20">

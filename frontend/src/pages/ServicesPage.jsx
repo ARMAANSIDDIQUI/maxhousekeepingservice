@@ -588,12 +588,14 @@ export default function ServicesPage() {
                   {/* Body Content */}
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors mb-2 leading-snug flex items-center gap-2">
-                        <span className="p-1 rounded-lg bg-[#ECE5D8] text-[#E9A23B] shrink-0 inline-flex">
-                          {getServiceIcon(service.icon, 'w-4 h-4')}
-                        </span>
-                        <span className="truncate">{service.title}</span>
-                      </h3>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs border border-[#E9A23B]/30 group-hover:scale-110 transition-transform">
+                          {getServiceIcon(service.icon || service.iconKey || service.title, 'w-5 h-5')}
+                        </div>
+                        <h3 className="font-display font-bold text-lg sm:text-xl text-[#10231D] group-hover:text-[#C2512D] transition-colors leading-snug truncate">
+                          {service.title}
+                        </h3>
+                      </div>
                       <p className="text-xs text-[#3D524A] leading-relaxed line-clamp-2 mb-4">
                         {service.shortDescription || service.description}
                       </p>

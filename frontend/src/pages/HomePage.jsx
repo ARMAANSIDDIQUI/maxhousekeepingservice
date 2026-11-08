@@ -259,9 +259,14 @@ export default function HomePage() {
 
                   <div className="p-6 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors mb-2">
-                        {cat.name}
-                      </h3>
+                      <div className="flex items-center gap-2.5 mb-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border border-[#E9A23B]/20">
+                          {getServiceIcon(cat.iconKey || cat.slug || cat.name, 'w-4 h-4')}
+                        </div>
+                        <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors leading-tight">
+                          {cat.name}
+                        </h3>
+                      </div>
                       <p className="text-xs text-[#3D524A] leading-relaxed mb-4">
                         {cat.description || cat.tagline}
                       </p>

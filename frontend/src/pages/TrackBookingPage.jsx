@@ -33,7 +33,47 @@ export default function TrackBookingPage() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(false);
   const [copiedOtp, setCopiedOtp] = useState(false);
+  const [servicesCatalog, setServicesCatalog] = useState([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await apiRequest('/services');
+        if (res?.success && Array.isArray(res.services)) {
+          setServicesCatalog(res.services);
+        }
+      } catch (err) {
+        console.warn('Could not fetch services catalog for track icon resolution:', err);
+      }
+    }
+    loadCatalog();
+  }, []);
+
+  const resolveServiceIcon = (item) => {
+    if (!item) return 'Sparkles';
+    if (item.service && typeof item.service === 'object' && item.service.icon) {
+      return item.service.icon;
+    }
+    const serviceId = typeof item.service === 'string' ? item.service : (item.service?._id || item.serviceId);
+    if (serviceId && servicesCatalog.length > 0) {
+      const matchById = servicesCatalog.find(s => String(s._id) === String(serviceId));
+      if (matchById?.icon) return matchById.icon;
+    }
+    const title = item.titleSnapshot || item.title || '';
+    if (title && servicesCatalog.length > 0) {
+      const normTitle = title.toLowerCase().trim();
+      const matchByTitle = servicesCatalog.find(s =>
+        (s.title && s.title.toLowerCase().trim() === normTitle) ||
+        (s.slug && s.slug.toLowerCase().trim() === normTitle) ||
+        (s.title && (normTitle.includes(s.title.toLowerCase().trim()) || s.title.toLowerCase().trim().includes(normTitle)))
+      );
+      if (matchByTitle?.icon) return matchByTitle.icon;
+    }
+    if (item.iconSnapshot && item.iconSnapshot !== 'Sparkles') return item.iconSnapshot;
+    if (item.icon) return item.icon;
+    return title || 'Sparkles';
+  };
 
   useEffect(() => {
     if (code) {
@@ -407,7 +447,7 @@ export default function TrackBookingPage() {
               </div>
               <div className="divide-y divide-[#E2D9C8]/70">
                 {booking.items?.map((item, i) => {
-                  const iconKey = item.iconSnapshot || item.icon || item.service?.icon || item.service?.iconKey || item.titleSnapshot;
+                  const iconKey = resolveServiceIcon(item);
                   return (
                     <div key={i} className="flex items-center justify-between py-3 gap-3">
                       <div className="flex items-center gap-3 min-w-0">
