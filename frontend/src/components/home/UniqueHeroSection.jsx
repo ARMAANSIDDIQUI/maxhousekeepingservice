@@ -331,57 +331,19 @@ export default function UniqueHeroSection({ services = [] }) {
               </motion.div>
             </AnimatePresence>
 
-            {/* Bottom Legibility Scrim Only (Keeps top & side borders pure #F4EFE6 theme while making bottom text crisp) */}
-            <div className="absolute inset-x-0 bottom-0 h-56 sm:h-64 bg-gradient-to-t from-[#10231D]/85 via-[#10231D]/40 to-transparent pointer-events-none z-20" />
-
-            {/* Multi-Video Carousel Controls (When 2 or 3 videos are available) */}
-            {heroVideos.length > 1 && (
-              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-lg">
-                <button
-                  type="button"
-                  onClick={handlePrevVideo}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer text-xs font-bold"
-                  aria-label="Previous video"
-                >
-                  ‹
-                </button>
-                <div className="flex items-center gap-1.5 px-1">
-                  {heroVideos.map((vid, idx) => (
-                    <button
-                      key={vid.id}
-                      type="button"
-                      onClick={() => handleSelectVideo(idx)}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                        idx === activeVideoIndex ? 'w-5 bg-[#E9A23B]' : 'w-1.5 bg-white/40 hover:bg-white/70'
-                      }`}
-                      aria-label={`Switch to video ${idx + 1}`}
-                      title={vid.title}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNextVideo}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer text-xs font-bold"
-                  aria-label="Next video"
-                >
-                  ›
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Ultra-Compact Bottom-Aligned Content (Maximum Video Visibility) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-3">
-            <div className="max-w-2xl">
+          {/* Ultra-Compact Bottom-Aligned Content (Bright, Crisp & Zero Muddy Dark Shadow Over Video) */}
+          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-2">
+            <div className="max-w-2xl bg-[#F4EFE6]/92 backdrop-blur-md border border-[#E2D9C8] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl">
               
-              {/* Sleek Compact Headline */}
-              <h1 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-white leading-snug mb-1 drop-shadow-md">
-                Spotless homes. <span className="text-[#E9A23B]">Zero stress.</span>
+              {/* Sleek Compact Headline (Crisp Dark Forest Ink & Brass Gold) */}
+              <h1 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-[#10231D] leading-snug mb-1">
+                Spotless homes. <span className="text-[#D48E28]">Zero stress.</span>
               </h1>
 
               {/* Crisp Attention-Grabbing Line */}
-              <p className="text-[11px] sm:text-xs md:text-sm text-white/95 italic font-sans max-w-md mb-2.5 sm:mb-3 drop-shadow-xs">
+              <p className="text-[11px] sm:text-xs md:text-sm text-[#3D524A] italic font-medium font-sans max-w-md mb-3">
                 “A spotless home is peace of mind.”
               </p>
 
@@ -389,7 +351,7 @@ export default function UniqueHeroSection({ services = [] }) {
               <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
                 <Link
                   to="/book"
-                  className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-lg flex items-center gap-1.5 group cursor-pointer"
+                  className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md flex items-center gap-1.5 group cursor-pointer"
                 >
                   <LuCalendar className="w-3.5 h-3.5" />
                   <span>Book a service</span>
@@ -399,7 +361,7 @@ export default function UniqueHeroSection({ services = [] }) {
                 <button
                   type="button"
                   onClick={scrollToServices}
-                  className="px-3.5 py-2 sm:px-5 sm:py-3 rounded-xl bg-[#10231D]/70 hover:bg-[#10231D]/90 text-white font-bold text-xs sm:text-sm border border-white/25 backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 sm:px-5 sm:py-3 rounded-xl bg-[#10231D] hover:bg-[#1E3B31] text-[#F4EFE6] font-bold text-xs sm:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Select service</span>
                   <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B] animate-bounce" />
@@ -407,7 +369,7 @@ export default function UniqueHeroSection({ services = [] }) {
 
                 <a
                   href={`tel:${settings?.phone || '+919897766002'}`}
-                  className="p-2 sm:p-3 rounded-xl bg-[#10231D]/65 hover:bg-[#10231D]/85 text-white border border-white/25 backdrop-blur-md transition-all flex items-center justify-center shadow-md"
+                  className="p-2 sm:p-3 rounded-xl bg-white hover:bg-[#ECE5D8] text-[#10231D] border border-[#E2D9C8] transition-all flex items-center justify-center shadow-sm"
                   title="Direct Phone Dispatch"
                 >
                   <LuPhoneCall className="w-3.5 h-3.5 text-[#E9A23B]" />
@@ -417,11 +379,11 @@ export default function UniqueHeroSection({ services = [] }) {
             </div>
           </div>
 
-          {/* Bottom Bar: Trust Metrics & Scroll Cue */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-3 md:pt-4 border-t border-white/20">
-            <div className="flex items-center justify-between gap-4 text-xs text-white/80">
+          {/* Bottom Bar: Trust Metrics & Scroll Cue (Bright & Solid Contrast Pill) */}
+          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-2">
+            <div className="bg-[#F4EFE6]/92 backdrop-blur-md border border-[#E2D9C8] rounded-xl px-4 py-2.5 shadow-sm flex items-center justify-between gap-4 text-xs text-[#10231D]">
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1.5 font-bold text-white">
+                <div className="flex items-center gap-1.5 font-bold text-[#10231D]">
                   <div className="flex text-[#E9A23B]">
                     <LuStar className="w-3.5 h-3.5 fill-current" />
                     <LuStar className="w-3.5 h-3.5 fill-current" />
@@ -429,11 +391,11 @@ export default function UniqueHeroSection({ services = [] }) {
                     <LuStar className="w-3.5 h-3.5 fill-current" />
                     <LuStar className="w-3.5 h-3.5 fill-current" />
                   </div>
-                  <span className="font-mono ml-1">4.92 / 5.0</span>
-                  <span className="text-white/70 font-normal hidden sm:inline">(5,000+ happy customers)</span>
+                  <span className="font-mono ml-1 text-[#10231D]">4.92 / 5.0</span>
+                  <span className="text-[#3D524A] font-medium hidden sm:inline">(5,000+ happy customers)</span>
                 </div>
-                <div className="hidden md:flex items-center gap-1.5 text-white/80">
-                  <LuShieldCheck className="w-3.5 h-3.5 text-[#E9A23B]" />
+                <div className="hidden md:flex items-center gap-1.5 text-[#10231D] font-semibold">
+                  <LuShieldCheck className="w-3.5 h-3.5 text-[#D48E28]" />
                   <span>100% Free Re-Clean Guarantee</span>
                 </div>
               </div>
@@ -441,7 +403,7 @@ export default function UniqueHeroSection({ services = [] }) {
               <button
                 type="button"
                 onClick={scrollToServices}
-                className="flex items-center gap-1.5 text-white/80 hover:text-white font-semibold transition-colors cursor-pointer text-[11px] sm:text-xs"
+                className="flex items-center gap-1.5 text-[#10231D] hover:text-[#D48E28] font-bold transition-colors cursor-pointer text-[11px] sm:text-xs"
               >
                 <span>Service Catalog</span>
                 <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B]" />
