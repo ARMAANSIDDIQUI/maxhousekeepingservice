@@ -219,9 +219,9 @@ export function BookingProvider({ children }) {
     liveTrackingEnabled: true,
     closedBookingDates: [],
     heroVideoUrl: '/media/site/home_hero.mp4',
-    mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'],
+    mobileHeroVideos: ['/media/site/homehero4.mp4'],
     mobileHeroHeightVh: 92,
-    mobileHeroMinHeightPx: 680,
+    mobileHeroMinHeightPx: 420,
     desktopHeroHeightMode: 'fullscreen',
     heroVideoFitMode: 'contain',
     heroVideoTransition: 'swipe'

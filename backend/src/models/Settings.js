@@ -43,10 +43,10 @@ const settingsSchema = new mongoose.Schema({
   heroVideoUrl: { type: String, default: '/media/site/home_hero.mp4', trim: true },
   mobileHeroVideos: {
     type: [String],
-    default: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
+    default: ['/media/site/homehero4.mp4']
   },
   mobileHeroHeightVh: { type: Number, default: 92 },
-  mobileHeroMinHeightPx: { type: Number, default: 680 },
+  mobileHeroMinHeightPx: { type: Number, default: 420 },
   desktopHeroHeightMode: { type: String, enum: ['fullscreen', 'tall', 'compact'], default: 'fullscreen' },
   heroVideoFitMode: { type: String, enum: ['contain', 'cover'], default: 'contain' },
   heroVideoTransition: { type: String, enum: ['swipe', 'zoom', 'fade'], default: 'swipe' },

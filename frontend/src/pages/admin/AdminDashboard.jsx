@@ -222,9 +222,9 @@ export default function AdminDashboard() {
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
     heroVideoUrl: '/media/site/home_hero.mp4',
-    mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'],
+    mobileHeroVideos: ['/media/site/homehero4.mp4'],
     mobileHeroHeightVh: 92,
-    mobileHeroMinHeightPx: 680,
+    mobileHeroMinHeightPx: 420,
     desktopHeroHeightMode: 'fullscreen',
     heroVideoFitMode: 'contain',
     heroVideoTransition: 'swipe',
@@ -7562,15 +7562,15 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
-                {/* B. Mobile Carousel Videos (< 768px) */}
+                {/* B. Mobile Hero Video (< 768px) */}
                 <div className="p-4 bg-white/90 rounded-xl border border-[#E2D9C8] space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <span className="text-xs font-bold text-[#10231D] block">
-                        2. Mobile Screen Video Carousel (&lt; 768px · Max 4 Videos)
+                        2. Mobile Screen Hero Video (&lt; 768px · Single Active Video)
                       </span>
                       <span className="text-[10px] text-[#6B8077]">
-                        Plays in a touch-swipe carousel on phones. Default: homehero2.mp4 &amp; homehero4.mp4.
+                        Displays a single dedicated vertical/mobile video on phones. Default: homehero4.mp4.
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -7578,79 +7578,47 @@ export default function AdminDashboard() {
                         type="button"
                         onClick={() => setSettingsForm(prev => ({
                           ...prev,
-                          mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
+                          mobileHeroVideos: ['/media/site/homehero4.mp4']
                         }))}
                         className="px-2.5 py-1 rounded-lg border border-[#D2C8B8] hover:bg-[#ECE5D8] text-[10px] font-bold text-[#10231D] transition-colors cursor-pointer"
                       >
-                        Reset Mobile Defaults
+                        Reset Mobile Default
                       </button>
-                      {(settingsForm.mobileHeroVideos?.length || 0) < 4 && (
-                        <button
-                          type="button"
-                          onClick={() => setSettingsForm(prev => ({
-                            ...prev,
-                            mobileHeroVideos: [...(prev.mobileHeroVideos || []), '/media/site/home_hero.mp4']
-                          }))}
-                          className="px-2.5 py-1 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <LuPlus className="w-3 h-3" /> Add Video
-                        </button>
-                      )}
                     </div>
                   </div>
 
                   <div className="space-y-2.5">
-                    {(settingsForm.mobileHeroVideos && settingsForm.mobileHeroVideos.length > 0
-                      ? settingsForm.mobileHeroVideos
-                      : ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
-                    ).map((vidUrl, idx) => (
-                      <div key={idx} className="p-2.5 rounded-xl bg-[#F4EFE6]/70 border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center gap-2.5">
-                        <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-[#10231D] text-[#E9A23B] self-start sm:self-center shrink-0">
-                          #{idx + 1}
-                        </span>
-                        <input
-                          type="text"
-                          value={vidUrl}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSettingsForm(prev => {
-                              const arr = [...(prev.mobileHeroVideos || ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'])];
-                              arr[idx] = val;
-                              return { ...prev, mobileHeroVideos: arr };
-                            });
-                          }}
-                          placeholder="/media/site/homehero2.mp4"
-                          className="flex-1 p-2 rounded-lg border border-[#E2D9C8] bg-white text-xs font-mono font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
-                        />
-                        <div className="flex items-center gap-1.5 shrink-0">
+                    {(() => {
+                      const vidUrl = (Array.isArray(settingsForm.mobileHeroVideos) && settingsForm.mobileHeroVideos[0] && settingsForm.mobileHeroVideos[0] !== '/media/site/homehero2.mp4')
+                        ? settingsForm.mobileHeroVideos[0]
+                        : '/media/site/homehero4.mp4';
+                      return (
+                        <div className="p-2.5 rounded-xl bg-[#F4EFE6]/70 border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center gap-2.5">
+                          <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-[#10231D] text-[#E9A23B] self-start sm:self-center shrink-0">
+                            MOBILE
+                          </span>
+                          <input
+                            type="text"
+                            value={vidUrl}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSettingsForm(prev => ({ ...prev, mobileHeroVideos: [val] }));
+                            }}
+                            placeholder="/media/site/homehero4.mp4"
+                            className="flex-1 p-2 rounded-lg border border-[#E2D9C8] bg-white text-xs font-mono font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                          />
                           <div className="w-12 h-9 rounded-md overflow-hidden border border-[#D2C8B8] bg-[#121614] shrink-0">
                             <video src={vidUrl} muted playsInline className="w-full h-full object-contain" />
                           </div>
-                          {(settingsForm.mobileHeroVideos?.length || 2) > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSettingsForm(prev => {
-                                  const arr = [...(prev.mobileHeroVideos || [])];
-                                  arr.splice(idx, 1);
-                                  return { ...prev, mobileHeroVideos: arr };
-                                });
-                              }}
-                              className="p-1.5 rounded-lg border border-[#C2512D]/40 text-[#C2512D] hover:bg-[#C2512D] hover:text-white transition-colors cursor-pointer"
-                              title="Remove mobile video"
-                            >
-                              <LuTrash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })()}
                   </div>
 
                   {/* Quick-pick available site video assets */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <span className="text-[10px] font-bold text-[#6B8077]">Site Media Assets:</span>
-                    {['/media/site/home_hero.mp4', '/media/site/homehero2.mp4', '/media/site/homehero4.mp4'].map((preset) => (
+                    {['/media/site/home_hero.mp4', '/media/site/homehero4.mp4'].map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -7698,13 +7666,13 @@ export default function AdminDashboard() {
                     <input
                       type="number"
                       min="360"
-                      max="1100"
+                      max="900"
                       step="10"
-                      value={settingsForm.mobileHeroMinHeightPx ?? 680}
+                      value={settingsForm.mobileHeroMinHeightPx ?? 420}
                       onChange={(e) => setSettingsForm(prev => ({ ...prev, mobileHeroMinHeightPx: Number(e.target.value) }))}
                       className="w-full p-2 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D]"
                     />
-                    <span className="text-[9px] text-[#6B8077]">Default: 680px</span>
+                    <span className="text-[9px] text-[#6B8077]">Capped at 100% screen height</span>
                   </div>
 
                   {/* Desktop Height Mode & Video Fit */}

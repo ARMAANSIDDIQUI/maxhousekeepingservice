@@ -24,8 +24,8 @@ export default function UniqueHeroSection({ services = [] }) {
   const cityName = selectedCity?.name || 'Moradabad';
 
   // Responsive screen-size tracking:
-  // - Desktop (>= 768px): Only home_hero.mp4
-  // - Mobile (< 768px): homehero2.mp4 and homehero4.mp4 (2-video carousel with transitions)
+  // - Desktop (>= 768px): Only 1 video (home_hero.mp4 by default)
+  // - Mobile (< 768px): Only 1 video (homehero4.mp4 by default)
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
 
   useEffect(() => {
@@ -38,25 +38,23 @@ export default function UniqueHeroSection({ services = [] }) {
 
   const heroVideos = useMemo(() => {
     if (!isMobile) {
-      // Big screen (Desktop/Tablet >= 768px): Configurable via admin, default /media/site/home_hero.mp4
+      // Big screen (Desktop/Tablet >= 768px): Strictly 1 video (default /media/site/home_hero.mp4)
       const desktopSrc = (settings?.heroVideoUrl && String(settings.heroVideoUrl).trim()) || '/media/site/home_hero.mp4';
       return [
         { id: 'hero-desktop', src: desktopSrc, title: 'Spotless Homes. Zero Stress.' }
       ];
     } else {
-      // Mobile screen (< 768px): Configurable carousel via admin, default homehero2.mp4 & homehero4.mp4
+      // Mobile screen (< 768px): Strictly 1 video (default /media/site/homehero4.mp4)
       const customMob = Array.isArray(settings?.mobileHeroVideos)
-        ? settings.mobileHeroVideos.map(v => String(v || '').trim()).filter(Boolean)
+        ? settings.mobileHeroVideos
+            .map(v => String(v || '').trim())
+            .filter(v => Boolean(v) && !v.includes('homehero2'))
         : [];
-      const mobileList = customMob.length > 0
-        ? customMob.slice(0, 4)
-        : ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'];
+      const mobileSrc = customMob[0] || '/media/site/homehero4.mp4';
 
-      return mobileList.map((src, i) => ({
-        id: `hero-mob-${i}`,
-        src,
-        title: i === 0 ? 'Whole Home Deep Cleaning' : i === 1 ? 'Sofa, Floor & Surface Care' : `Housekeeping Highlight ${i + 1}`
-      }));
+      return [
+        { id: 'hero-mobile', src: mobileSrc, title: 'Whole Home Deep Cleaning' }
+      ];
     }
   }, [isMobile, settings]);
 
@@ -144,15 +142,15 @@ export default function UniqueHeroSection({ services = [] }) {
   }, [transitionMode]);
 
   // Compute dynamic height style & video fit class from Admin Settings
+  // Max height strictly capped at screen size (100dvh / 100vh)
   const mobileHeightVh = Math.max(40, Math.min(100, Number(settings?.mobileHeroHeightVh ?? 92)));
-  const mobileMinHeightPx = Math.max(360, Math.min(1100, Number(settings?.mobileHeroMinHeightPx ?? 680)));
   const desktopMode = settings?.desktopHeroHeightMode || 'fullscreen';
   const desktopHeightClass =
     desktopMode === 'tall'
-      ? 'md:h-screen md:min-h-0'
+      ? 'md:h-screen md:max-h-screen md:min-h-0'
       : desktopMode === 'compact'
-      ? 'md:h-[78vh] md:min-h-[540px]'
-      : 'md:h-[calc(100vh-68px)] md:min-h-0';
+      ? 'md:h-[78vh] md:max-h-screen md:min-h-0'
+      : 'md:h-[calc(100vh-68px)] md:max-h-[calc(100vh-68px)] md:min-h-0';
   const videoFitClass = settings?.heroVideoFitMode === 'cover' ? 'object-cover' : 'object-contain';
 
   // Dynamically resolve curated services directly from live MongoDB database props
@@ -270,8 +268,12 @@ export default function UniqueHeroSection({ services = [] }) {
       <div className="w-full p-0 m-0">
         
         <section
-          style={isMobile ? { height: `${mobileHeightVh}dvh`, minHeight: `${mobileMinHeightPx}px` } : undefined}
-          className={`relative w-full overflow-hidden bg-[#111714] h-[92dvh] min-h-[680px] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
+          style={
+            isMobile
+              ? { height: `${mobileHeightVh}dvh`, maxHeight: '100dvh' }
+              : { maxHeight: '100vh' }
+          }
+          className={`relative w-full overflow-hidden bg-[#111714] h-[92dvh] max-h-[100dvh] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
         >
           
           {/* Dynamic Video Stage: 100% VISIBLE WITH NEUTRAL GREY FRAMING & DIRECTIONAL SWIPE TRANSITION */}
