@@ -28,7 +28,8 @@ import {
   LuCreditCard,
   LuBanknote,
   LuCopy,
-  LuNavigation
+  LuNavigation,
+  LuPrinter
 } from 'react-icons/lu';
 import { FaWhatsapp } from 'react-icons/fa6';
 import confetti from 'canvas-confetti';
@@ -43,6 +44,7 @@ import AddressPickerWithMap from '../components/common/AddressPickerWithMap';
 import LiveTrackingRadar from '../components/common/LiveTrackingRadar';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../utils/date';
 import { getServiceIcon } from '../utils/iconHelper';
+import { printBookingReceipt } from '../utils/printReceipt';
 
 export default function CustomerDashboard() {
   const { user, updateProfile, changePassword, addAddress, updateAddress, deleteAddress, setDefaultAddress, isLoading: isAuthLoading } = useAuth();
@@ -1274,7 +1276,7 @@ export default function CustomerDashboard() {
                             return (
                               <div key={idx} className="flex items-center gap-2.5 p-2 rounded-xl bg-white/70 border border-[#E2D9C8]/80 shadow-2xs">
                                 <div className="w-10 h-10 rounded-xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-2xs border border-[#E2D9C8] p-1">
-                                  {getServiceIcon(it.realisticIconSnapshot || it.service?.realisticIcon || itIcon, 'w-7 h-7 object-contain drop-shadow-xs')}
+                                  {getServiceIcon({ ...it, icon: itIcon }, 'w-7 h-7 object-contain drop-shadow-xs')}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="font-semibold text-xs text-[#10231D] truncate leading-tight">
@@ -1364,6 +1366,17 @@ export default function CustomerDashboard() {
                             </span>
                           </button>
                         )}
+
+                        {/* Print Bill / Receipt (A4 PDF) */}
+                        <button
+                          type="button"
+                          onClick={() => printBookingReceipt(b, settings)}
+                          className="px-3.5 py-2 rounded-xl bg-white hover:bg-[#ECE5D8] text-[#10231D] border border-[#E2D9C8] font-bold text-xs shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all"
+                          title="Print or Save Official A4 Bill / Receipt as PDF"
+                        >
+                          <LuPrinter className="w-3.5 h-3.5 text-[#E9A23B]" />
+                          <span>Print Bill</span>
+                        </button>
 
                         {/* WhatsApp support */}
                         <a

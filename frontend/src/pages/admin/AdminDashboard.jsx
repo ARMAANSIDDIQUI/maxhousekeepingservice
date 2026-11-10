@@ -49,7 +49,8 @@ import {
   LuNavigation,
   LuExternalLink,
   LuCircleHelp,
-  LuFileText
+  LuFileText,
+  LuPrinter
 } from 'react-icons/lu';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../../utils/date';
 import {
@@ -67,11 +68,67 @@ import ServiceCarousel from '../../components/common/ServiceCarousel';
 import LiveTrackingRadar from '../../components/common/LiveTrackingRadar';
 import UserAvatar from '../../components/common/UserAvatar';
 import SEO from '../../components/common/SEO';
+import { printBookingReceipt } from '../../utils/printReceipt';
+
+const CANONICAL_ICON_MAP = {
+  cookingpot: 'stove',
+  kitchen: 'stove',
+  gas: 'stove',
+  utensils: 'stove',
+  bath: 'bathroom',
+  toilet: 'bathroom',
+  commode: 'bathroom',
+  bathtub: 'bathroom',
+  windows: 'window',
+  doorclosed: 'window',
+  house: 'fullhome',
+  home: 'fullhome',
+  deepclean: 'fullhome',
+  tank: 'watertank',
+  waves: 'watertank',
+  water: 'watertank',
+  polish: 'marble',
+  floor: 'marble',
+  curtains: 'curtain',
+  drapes: 'curtain',
+  chairs: 'chair',
+  diningchair: 'chair',
+  diningtable: 'dining',
+  table: 'dining',
+  carwash: 'car',
+  vehicle: 'car',
+  garden: 'balcony',
+  plant: 'balcony',
+  commercial: 'office',
+  building: 'office',
+  airconditioner: 'ac',
+  accleaning: 'ac',
+  shieldcheck: 'disinfection',
+  shield: 'disinfection',
+  package: 'movein',
+  vacancy: 'movein',
+  relocation: 'movein',
+  trash2: 'postconstruction',
+  trash: 'postconstruction',
+  construction: 'postconstruction',
+  sparkles: 'generalclean',
+  brush: 'staintreatment',
+  paintbrush: 'staintreatment',
+  wrench: 'plumbing',
+  plumber: 'plumbing',
+  hammer: 'carpentry',
+  carpenter: 'carpentry',
+  zap: 'electrical',
+  electrician: 'electrical',
+  pest: 'pest',
+  bug: 'pest',
+  pestcontrol: 'pest'
+};
 
 const ICON_SELECT_OPTIONS = AVAILABLE_ICONS.map((ic) => ({
   value: ic.key,
   label: ic.label,
-  icon: getServiceIcon(ic.key, 'w-5 h-5 object-contain')
+  icon: getServiceIcon(ic.key, 'w-6 h-6 object-contain')
 }));
 
 export default function AdminDashboard() {
@@ -164,6 +221,12 @@ export default function AdminDashboard() {
     workingHours: '8:00 AM – 8:00 PM (Monday – Sunday)',
     ratingClaim: 'Rated 4.9/5 by 10,000+ happy homes',
     heroVideoUrl: '/media/site/home_hero.mp4',
+    mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'],
+    mobileHeroHeightVh: 92,
+    mobileHeroMinHeightPx: 680,
+    desktopHeroHeightMode: 'fullscreen',
+    heroVideoFitMode: 'contain',
+    heroVideoTransition: 'swipe',
     acceptOnlinePayments: false,
     paymentGatewayProvider: 'razorpay',
     razorpayKeyId: '',
@@ -872,12 +935,12 @@ export default function AdminDashboard() {
               Service Icon:
             </label>
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-white border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner">
-                {getServiceIcon(form.icon, 'w-6 h-6 text-[#E9A23B]')}
+              <div className="w-11 h-11 rounded-xl bg-white border border-[#E2D9C8] flex items-center justify-center shrink-0 shadow-inner p-1">
+                {getServiceIcon(CANONICAL_ICON_MAP[String(form.icon || '').toLowerCase()] || form.icon, 'w-8 h-8 object-contain')}
               </div>
               <div className="flex-1 min-w-0">
                 <CustomSelect
-                  value={form.icon}
+                  value={CANONICAL_ICON_MAP[String(form.icon || '').toLowerCase()] || form.icon}
                   onChange={(val) => setter(prev => ({ ...prev, icon: val }))}
                   options={ICON_SELECT_OPTIONS}
                   placeholder="Select Service Icon..."
@@ -5228,6 +5291,15 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               type="button"
+                              onClick={() => printBookingReceipt(b, settingsForm)}
+                              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#ECE5D8] text-[#10231D] border border-[#E2D9C8] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title="Print or Save Official A4 Bill / Receipt as PDF"
+                            >
+                              <LuPrinter className="w-3.5 h-3.5 text-[#E9A23B]" />
+                              <span>Bill / PDF</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setViewBookingDetails(b)}
                               className="px-2.5 py-1.5 rounded-lg bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                               title="View Full Booking Details"
@@ -7429,71 +7501,270 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* 5. Home Hero Video Background Setting */}
-              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-4">
-                <div className="flex items-center justify-between">
+              {/* 5. Dynamic Home Hero Video & Responsive Sizing Control */}
+              <div className="p-5 rounded-2xl bg-[#F4EFE6] border border-[#E2D9C8] space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-xl bg-[#10231D] text-[#E9A23B] flex items-center justify-center shadow-xs shrink-0">
-                      <LuPlay className="w-5 h-5 text-[#E9A23B]" />
+                      <svg className="w-5 h-5 text-[#E9A23B] fill-[#E9A23B]" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
                     </div>
                     <div>
                       <h4 className="font-display font-bold text-sm text-[#10231D]">
-                        Home Page Hero Video Background
+                        Dynamic Home Hero Video &amp; Screen-Size Controls
                       </h4>
                       <p className="text-[11px] text-[#6B8077]">
-                        Change the looping cinematic video playing behind the Home Page hero section. Default is the official cleaning video.
+                        Manage Desktop (&ge;768px) and Mobile (&lt;768px) hero videos, container height, unclipped fit mode &amp; transition effects.
                       </p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    Active Video
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 self-start sm:self-auto">
+                    Live Responsive Stage
                   </span>
                 </div>
 
-                <div className="p-4 bg-white/80 rounded-xl border border-[#E2D9C8] space-y-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
-                      Hero Video URL or Local Path:
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="/media/site/home_hero.mp4"
-                        value={settingsForm.heroVideoUrl || ''}
-                        onChange={(e) => setSettingsForm(prev => ({ ...prev, heroVideoUrl: e.target.value }))}
-                        className="flex-1 p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSettingsForm(prev => ({ ...prev, heroVideoUrl: '/media/site/home_hero.mp4' }))}
-                        className="px-3 py-2 rounded-xl border border-[#D2C8B8] hover:bg-[#ECE5D8] text-[11px] font-bold text-[#10231D] transition-colors"
-                      >
-                        Reset Default
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-[#6B8077] mt-1">
-                      Default: <code className="font-mono text-[#10231D]">/media/site/home_hero.mp4</code> (Initial video added in root). You can also paste any MP4 video URL.
-                    </p>
+                {/* A. Desktop / Big Screen Video (>= 768px) */}
+                <div className="p-4 bg-white/90 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#10231D]">
+                      1. Big Screen / Desktop Hero Video (&ge; 768px)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsForm(prev => ({ ...prev, heroVideoUrl: '/media/site/home_hero.mp4' }))}
+                      className="px-2.5 py-1 rounded-lg border border-[#D2C8B8] hover:bg-[#ECE5D8] text-[10px] font-bold text-[#10231D] transition-colors cursor-pointer"
+                    >
+                      Reset Default
+                    </button>
                   </div>
-
-                  {/* Video Live Preview */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      placeholder="/media/site/home_hero.mp4"
+                      value={settingsForm.heroVideoUrl || ''}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, heroVideoUrl: e.target.value }))}
+                      className="flex-1 p-2.5 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                    />
+                  </div>
                   {settingsForm.heroVideoUrl && (
-                    <div className="pt-2">
-                      <span className="text-[11px] font-bold text-[#3D524A] block mb-1.5">
-                        Live Hero Video Preview:
-                      </span>
-                      <div className="relative h-36 max-w-sm rounded-xl overflow-hidden border border-[#D2C8B8] bg-black">
-                        <video
-                          src={settingsForm.heroVideoUrl}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                    <div className="relative h-32 max-w-xs rounded-xl overflow-hidden border border-[#D2C8B8] bg-[#121614] flex items-center justify-center">
+                      <video
+                        src={settingsForm.heroVideoUrl}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className={`w-full h-full ${settingsForm.heroVideoFitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+                      />
                     </div>
                   )}
+                </div>
+
+                {/* B. Mobile Carousel Videos (< 768px) */}
+                <div className="p-4 bg-white/90 rounded-xl border border-[#E2D9C8] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-bold text-[#10231D] block">
+                        2. Mobile Screen Video Carousel (&lt; 768px · Max 4 Videos)
+                      </span>
+                      <span className="text-[10px] text-[#6B8077]">
+                        Plays in a touch-swipe carousel on phones. Default: homehero2.mp4 &amp; homehero4.mp4.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSettingsForm(prev => ({
+                          ...prev,
+                          mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
+                        }))}
+                        className="px-2.5 py-1 rounded-lg border border-[#D2C8B8] hover:bg-[#ECE5D8] text-[10px] font-bold text-[#10231D] transition-colors cursor-pointer"
+                      >
+                        Reset Mobile Defaults
+                      </button>
+                      {(settingsForm.mobileHeroVideos?.length || 0) < 4 && (
+                        <button
+                          type="button"
+                          onClick={() => setSettingsForm(prev => ({
+                            ...prev,
+                            mobileHeroVideos: [...(prev.mobileHeroVideos || []), '/media/site/home_hero.mp4']
+                          }))}
+                          className="px-2.5 py-1 rounded-lg bg-[#10231D] hover:bg-[#3D524A] text-[#E9A23B] text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <LuPlus className="w-3 h-3" /> Add Video
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {(settingsForm.mobileHeroVideos && settingsForm.mobileHeroVideos.length > 0
+                      ? settingsForm.mobileHeroVideos
+                      : ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
+                    ).map((vidUrl, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-[#F4EFE6]/70 border border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center gap-2.5">
+                        <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-[#10231D] text-[#E9A23B] self-start sm:self-center shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={vidUrl}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSettingsForm(prev => {
+                              const arr = [...(prev.mobileHeroVideos || ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'])];
+                              arr[idx] = val;
+                              return { ...prev, mobileHeroVideos: arr };
+                            });
+                          }}
+                          placeholder="/media/site/homehero2.mp4"
+                          className="flex-1 p-2 rounded-lg border border-[#E2D9C8] bg-white text-xs font-mono font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
+                        />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="w-12 h-9 rounded-md overflow-hidden border border-[#D2C8B8] bg-[#121614] shrink-0">
+                            <video src={vidUrl} muted playsInline className="w-full h-full object-contain" />
+                          </div>
+                          {(settingsForm.mobileHeroVideos?.length || 2) > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSettingsForm(prev => {
+                                  const arr = [...(prev.mobileHeroVideos || [])];
+                                  arr.splice(idx, 1);
+                                  return { ...prev, mobileHeroVideos: arr };
+                                });
+                              }}
+                              className="p-1.5 rounded-lg border border-[#C2512D]/40 text-[#C2512D] hover:bg-[#C2512D] hover:text-white transition-colors cursor-pointer"
+                              title="Remove mobile video"
+                            >
+                              <LuTrash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Quick-pick available site video assets */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] font-bold text-[#6B8077]">Site Media Assets:</span>
+                    {['/media/site/home_hero.mp4', '/media/site/homehero2.mp4', '/media/site/homehero4.mp4'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(preset);
+                          toast.success(`Copied ${preset} to clipboard`);
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-[#F4EFE6] border border-[#E2D9C8] text-[10px] font-mono text-[#10231D] hover:border-[#E9A23B] transition-colors cursor-pointer"
+                        title="Click to copy path"
+                      >
+                        {preset.split('/').pop()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* C. Sizing, Framing & Transition Controls */}
+                <div className="p-4 bg-white/90 rounded-xl border border-[#E2D9C8] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Mobile Height % (dvh) */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                      Mobile Height ({settingsForm.mobileHeroHeightVh ?? 92}dvh):
+                    </label>
+                    <input
+                      type="range"
+                      min="50"
+                      max="100"
+                      step="1"
+                      value={settingsForm.mobileHeroHeightVh ?? 92}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, mobileHeroHeightVh: Number(e.target.value) }))}
+                      className="w-full accent-[#E9A23B] cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] font-mono text-[#6B8077]">
+                      <span>50dvh</span>
+                      <span>92dvh (Default)</span>
+                      <span>100dvh</span>
+                    </div>
+                  </div>
+
+                  {/* Mobile Minimum Height (px) */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                      Mobile Min Height (px):
+                    </label>
+                    <input
+                      type="number"
+                      min="360"
+                      max="1100"
+                      step="10"
+                      value={settingsForm.mobileHeroMinHeightPx ?? 680}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, mobileHeroMinHeightPx: Number(e.target.value) }))}
+                      className="w-full p-2 rounded-xl border border-[#E2D9C8] bg-[#F4EFE6] text-xs font-mono font-bold text-[#10231D]"
+                    />
+                    <span className="text-[9px] text-[#6B8077]">Default: 680px</span>
+                  </div>
+
+                  {/* Desktop Height Mode & Video Fit */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                      Video Framing &amp; Borders:
+                    </label>
+                    <CustomSelect
+                      value={settingsForm.heroVideoFitMode || 'contain'}
+                      onChange={(val) => setSettingsForm(prev => ({ ...prev, heroVideoFitMode: val }))}
+                      options={[
+                        { value: 'contain', label: 'Full Video (Grey Borders)' },
+                        { value: 'cover', label: 'Fill Frame (Crop Edges)' }
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Carousel Transition Effect */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[#3D524A] block mb-1">
+                      Video Switch Transition:
+                    </label>
+                    <CustomSelect
+                      value={settingsForm.heroVideoTransition || 'swipe'}
+                      onChange={(val) => setSettingsForm(prev => ({ ...prev, heroVideoTransition: val }))}
+                      options={[
+                        { value: 'swipe', label: 'Directional Swipe' },
+                        { value: 'zoom', label: 'Circular Scale Zoom' },
+                        { value: 'fade', label: 'Smooth Crossfade' }
+                      ]}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Desktop Height Preset */}
+                  <div className="md:col-span-2 lg:col-span-4 pt-2 border-t border-[#E2D9C8] flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-[#3D524A]">Desktop Screen Height Mode:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[
+                          { val: 'fullscreen', label: 'Fit Screen Below Nav (Default)' },
+                          { val: 'tall', label: '100vh Fullscreen' },
+                          { val: 'compact', label: 'Compact (78vh)' }
+                        ].map((mode) => (
+                          <button
+                            key={mode.val}
+                            type="button"
+                            onClick={() => setSettingsForm(prev => ({ ...prev, desktopHeroHeightMode: mode.val }))}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                              (settingsForm.desktopHeroHeightMode || 'fullscreen') === mode.val
+                                ? 'bg-[#10231D] text-[#E9A23B] border-[#10231D]'
+                                : 'bg-[#F4EFE6] text-[#3D524A] border-[#E2D9C8] hover:border-[#E9A23B]'
+                            }`}
+                          >
+                            {mode.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -9397,8 +9668,8 @@ export default function AdminDashboard() {
                         <tr key={idx}>
                           <td className="py-2.5 px-2 font-bold text-[#10231D]">
                             <div className="flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-md bg-[#10231D] text-[#E9A23B] flex items-center justify-center shrink-0 border border-[#E9A23B]/30">
-                                {getServiceIcon(it.iconSnapshot || it.service?.icon || it.service?.iconKey || it.titleSnapshot, 'w-3.5 h-3.5')}
+                              <span className="w-8 h-8 rounded-lg bg-white text-[#10231D] flex items-center justify-center shrink-0 border border-[#E2D9C8] p-0.5 shadow-2xs">
+                                {getServiceIcon(it, 'w-6 h-6 object-contain drop-shadow-xs')}
                               </span>
                               <span>{it.titleSnapshot || 'Cleaning Service'}</span>
                             </div>
@@ -9525,8 +9796,16 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Close Button */}
-              <div className="flex justify-end pt-3 border-t border-[#E2D9C8]">
+              {/* Action Footer: Print A4 Receipt + Close Button */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2D9C8]">
+                <button
+                  type="button"
+                  onClick={() => printBookingReceipt(viewBookingDetails, settingsForm)}
+                  className="px-4 py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <LuPrinter className="w-4 h-4" />
+                  <span>Print Receipt / A4 PDF</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setViewBookingDetails(null)}

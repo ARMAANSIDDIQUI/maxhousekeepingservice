@@ -217,7 +217,14 @@ export function BookingProvider({ children }) {
     platformChargeAmount: 49,
     platformChargeLabel: 'Platform Charges',
     liveTrackingEnabled: true,
-    closedBookingDates: []
+    closedBookingDates: [],
+    heroVideoUrl: '/media/site/home_hero.mp4',
+    mobileHeroVideos: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'],
+    mobileHeroHeightVh: 92,
+    mobileHeroMinHeightPx: 680,
+    desktopHeroHeightMode: 'fullscreen',
+    heroVideoFitMode: 'contain',
+    heroVideoTransition: 'swipe'
   });
 
   const refreshSettings = useCallback(async () => {

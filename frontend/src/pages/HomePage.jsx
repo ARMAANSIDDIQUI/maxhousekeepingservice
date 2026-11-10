@@ -8,8 +8,7 @@ import {
   LuArrowRight,
   LuCheck,
   LuCalendar,
-  LuAward,
-  LuPlay
+  LuAward
 } from 'react-icons/lu';
 import { apiRequest } from '../api';
 import { useBooking } from '../context/BookingContext';
@@ -40,13 +39,21 @@ export default function HomePage() {
         ]);
 
         if (catsRes.status === 'fulfilled' && catsRes.value?.categories && catsRes.value.categories.length > 0) {
-          setCategories(catsRes.value.categories);
+          const cleanCats = catsRes.value.categories.filter(c => 
+            !c.slug?.toLowerCase().includes('pest') && 
+            !c.name?.toLowerCase().includes('pest')
+          );
+          setCategories(cleanCats);
         } else {
           setCategories([]);
         }
 
         if (allSrvsRes.status === 'fulfilled' && allSrvsRes.value?.services && allSrvsRes.value.services.length > 0) {
-          const srvList = allSrvsRes.value.services;
+          const srvList = allSrvsRes.value.services.filter(s =>
+            !s.slug?.toLowerCase().includes('pest') &&
+            !s.title?.toLowerCase().includes('pest') &&
+            !s.categorySlug?.toLowerCase().includes('pest')
+          );
           setAllServices(srvList);
           const popular = srvList.filter(s => s.isPopular);
           setFeaturedServices(popular.length > 0 ? popular : srvList.slice(0, 4));
@@ -166,7 +173,9 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {categories.map((cat) => (
+              {categories
+                .filter(cat => !cat.slug?.toLowerCase().includes('pest') && !cat.name?.toLowerCase().includes('pest'))
+                .map((cat) => (
                 <Link
                   key={cat.slug}
                   to={`/services?category=${cat.slug}`}
@@ -191,7 +200,7 @@ export default function HomePage() {
                     <div>
                       <div className="flex items-center gap-3 mb-2.5">
                         <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform border border-[#E2D9C8] p-1.5">
-                          {getServiceIcon(cat.iconKey || cat.slug || cat.name, 'w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs')}
+                          {getServiceIcon(cat, 'w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow-xs')}
                         </div>
                         <h3 className="font-display font-bold text-xl text-[#10231D] group-hover:text-[#E9A23B] transition-colors leading-tight">
                           {cat.name}
@@ -392,7 +401,9 @@ export default function HomePage() {
                               className="flex items-center justify-between p-3 bg-[#10231D] text-[#F4EFE6] text-xs font-bold"
                             >
                               <span className="inline-flex items-center gap-1.5">
-                                <LuPlay className="w-3.5 h-3.5 text-[#E9A23B] fill-[#E9A23B]" />
+                                <svg className="w-3.5 h-3.5 text-[#E9A23B] fill-[#E9A23B]" viewBox="0 0 24 24" fill="currentColor">
+                                  <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
                                 Watch Video Testimonial
                               </span>
                               <LuArrowRight className="w-3.5 h-3.5 text-[#E9A23B]" />

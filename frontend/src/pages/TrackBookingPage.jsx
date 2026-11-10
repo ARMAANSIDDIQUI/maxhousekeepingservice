@@ -13,7 +13,8 @@ import {
   LuBanknote,
   LuCamera,
   LuSparkles,
-  LuCopy
+  LuCopy,
+  LuPrinter
 } from 'react-icons/lu';
 import { apiRequest } from '../api/client';
 import { useToast } from '../context/ToastContext';
@@ -25,6 +26,7 @@ import { calculateDistanceKm, getEtaInfo } from '../utils/geoUtils';
 
 import { formatDateDMY } from '../utils/date';
 import { getServiceIcon } from '../utils/iconHelper';
+import { printBookingReceipt } from '../utils/printReceipt';
 
 export default function TrackBookingPage() {
   const { settings } = useBooking();
@@ -452,7 +454,7 @@ export default function TrackBookingPage() {
                     <div key={i} className="flex items-center justify-between py-3 gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-12 h-12 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5">
-                          {getServiceIcon(item.realisticIconSnapshot || item.service?.realisticIcon || iconKey, 'w-8 h-8 object-contain drop-shadow-xs')}
+                          {getServiceIcon({ ...item, icon: iconKey }, 'w-8 h-8 object-contain drop-shadow-xs')}
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-sm text-[#10231D] truncate leading-tight">
@@ -536,14 +538,24 @@ export default function TrackBookingPage() {
                 </div>
               )}
 
-              {/* Customer Savings Pill */}
-              {booking.totals?.customerSaved > 0 && (
-                <div className="mt-2 text-right">
-                  <span className="inline-block px-3 py-1 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-black">
+              {/* Customer Savings Pill & Print Official A4 Bill / Receipt */}
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => printBookingReceipt(booking, settings)}
+                  className="px-4 py-2.5 rounded-xl bg-[#10231D] hover:bg-[#3D524A] text-[#F4EFE6] font-bold text-xs shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                  title="Print or Download Official A4 Receipt as PDF"
+                >
+                  <LuPrinter className="w-4 h-4 text-[#E9A23B]" />
+                  <span>Print Bill / A4 PDF Receipt</span>
+                </button>
+
+                {booking.totals?.customerSaved > 0 && (
+                  <span className="inline-block px-3 py-1.5 rounded-full bg-[#F9ECE8] text-[#C2512D] text-xs font-black text-center">
                     You saved ₹{booking.totals.customerSaved.toLocaleString('en-IN')} on this order!
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* INSPECTION PHOTOS GALLERY (BEFORE & AFTER PROOF) */}

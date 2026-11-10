@@ -146,7 +146,11 @@ export async function getServiceBySlug(req, res, next) {
  */
 export async function getCategories(req, res, next) {
   try {
-    const categories = await Category.find({ isActive: true }).sort({ sortOrder: 1 });
+    const categories = await Category.find({ 
+      isActive: true,
+      slug: { $not: /pest/i },
+      name: { $not: /pest/i }
+    }).sort({ sortOrder: 1 });
 
     // Aggregate active service count per category across single and multi-category fields
     const counts = await Service.aggregate([

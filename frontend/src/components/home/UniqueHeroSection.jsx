@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LuSparkles,
   LuShieldCheck,
@@ -21,7 +22,138 @@ export default function UniqueHeroSection({ services = [] }) {
   const [addedAnim, setAddedAnim] = useState(false);
 
   const cityName = selectedCity?.name || 'Moradabad';
-  const heroVideoSrc = settings?.heroVideoUrl || '/media/site/home_hero.mp4';
+
+  // Responsive screen-size tracking:
+  // - Desktop (>= 768px): Only home_hero.mp4
+  // - Mobile (< 768px): homehero2.mp4 and homehero4.mp4 (2-video carousel with transitions)
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const heroVideos = useMemo(() => {
+    if (!isMobile) {
+      // Big screen (Desktop/Tablet >= 768px): Configurable via admin, default /media/site/home_hero.mp4
+      const desktopSrc = (settings?.heroVideoUrl && String(settings.heroVideoUrl).trim()) || '/media/site/home_hero.mp4';
+      return [
+        { id: 'hero-desktop', src: desktopSrc, title: 'Spotless Homes. Zero Stress.' }
+      ];
+    } else {
+      // Mobile screen (< 768px): Configurable carousel via admin, default homehero2.mp4 & homehero4.mp4
+      const customMob = Array.isArray(settings?.mobileHeroVideos)
+        ? settings.mobileHeroVideos.map(v => String(v || '').trim()).filter(Boolean)
+        : [];
+      const mobileList = customMob.length > 0
+        ? customMob.slice(0, 4)
+        : ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4'];
+
+      return mobileList.map((src, i) => ({
+        id: `hero-mob-${i}`,
+        src,
+        title: i === 0 ? 'Whole Home Deep Cleaning' : i === 1 ? 'Sofa, Floor & Surface Care' : `Housekeeping Highlight ${i + 1}`
+      }));
+    }
+  }, [isMobile, settings]);
+
+  const [[activeVideoIndex, direction], setVideoPage] = useState([0, 0]);
+  const activeVideo = heroVideos[activeVideoIndex] || heroVideos[0];
+  const videoRef = useRef(null);
+
+  // Reset active video index when switching between mobile and desktop
+  useEffect(() => {
+    setVideoPage([0, 0]);
+  }, [isMobile, heroVideos.length]);
+
+  // Auto-play video immediately when active index or video source changes
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    }
+  }, [activeVideoIndex, activeVideo?.src]);
+
+  const handleNextVideo = () => {
+    setVideoPage(([prev]) => [(prev + 1) % heroVideos.length, 1]);
+  };
+
+  const handlePrevVideo = () => {
+    setVideoPage(([prev]) => [(prev - 1 + heroVideos.length) % heroVideos.length, -1]);
+  };
+
+  const handleSelectVideo = (idx) => {
+    setVideoPage(([prev]) => [idx, idx > prev ? 1 : -1]);
+  };
+
+  // Dynamic Transition Variants controlled by Admin Settings
+  const transitionMode = settings?.heroVideoTransition || 'swipe';
+  const videoSwipeVariants = useMemo(() => {
+    if (transitionMode === 'zoom') {
+      return {
+        enter: { opacity: 0, scale: 0.84, borderRadius: '48px' },
+        center: {
+          opacity: 1,
+          scale: 1,
+          borderRadius: '0px',
+          transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] }
+        },
+        exit: { opacity: 0, scale: 1.08, transition: { duration: 0.4 } }
+      };
+    }
+    if (transitionMode === 'fade') {
+      return {
+        enter: { opacity: 0 },
+        center: { opacity: 1, transition: { duration: 0.6 } },
+        exit: { opacity: 0, transition: { duration: 0.4 } }
+      };
+    }
+    // Default: Directional Swipe
+    return {
+      enter: (dir) => ({
+        x: dir > 0 ? '100%' : dir < 0 ? '-100%' : 0,
+        opacity: 0,
+        scale: 0.94
+      }),
+      center: {
+        x: 0,
+        opacity: 1,
+        scale: 1,
+        transition: {
+          x: { type: 'spring', stiffness: 260, damping: 28 },
+          opacity: { duration: 0.4 },
+          scale: { duration: 0.4 }
+        }
+      },
+      exit: (dir) => ({
+        x: dir < 0 ? '100%' : '-100%',
+        opacity: 0,
+        scale: 0.94,
+        transition: {
+          x: { type: 'spring', stiffness: 260, damping: 28 },
+          opacity: { duration: 0.3 }
+        }
+      })
+    };
+  }, [transitionMode]);
+
+  // Compute dynamic height style & video fit class from Admin Settings
+  const mobileHeightVh = Math.max(40, Math.min(100, Number(settings?.mobileHeroHeightVh ?? 92)));
+  const mobileMinHeightPx = Math.max(360, Math.min(1100, Number(settings?.mobileHeroMinHeightPx ?? 680)));
+  const desktopMode = settings?.desktopHeroHeightMode || 'fullscreen';
+  const desktopHeightClass =
+    desktopMode === 'tall'
+      ? 'md:h-screen md:min-h-0'
+      : desktopMode === 'compact'
+      ? 'md:h-[78vh] md:min-h-[540px]'
+      : 'md:h-[calc(100vh-68px)] md:min-h-0';
+  const videoFitClass = settings?.heroVideoFitMode === 'cover' ? 'object-cover' : 'object-contain';
 
   // Dynamically resolve curated services directly from live MongoDB database props
   const dynamicHeroServices = useMemo(() => {
@@ -131,29 +263,110 @@ export default function UniqueHeroSection({ services = [] }) {
       
       {/* ========================================================
           1. CINEMATIC HERO SECTION
-          - Desktop/Tablet: Dynamically equal to screen (100vw x 100vh below nav)
-          - Mobile: Reduced height with gentle white-grey framing on sides
-          - Video: Bright and unobstructed, content shifted down
+          - Dynamic Fullscreen Matching: 100vw x 100vh / 100dvh on mobile & desktop
+          - Edge-to-edge full width and full viewport height
+          - Complete unclipped video visibility with neutral grey framing
       ======================================================== */}
-      <div className="w-full px-3 sm:px-6 pt-3 sm:pt-4 md:px-0 md:pt-0">
+      <div className="w-full p-0 m-0">
         
-        <section className="relative w-full overflow-hidden rounded-3xl md:rounded-none bg-[#07130F] h-[55vh] min-h-[350px] max-h-[460px] md:h-[calc(100vh-68px)] md:min-h-0 md:max-h-none flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-lg md:shadow-none">
+        <section
+          style={isMobile ? { height: `${mobileHeightVh}dvh`, minHeight: `${mobileMinHeightPx}px` } : undefined}
+          className={`relative w-full overflow-hidden bg-[#111714] h-[92dvh] min-h-[680px] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
+        >
           
-          {/* Looping Cinematic Background Video - Clearly Visible */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover object-center filter brightness-[0.98] contrast-[1.03]"
-              poster="/media/site/hero-clean-home.jpg"
-            >
-              <source src={heroVideoSrc} type="video/mp4" />
-            </video>
+          {/* Dynamic Video Stage: 100% VISIBLE WITH NEUTRAL GREY FRAMING & DIRECTIONAL SWIPE TRANSITION */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden bg-[#121614] flex items-center justify-center">
+            
+            <AnimatePresence initial={false} custom={direction} mode="popLayout">
+              <motion.div
+                key={activeVideo.src + '-' + activeVideoIndex}
+                custom={direction}
+                variants={videoSwipeVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                drag={heroVideos.length > 1 ? "x" : false}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(e, { offset, velocity }) => {
+                  const swipe = Math.abs(offset.x) * velocity.x;
+                  if (swipe < -80 || offset.x < -60) {
+                    handleNextVideo();
+                  } else if (swipe > 80 || offset.x > 60) {
+                    handlePrevVideo();
+                  }
+                }}
+                className="absolute inset-0 w-full h-full flex items-center justify-center touch-pan-y"
+              >
+                {/* 1. Ambient Blurred Fill (Gentle colored glow matching the video behind the frame) */}
+                <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-25 blur-2xl scale-110">
+                  <video
+                    src={activeVideo.src}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover object-center filter brightness-90"
+                  />
+                </div>
 
-            {/* Ultra-Gentle Bottom Scrim (Leaves 75%+ of Upper Video Completely Clear) */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                {/* 2. Sleek Neutral Grey / Slate Background Frame (Adds grey borders on top/bottom or sides dynamically) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#181E1B]/95 via-[#101513]/80 to-[#0A0E0C] pointer-events-none" />
+
+                {/* 3. The Video Itself: 100% UNCLIPPED & FULLY VISIBLE REGARDLESS OF SCREEN/ASPECT RATIO */}
+                <video
+                  key={activeVideo.src}
+                  ref={videoRef}
+                  src={activeVideo.src}
+                  autoPlay
+                  loop={heroVideos.length === 1}
+                  muted
+                  playsInline
+                  onEnded={heroVideos.length > 1 ? handleNextVideo : undefined}
+                  className={`w-full h-full max-w-full max-h-full ${videoFitClass} object-center relative z-10 filter brightness-[1.02] contrast-[1.02]`}
+                  poster="/media/site/hero-clean-home.jpg"
+                />
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Ultra-Gentle Bottom Scrim (Leaves 80%+ of video completely clear while keeping buttons readable) */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none z-20" />
+
+            {/* Multi-Video Carousel Controls (When 2 or 3 videos are available) */}
+            {heroVideos.length > 1 && (
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-lg">
+                <button
+                  type="button"
+                  onClick={handlePrevVideo}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer text-xs font-bold"
+                  aria-label="Previous video"
+                >
+                  ‹
+                </button>
+                <div className="flex items-center gap-1.5 px-1">
+                  {heroVideos.map((vid, idx) => (
+                    <button
+                      key={vid.id}
+                      type="button"
+                      onClick={() => handleSelectVideo(idx)}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        idx === activeVideoIndex ? 'w-5 bg-[#E9A23B]' : 'w-1.5 bg-white/40 hover:bg-white/70'
+                      }`}
+                      aria-label={`Switch to video ${idx + 1}`}
+                      title={vid.title}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextVideo}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer text-xs font-bold"
+                  aria-label="Next video"
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Ultra-Compact Bottom-Aligned Content (Maximum Video Visibility) */}

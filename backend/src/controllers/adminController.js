@@ -825,6 +825,35 @@ export async function updateSettings(req, res, next) {
     if (updatePayload.platformChargeLabel !== undefined) {
       updatePayload.platformChargeLabel = String(updatePayload.platformChargeLabel || 'Platform Charges').trim() || 'Platform Charges';
     }
+    if (updatePayload.mobileHeroVideos !== undefined) {
+      if (Array.isArray(updatePayload.mobileHeroVideos)) {
+        updatePayload.mobileHeroVideos = updatePayload.mobileHeroVideos
+          .map(v => String(v || '').trim())
+          .filter(Boolean)
+          .slice(0, 4);
+      } else {
+        delete updatePayload.mobileHeroVideos;
+      }
+    }
+    if (updatePayload.mobileHeroHeightVh !== undefined) {
+      updatePayload.mobileHeroHeightVh = Math.max(40, Math.min(100, Number(updatePayload.mobileHeroHeightVh) || 92));
+    }
+    if (updatePayload.mobileHeroMinHeightPx !== undefined) {
+      updatePayload.mobileHeroMinHeightPx = Math.max(360, Math.min(1100, Number(updatePayload.mobileHeroMinHeightPx) || 680));
+    }
+    if (updatePayload.desktopHeroHeightMode !== undefined) {
+      updatePayload.desktopHeroHeightMode = ['fullscreen', 'tall', 'compact'].includes(updatePayload.desktopHeroHeightMode)
+        ? updatePayload.desktopHeroHeightMode
+        : 'fullscreen';
+    }
+    if (updatePayload.heroVideoFitMode !== undefined) {
+      updatePayload.heroVideoFitMode = updatePayload.heroVideoFitMode === 'cover' ? 'cover' : 'contain';
+    }
+    if (updatePayload.heroVideoTransition !== undefined) {
+      updatePayload.heroVideoTransition = ['swipe', 'zoom', 'fade'].includes(updatePayload.heroVideoTransition)
+        ? updatePayload.heroVideoTransition
+        : 'swipe';
+    }
     if (updatePayload.closedBookingDates !== undefined) {
       if (Array.isArray(updatePayload.closedBookingDates)) {
         updatePayload.closedBookingDates = updatePayload.closedBookingDates

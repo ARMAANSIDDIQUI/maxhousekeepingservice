@@ -92,12 +92,21 @@ export default function ServicesPage() {
         ]);
 
         if (catsRes.status === 'fulfilled' && catsRes.value?.categories && catsRes.value.categories.length > 0) {
-          setCategories(catsRes.value.categories);
+          const cleanCats = catsRes.value.categories.filter(c => 
+            !c.slug?.toLowerCase().includes('pest') && 
+            !c.name?.toLowerCase().includes('pest')
+          );
+          setCategories(cleanCats);
         } else {
           setCategories([]);
         }
         if (srvsRes.status === 'fulfilled' && srvsRes.value?.services && srvsRes.value.services.length > 0) {
-          setServices(srvsRes.value.services);
+          const cleanSrvs = srvsRes.value.services.filter(s =>
+            !s.slug?.toLowerCase().includes('pest') &&
+            !s.title?.toLowerCase().includes('pest') &&
+            !s.categorySlug?.toLowerCase().includes('pest')
+          );
+          setServices(cleanSrvs);
         } else {
           setServices([]);
         }
@@ -463,7 +472,9 @@ export default function ServicesPage() {
             >
               All Categories
             </button>
-            {categories.map((c) => (
+            {categories
+              .filter(c => !c.slug?.toLowerCase().includes('pest') && !c.name?.toLowerCase().includes('pest'))
+              .map((c) => (
               <button
                 key={c.slug}
                 type="button"
@@ -479,7 +490,7 @@ export default function ServicesPage() {
                 }`}
               >
                 <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white flex items-center justify-center shrink-0 p-1 shadow-xs border border-[#E2D9C8]/80">
-                  {getServiceIcon(c.iconKey || c.slug, 'w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow-xs')}
+                  {getServiceIcon(c, 'w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow-xs')}
                 </span>
                 <span>{c.name}</span>
               </button>

@@ -1352,7 +1352,7 @@ export default function BookingPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5 group-hover:scale-105 transition-transform">
-                              {getServiceIcon(svc.realisticIcon || svc.icon || svc.iconKey || svc.title, 'w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-xs')}
+                              {getServiceIcon(svc, 'w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-xs')}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
@@ -2018,7 +2018,7 @@ export default function BookingPage() {
                         <div key={i} className="py-2.5 flex items-start justify-between gap-2.5 text-xs">
                           <div className="flex items-start gap-2.5 min-w-0">
                             <div className="w-9 h-9 rounded-xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-xs mt-0.5 border border-[#E2D9C8] p-1">
-                              {getServiceIcon(it.realisticIcon || itService?.realisticIcon || itIcon, 'w-6 h-6 object-contain drop-shadow-xs')}
+                              {getServiceIcon({ ...(itService || {}), ...it, icon: itIcon }, 'w-6 h-6 object-contain drop-shadow-xs')}
                             </div>
                             <div className="min-w-0">
                               <p className="font-bold text-[#10231D] leading-tight truncate">{it.title}</p>
@@ -2306,7 +2306,7 @@ export default function BookingPage() {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-2xl bg-white text-[#10231D] flex items-center justify-center shrink-0 shadow-sm border border-[#E2D9C8] p-1.5 group-hover:scale-105 transition-transform">
-                    {getServiceIcon(s.realisticIcon || s.icon || s.iconKey || s.title, 'w-9 h-9 object-contain drop-shadow-xs')}
+                    {getServiceIcon(s, 'w-9 h-9 object-contain drop-shadow-xs')}
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-[#10231D] truncate">{s.title}</p>

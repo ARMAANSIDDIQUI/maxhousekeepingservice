@@ -15,8 +15,7 @@ import {
   LuStar,
   LuCalendar,
   LuMail,
-  LuVideo,
-  LuPlay
+  LuVideo
 } from 'react-icons/lu';
 import { FaInstagram, FaWhatsapp } from 'react-icons/fa6';
 import { useBooking } from '../context/BookingContext';
@@ -583,7 +582,9 @@ export default function AboutPage() {
                               className="flex items-center justify-between p-4 bg-[#10231D] text-[#F4EFE6] hover:bg-[#1A332B] transition-colors"
                             >
                               <span className="inline-flex items-center gap-2 text-xs font-bold">
-                                <LuPlay className="w-4 h-4 text-[#E9A23B] fill-[#E9A23B]" />
+                                <svg className="w-4 h-4 text-[#E9A23B] fill-[#E9A23B]" viewBox="0 0 24 24" fill="currentColor">
+                                  <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
                                 Watch Customer Video Review
                               </span>
                               <LuArrowRight className="w-4 h-4 text-[#E9A23B]" />

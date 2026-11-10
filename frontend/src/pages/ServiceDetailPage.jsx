@@ -9,8 +9,7 @@ import {
   LuArrowLeft,
   LuSparkles,
   LuMoveHorizontal,
-  LuVideo,
-  LuPlay
+  LuVideo
 } from 'react-icons/lu';
 import { FaInstagram, FaYoutube } from 'react-icons/fa6';
 import { apiRequest } from '../api';

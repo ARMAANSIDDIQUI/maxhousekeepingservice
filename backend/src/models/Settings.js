@@ -39,8 +39,17 @@ const settingsSchema = new mongoose.Schema({
   agencyCreditUrl: { type: String, default: '' },
   ratingClaim: { type: String, default: 'Rated 4.9/5 by 10,000+ happy homes' },
 
-  // Home Hero Video Background
+  // Home Hero Video Background (Dynamic Desktop, Mobile & Sizing Controls)
   heroVideoUrl: { type: String, default: '/media/site/home_hero.mp4', trim: true },
+  mobileHeroVideos: {
+    type: [String],
+    default: ['/media/site/homehero2.mp4', '/media/site/homehero4.mp4']
+  },
+  mobileHeroHeightVh: { type: Number, default: 92 },
+  mobileHeroMinHeightPx: { type: Number, default: 680 },
+  desktopHeroHeightMode: { type: String, enum: ['fullscreen', 'tall', 'compact'], default: 'fullscreen' },
+  heroVideoFitMode: { type: String, enum: ['contain', 'cover'], default: 'contain' },
+  heroVideoTransition: { type: String, enum: ['swipe', 'zoom', 'fade'], default: 'swipe' },
 
   // Supervisor Live GPS Tracking (Global Control)
   liveTrackingEnabled: { type: Boolean, default: true },
