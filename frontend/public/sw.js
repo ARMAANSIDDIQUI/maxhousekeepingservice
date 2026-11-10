@@ -1,34 +1,31 @@
 /**
- * Max Housekeeping Service - Progressive Web App Service Worker
- * Western UP, India
+ * Max Housekeeping Service - Progressive Web App Service Worker (v3.0)
+ * Strictly prevents stale HTML-for-JS MIME caching on SPA deployments
  */
 
-const CACHE_NAME = 'max-housekeeping-v2.0';
+const CACHE_NAME = 'max-housekeeping-v3.0';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/favicon.png',
-  '/favicon.svg',
   '/logo.png',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png'
 ];
 
-// Install: Pre-cache core shell assets and activate immediately
+// Install: Pre-cache brand icons & manifest and activate immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[PWA SW] Pre-caching non-fatal notice:', err);
+        console.warn('[PWA SW] Pre-caching notice:', err);
       });
     })
   );
 });
 
-// Activate: Purge old cache versions and claim all client tabs immediately
+// Activate: Purge all old cache versions (including any stale v2 HTML/JS entries) and claim tabs
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -43,45 +40,31 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Secure & defensive request handling
+// Fetch: Defensive handling that NEVER intercepts hashed Vite /assets/* or module scripts
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // 1. Never intercept non-GET, non-HTTP, API, payment, or third-party requests.
-  // Passing through without calling event.respondWith lets the browser handle them natively.
+  // 1. Pass through non-GET, API, third-party, hashed Vite bundles (/assets/), scripts, styles, and media natively
   if (
     req.method !== 'GET' ||
     !url.protocol.startsWith('http') ||
+    url.hostname !== self.location.hostname ||
     url.pathname.startsWith('/api') ||
-    url.hostname.includes('razorpay') ||
-    url.hostname.includes('cloudinary') ||
-    url.hostname.includes('google') ||
-    url.hostname !== self.location.hostname
+    url.pathname.startsWith('/assets/') ||
+    /\.(js|mjs|css|wasm|mp4|webm|map)$/i.test(url.pathname)
   ) {
     return;
   }
 
-  // 2. Navigation / Page loads: Network-first, fallback to cached index.html or offline fallback
+  // 2. Navigation / HTML loads: Strict Network-first (no-store) so chunk hashes always match latest deploy
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      fetch(new Request(req, { cache: 'no-store' }))
         .then((response) => {
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(req, responseToCache);
-            }).catch(() => {});
-          }
           return response;
         })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-
-          const cachedIndex = (await caches.match('/index.html')) || (await caches.match('/'));
-          if (cachedIndex) return cachedIndex;
-
+        .catch(() => {
           return new Response(
             '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Offline - Max Housekeeping</title></head><body style="font-family:sans-serif;text-align:center;padding:50px;"><h2>You are currently offline</h2><p>Please check your internet connection.</p><button onclick="location.reload()" style="padding:10px 20px;cursor:pointer;">Retry</button></body></html>',
             {
@@ -95,15 +78,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Same-origin static assets: Stale-While-Revalidate
-  // Strictly ensures event.respondWith always receives a valid Response or rejects cleanly.
+  // 3. Same-origin images & icons: Stale-While-Revalidate (NEVER cache text/html responses)
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch fresh version in background
         fetch(req)
           .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const ct = networkResponse?.headers?.get('content-type') || '';
+            if (
+              networkResponse &&
+              networkResponse.status === 200 &&
+              networkResponse.type === 'basic' &&
+              !ct.includes('text/html')
+            ) {
               const responseToCache = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(req, responseToCache);
@@ -115,24 +102,21 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
 
-      // If not in cache, fetch from network and cache for subsequent hits
-      return fetch(req)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(req, responseToCache);
-            }).catch(() => {});
-          }
-          return networkResponse;
-        })
-        .catch(async () => {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          const cachedIndex = (await caches.match('/index.html')) || (await caches.match('/'));
-          if (cachedIndex) return cachedIndex;
-          return new Response('', { status: 408, statusText: 'Request Timeout' });
-        });
+      return fetch(req).then((networkResponse) => {
+        const ct = networkResponse?.headers?.get('content-type') || '';
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          networkResponse.type === 'basic' &&
+          !ct.includes('text/html')
+        ) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, responseToCache);
+          }).catch(() => {});
+        }
+        return networkResponse;
+      });
     })
   );
 });
