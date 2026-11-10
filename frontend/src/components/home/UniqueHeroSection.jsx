@@ -273,10 +273,10 @@ export default function UniqueHeroSection({ services = [] }) {
     <div className="relative w-full bg-[#F4EFE6]">
       
       {/* ========================================================
-          1. CLEAN TWO-TIER HERO SECTION (EXACT SCREEN HEIGHT)
-          - Top Tier (flex-1 min-h-0): 100% Unobstructed Video Stage
-            (Zero text covering video content/phone/email/address)
-          - Bottom Tier (shrink-0): Sleek Theme Editorial Action & Trust Bar
+          1. FULL-WIDTH UNOBSTRUCTED HERO VIDEO SECTION (MAX HEIGHT = SCREEN SIZE)
+          - Desktop: Expands 100% edge-to-edge width without shrinking
+          - Mobile: Dynamic viewport height up to screen size
+          - Zero text overlapping video content; CTA & Trust Bar sits cleanly below
       ======================================================== */}
       <div className="w-full p-0 m-0 bg-[#F4EFE6]">
         <section
@@ -285,50 +285,53 @@ export default function UniqueHeroSection({ services = [] }) {
               ? { height: `${mobileHeightVh}dvh`, maxHeight: 'calc(100dvh - 56px)' }
               : { maxHeight: desktopMode === 'tall' ? '100vh' : 'calc(100vh - 92px)' }
           }
-          className={`relative w-full overflow-hidden bg-[#F4EFE6] h-[calc(100dvh-56px)] max-h-[calc(100dvh-56px)] ${desktopHeightClass} flex flex-col justify-between shadow-none`}
+          className="relative w-full overflow-hidden bg-[#F4EFE6] flex items-center justify-center shadow-none"
         >
-          {/* Tier 1: Pure Unobstructed Video Stage (Takes all remaining viewport height seamlessly) */}
-          <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-[#F4EFE6] flex items-center justify-center px-0 sm:px-2 pt-1">
-            <AnimatePresence initial={false} custom={direction} mode="popLayout">
-              <motion.div
-                key={activeVideo.src + '-' + activeVideoIndex}
-                custom={direction}
-                variants={videoSwipeVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                drag={heroVideos.length > 1 ? "x" : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.2}
-                onDragEnd={(e, { offset, velocity }) => {
-                  const swipe = Math.abs(offset.x) * velocity.x;
-                  if (swipe < -80 || offset.x < -60) {
-                    handleNextVideo();
-                  } else if (swipe > 80 || offset.x > 60) {
-                    handlePrevVideo();
-                  }
-                }}
-                className="w-full h-full flex items-center justify-center touch-pan-y bg-[#F4EFE6]"
-              >
-                <video
-                  key={activeVideo.src}
-                  ref={videoRef}
-                  src={activeVideo.src}
-                  preload="auto"
-                  autoPlay
-                  loop={heroVideos.length === 1}
-                  muted
-                  playsInline
-                  onEnded={heroVideos.length > 1 ? handleNextVideo : undefined}
-                  className={`w-full h-full max-w-full max-h-full ${videoFitClass} object-center`}
-                  poster="/media/site/hero-clean-home.jpg"
-                />
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.div
+              key={activeVideo.src + '-' + activeVideoIndex}
+              custom={direction}
+              variants={videoSwipeVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              drag={heroVideos.length > 1 ? "x" : false}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(e, { offset, velocity }) => {
+                const swipe = Math.abs(offset.x) * velocity.x;
+                if (swipe < -80 || offset.x < -60) {
+                  handleNextVideo();
+                } else if (swipe > 80 || offset.x > 60) {
+                  handlePrevVideo();
+                }
+              }}
+              className="w-full h-full flex items-center justify-center touch-pan-y bg-[#F4EFE6]"
+            >
+              <video
+                key={activeVideo.src}
+                ref={videoRef}
+                src={activeVideo.src}
+                preload="auto"
+                autoPlay
+                loop={heroVideos.length === 1}
+                muted
+                playsInline
+                onEnded={heroVideos.length > 1 ? handleNextVideo : undefined}
+                style={
+                  isMobile
+                    ? { height: '100%', maxHeight: 'calc(100dvh - 56px)' }
+                    : { height: 'auto', maxHeight: desktopMode === 'tall' ? '100vh' : 'calc(100vh - 92px)' }
+                }
+                className={`w-full ${videoFitClass} object-center block`}
+                poster="/media/site/hero-clean-home.jpg"
+              />
+            </motion.div>
+          </AnimatePresence>
+        </section>
 
-          {/* Tier 2: Crisp Compact Action & Trust Command Bar Below Video (Never overlaps video!) */}
-          <div className="shrink-0 w-full bg-[#F4EFE6] border-t border-[#E2D9C8] px-4 sm:px-6 md:px-10 py-3 sm:py-4">
+        {/* Crisp Action & Trust Command Bar Directly Below Full-Size Video (Zero shrinkage & Zero overlap) */}
+        <div className="w-full bg-[#F4EFE6] border-t border-b border-[#E2D9C8] px-4 sm:px-6 md:px-10 py-3.5 sm:py-4">
             <div className="container mx-auto">
               {/* Row 1: Headline/Quote on Left + CTAs on Right */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -402,7 +405,6 @@ export default function UniqueHeroSection({ services = [] }) {
               </div>
             </div>
           </div>
-        </section>
       </div>
 
       {/* ========================================================
