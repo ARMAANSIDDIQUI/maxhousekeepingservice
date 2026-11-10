@@ -50,7 +50,8 @@ import {
   LuExternalLink,
   LuCircleHelp,
   LuFileText,
-  LuPrinter
+  LuPrinter,
+  LuTruck
 } from 'react-icons/lu';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../../utils/date';
 import {
