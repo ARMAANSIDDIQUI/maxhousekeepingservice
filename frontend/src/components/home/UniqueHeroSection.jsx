@@ -265,7 +265,7 @@ export default function UniqueHeroSection({ services = [] }) {
           - Edge-to-edge full width and full viewport height
           - Complete unclipped video visibility with neutral grey framing
       ======================================================== */}
-      <div className="w-full p-0 m-0">
+      <div className="w-full p-0 m-0 bg-[#F4EFE6]">
         
         <section
           style={
@@ -273,11 +273,11 @@ export default function UniqueHeroSection({ services = [] }) {
               ? { height: `${mobileHeightVh}dvh`, maxHeight: '100dvh' }
               : { maxHeight: '100vh' }
           }
-          className={`relative w-full overflow-hidden bg-[#111714] h-[92dvh] max-h-[100dvh] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
+          className={`relative w-full overflow-hidden bg-[#F4EFE6] h-[92dvh] max-h-[100dvh] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
         >
           
-          {/* Dynamic Video Stage: 100% VISIBLE WITH NEUTRAL GREY FRAMING & DIRECTIONAL SWIPE TRANSITION */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden bg-[#121614] flex items-center justify-center">
+          {/* Dynamic Video Stage: 100% VISIBLE WITH THEME-MATCHED CREAM FRAMING */}
+          <div className="absolute inset-0 z-0 w-full h-full overflow-hidden bg-[#F4EFE6] flex items-center justify-center">
             
             <AnimatePresence initial={false} custom={direction} mode="popLayout">
               <motion.div
@@ -298,9 +298,9 @@ export default function UniqueHeroSection({ services = [] }) {
                     handlePrevVideo();
                   }
                 }}
-                className="absolute inset-0 w-full h-full flex items-center justify-center touch-pan-y"
+                className="absolute inset-0 w-full h-full flex items-center justify-center touch-pan-y bg-[#F4EFE6]"
               >
-                {/* 1. Ambient Blurred Fill (Gentle colored glow matching the video behind the frame) */}
+                {/* 1. Ambient Blurred Fill (Soft atmospheric glow behind the unclipped video frame) */}
                 <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-25 blur-2xl scale-110">
                   <video
                     src={activeVideo.src}
@@ -308,12 +308,12 @@ export default function UniqueHeroSection({ services = [] }) {
                     loop
                     muted
                     playsInline
-                    className="w-full h-full object-cover object-center filter brightness-90"
+                    className="w-full h-full object-cover object-center"
                   />
                 </div>
 
-                {/* 2. Sleek Neutral Grey / Slate Background Frame (Adds grey borders on top/bottom or sides dynamically) */}
-                <div className="absolute inset-0 bg-gradient-to-b from-[#181E1B]/95 via-[#101513]/80 to-[#0A0E0C] pointer-events-none" />
+                {/* 2. Theme-Matched Cream / Sand Background Frame (#F4EFE6 / #ECE5D8) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#F4EFE6]/95 via-[#ECE5D8]/85 to-[#F4EFE6]/95 pointer-events-none" />
 
                 {/* 3. The Video Itself: 100% UNCLIPPED & FULLY VISIBLE REGARDLESS OF SCREEN/ASPECT RATIO */}
                 <video
@@ -331,8 +331,8 @@ export default function UniqueHeroSection({ services = [] }) {
               </motion.div>
             </AnimatePresence>
 
-            {/* Ultra-Gentle Bottom Scrim (Leaves 80%+ of video completely clear while keeping buttons readable) */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none z-20" />
+            {/* Bottom Legibility Scrim Only (Keeps top & side borders pure #F4EFE6 theme while making bottom text crisp) */}
+            <div className="absolute inset-x-0 bottom-0 h-56 sm:h-64 bg-gradient-to-t from-[#10231D]/85 via-[#10231D]/40 to-transparent pointer-events-none z-20" />
 
             {/* Multi-Video Carousel Controls (When 2 or 3 videos are available) */}
             {heroVideos.length > 1 && (
@@ -372,7 +372,7 @@ export default function UniqueHeroSection({ services = [] }) {
           </div>
 
           {/* Ultra-Compact Bottom-Aligned Content (Maximum Video Visibility) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-10 mt-auto pb-1 sm:pb-3">
+          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-3">
             <div className="max-w-2xl">
               
               {/* Sleek Compact Headline */}
@@ -381,7 +381,7 @@ export default function UniqueHeroSection({ services = [] }) {
               </h1>
 
               {/* Crisp Attention-Grabbing Line */}
-              <p className="text-[11px] sm:text-xs md:text-sm text-white/90 italic font-sans max-w-md mb-2.5 sm:mb-3 drop-shadow-xs">
+              <p className="text-[11px] sm:text-xs md:text-sm text-white/95 italic font-sans max-w-md mb-2.5 sm:mb-3 drop-shadow-xs">
                 “A spotless home is peace of mind.”
               </p>
 
@@ -399,7 +399,7 @@ export default function UniqueHeroSection({ services = [] }) {
                 <button
                   type="button"
                   onClick={scrollToServices}
-                  className="px-3.5 py-2 sm:px-5 sm:py-3 rounded-xl bg-black/40 hover:bg-black/60 text-white font-bold text-xs sm:text-sm border border-white/20 backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 sm:px-5 sm:py-3 rounded-xl bg-[#10231D]/70 hover:bg-[#10231D]/90 text-white font-bold text-xs sm:text-sm border border-white/25 backdrop-blur-md transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Select service</span>
                   <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B] animate-bounce" />
@@ -407,7 +407,7 @@ export default function UniqueHeroSection({ services = [] }) {
 
                 <a
                   href={`tel:${settings?.phone || '+919897766002'}`}
-                  className="p-2 sm:p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all flex items-center justify-center shadow-md"
+                  className="p-2 sm:p-3 rounded-xl bg-[#10231D]/65 hover:bg-[#10231D]/85 text-white border border-white/25 backdrop-blur-md transition-all flex items-center justify-center shadow-md"
                   title="Direct Phone Dispatch"
                 >
                   <LuPhoneCall className="w-3.5 h-3.5 text-[#E9A23B]" />
@@ -418,7 +418,7 @@ export default function UniqueHeroSection({ services = [] }) {
           </div>
 
           {/* Bottom Bar: Trust Metrics & Scroll Cue */}
-          <div className="container mx-auto px-0 md:px-4 relative z-10 pt-3 md:pt-4 border-t border-white/15">
+          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-3 md:pt-4 border-t border-white/20">
             <div className="flex items-center justify-between gap-4 text-xs text-white/80">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-1.5 font-bold text-white">

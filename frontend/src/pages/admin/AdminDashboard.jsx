@@ -7549,7 +7549,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   {settingsForm.heroVideoUrl && (
-                    <div className="relative h-32 max-w-xs rounded-xl overflow-hidden border border-[#D2C8B8] bg-[#121614] flex items-center justify-center">
+                    <div className="relative h-32 max-w-xs rounded-xl overflow-hidden border border-[#D2C8B8] bg-[#F4EFE6] flex items-center justify-center">
                       <video
                         src={settingsForm.heroVideoUrl}
                         autoPlay
@@ -7607,7 +7607,7 @@ export default function AdminDashboard() {
                             placeholder="/media/site/homehero4.mp4"
                             className="flex-1 p-2 rounded-lg border border-[#E2D9C8] bg-white text-xs font-mono font-semibold text-[#10231D] focus:outline-none focus:border-[#E9A23B]"
                           />
-                          <div className="w-12 h-9 rounded-md overflow-hidden border border-[#D2C8B8] bg-[#121614] shrink-0">
+                          <div className="w-12 h-9 rounded-md overflow-hidden border border-[#D2C8B8] bg-[#F4EFE6] shrink-0">
                             <video src={vidUrl} muted playsInline className="w-full h-full object-contain" />
                           </div>
                         </div>
@@ -7684,7 +7684,7 @@ export default function AdminDashboard() {
                       value={settingsForm.heroVideoFitMode || 'contain'}
                       onChange={(val) => setSettingsForm(prev => ({ ...prev, heroVideoFitMode: val }))}
                       options={[
-                        { value: 'contain', label: 'Full Video (Grey Borders)' },
+                        { value: 'contain', label: 'Full Video (Theme Borders)' },
                         { value: 'cover', label: 'Fill Frame (Crop Edges)' }
                       ]}
                       size="sm"
