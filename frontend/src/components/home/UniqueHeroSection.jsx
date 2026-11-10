@@ -333,17 +333,17 @@ export default function UniqueHeroSection({ services = [] }) {
 
           </div>
 
-          {/* Ultra-Compact Bottom-Aligned Content (Bright, Crisp & Zero Muddy Dark Shadow Over Video) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-2">
-            <div className="max-w-2xl bg-[#F4EFE6]/92 backdrop-blur-md border border-[#E2D9C8] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xl">
+          {/* Ultra-Compact Bottom-Aligned Content (Transparent, Background-Free Directly Over Video) */}
+          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-3">
+            <div className="max-w-2xl">
               
               {/* Sleek Compact Headline (Crisp Dark Forest Ink & Brass Gold) */}
-              <h1 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-[#10231D] leading-snug mb-1">
+              <h1 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-[#10231D] leading-snug mb-1 [text-shadow:0_1px_12px_rgba(244,239,230,0.9)]">
                 Spotless homes. <span className="text-[#D48E28]">Zero stress.</span>
               </h1>
 
               {/* Crisp Attention-Grabbing Line */}
-              <p className="text-[11px] sm:text-xs md:text-sm text-[#3D524A] italic font-medium font-sans max-w-md mb-3">
+              <p className="text-[11px] sm:text-xs md:text-sm text-[#10231D] italic font-semibold font-sans max-w-md mb-2.5 sm:mb-3 [text-shadow:0_1px_8px_rgba(244,239,230,0.9)]">
                 “A spotless home is peace of mind.”
               </p>
 
@@ -379,9 +379,9 @@ export default function UniqueHeroSection({ services = [] }) {
             </div>
           </div>
 
-          {/* Bottom Bar: Trust Metrics & Scroll Cue (Bright & Solid Contrast Pill) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-2">
-            <div className="bg-[#F4EFE6]/92 backdrop-blur-md border border-[#E2D9C8] rounded-xl px-4 py-2.5 shadow-sm flex items-center justify-between gap-4 text-xs text-[#10231D]">
+          {/* Bottom Bar: Trust Metrics & Scroll Cue (Clean Transparent Overlay) */}
+          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-3 md:pt-4 border-t border-[#10231D]/15">
+            <div className="flex items-center justify-between gap-4 text-xs text-[#10231D] [text-shadow:0_1px_8px_rgba(244,239,230,0.9)]">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-1.5 font-bold text-[#10231D]">
                   <div className="flex text-[#E9A23B]">
@@ -392,9 +392,9 @@ export default function UniqueHeroSection({ services = [] }) {
                     <LuStar className="w-3.5 h-3.5 fill-current" />
                   </div>
                   <span className="font-mono ml-1 text-[#10231D]">4.92 / 5.0</span>
-                  <span className="text-[#3D524A] font-medium hidden sm:inline">(5,000+ happy customers)</span>
+                  <span className="text-[#10231D]/85 font-semibold hidden sm:inline">(5,000+ happy customers)</span>
                 </div>
-                <div className="hidden md:flex items-center gap-1.5 text-[#10231D] font-semibold">
+                <div className="hidden md:flex items-center gap-1.5 text-[#10231D] font-bold">
                   <LuShieldCheck className="w-3.5 h-3.5 text-[#D48E28]" />
                   <span>100% Free Re-Clean Guarantee</span>
                 </div>
