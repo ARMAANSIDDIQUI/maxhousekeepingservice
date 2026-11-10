@@ -67,14 +67,27 @@ export default function UniqueHeroSection({ services = [] }) {
     setVideoPage([0, 0]);
   }, [isMobile, heroVideos.length]);
 
-  // Auto-play video immediately when active index or video source changes
+  // Auto-play & persist active hero video in local Cache Storage for instant repeat loads
   useEffect(() => {
+    const src = activeVideo?.src;
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {});
       }
+    }
+    if (src && typeof window !== 'undefined' && 'caches' in window && src.startsWith('/media/')) {
+      const fullUrl = `${window.location.origin}${src}`;
+      caches.open('max-hero-media-v1').then(async (cache) => {
+        const hit = await cache.match(fullUrl);
+        if (!hit) {
+          const resp = await fetch(fullUrl);
+          if (resp && resp.ok) {
+            await cache.put(fullUrl, resp);
+          }
+        }
+      }).catch(() => {});
     }
   }, [activeVideoIndex, activeVideo?.src]);
 
@@ -150,7 +163,7 @@ export default function UniqueHeroSection({ services = [] }) {
       ? 'md:h-screen md:max-h-screen md:min-h-0'
       : desktopMode === 'compact'
       ? 'md:h-[78vh] md:max-h-screen md:min-h-0'
-      : 'md:h-[calc(100vh-68px)] md:max-h-[calc(100vh-68px)] md:min-h-0';
+      : 'md:h-[calc(100vh-92px)] md:max-h-[calc(100vh-92px)] md:min-h-0';
   const videoFitClass = settings?.heroVideoFitMode === 'cover' ? 'object-cover' : 'object-contain';
 
   // Dynamically resolve curated services directly from live MongoDB database props
@@ -260,25 +273,22 @@ export default function UniqueHeroSection({ services = [] }) {
     <div className="relative w-full bg-[#F4EFE6]">
       
       {/* ========================================================
-          1. CINEMATIC HERO SECTION
-          - Dynamic Fullscreen Matching: 100vw x 100vh / 100dvh on mobile & desktop
-          - Edge-to-edge full width and full viewport height
-          - Complete unclipped video visibility with neutral grey framing
+          1. CLEAN TWO-TIER HERO SECTION (EXACT SCREEN HEIGHT)
+          - Top Tier (flex-1 min-h-0): 100% Unobstructed Video Stage
+            (Zero text covering video content/phone/email/address)
+          - Bottom Tier (shrink-0): Sleek Theme Editorial Action & Trust Bar
       ======================================================== */}
       <div className="w-full p-0 m-0 bg-[#F4EFE6]">
-        
         <section
           style={
             isMobile
-              ? { height: `${mobileHeightVh}dvh`, maxHeight: '100dvh' }
-              : { maxHeight: '100vh' }
+              ? { height: `${mobileHeightVh}dvh`, maxHeight: 'calc(100dvh - 56px)' }
+              : { maxHeight: desktopMode === 'tall' ? '100vh' : 'calc(100vh - 92px)' }
           }
-          className={`relative w-full overflow-hidden bg-[#F4EFE6] h-[92dvh] max-h-[100dvh] ${desktopHeightClass} flex flex-col justify-end p-4 sm:p-6 md:p-10 lg:p-14 shadow-none`}
+          className={`relative w-full overflow-hidden bg-[#F4EFE6] h-[calc(100dvh-56px)] max-h-[calc(100dvh-56px)] ${desktopHeightClass} flex flex-col justify-between shadow-none`}
         >
-          
-          {/* Dynamic Video Stage: 100% VISIBLE WITH THEME-MATCHED CREAM FRAMING */}
-          <div className="absolute inset-0 z-0 w-full h-full overflow-hidden bg-[#F4EFE6] flex items-center justify-center">
-            
+          {/* Tier 1: Pure Unobstructed Video Stage (Takes all remaining viewport height seamlessly) */}
+          <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-[#F4EFE6] flex items-center justify-center px-0 sm:px-2 pt-1">
             <AnimatePresence initial={false} custom={direction} mode="popLayout">
               <motion.div
                 key={activeVideo.src + '-' + activeVideoIndex}
@@ -298,121 +308,101 @@ export default function UniqueHeroSection({ services = [] }) {
                     handlePrevVideo();
                   }
                 }}
-                className="absolute inset-0 w-full h-full flex items-center justify-center touch-pan-y bg-[#F4EFE6]"
+                className="w-full h-full flex items-center justify-center touch-pan-y bg-[#F4EFE6]"
               >
-                {/* 1. Ambient Blurred Fill (Soft atmospheric glow behind the unclipped video frame) */}
-                <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-25 blur-2xl scale-110">
-                  <video
-                    src={activeVideo.src}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover object-center"
-                  />
-                </div>
-
-                {/* 2. Theme-Matched Cream / Sand Background Frame (#F4EFE6 / #ECE5D8) */}
-                <div className="absolute inset-0 bg-gradient-to-b from-[#F4EFE6]/95 via-[#ECE5D8]/85 to-[#F4EFE6]/95 pointer-events-none" />
-
-                {/* 3. The Video Itself: 100% UNCLIPPED & FULLY VISIBLE REGARDLESS OF SCREEN/ASPECT RATIO */}
                 <video
                   key={activeVideo.src}
                   ref={videoRef}
                   src={activeVideo.src}
+                  preload="auto"
                   autoPlay
                   loop={heroVideos.length === 1}
                   muted
                   playsInline
                   onEnded={heroVideos.length > 1 ? handleNextVideo : undefined}
-                  className={`w-full h-full max-w-full max-h-full ${videoFitClass} object-center relative z-10 filter brightness-[1.02] contrast-[1.02]`}
+                  className={`w-full h-full max-w-full max-h-full ${videoFitClass} object-center`}
                   poster="/media/site/hero-clean-home.jpg"
                 />
               </motion.div>
             </AnimatePresence>
-
           </div>
 
-          {/* Ultra-Compact Bottom-Aligned Content (Transparent, Background-Free Directly Over Video) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 mt-auto pb-1 sm:pb-3">
-            <div className="max-w-2xl">
-              
-              {/* Sleek Compact Headline (Crisp Dark Forest Ink & Brass Gold) */}
-              <h1 className="font-display font-black text-lg sm:text-2xl md:text-3xl lg:text-4xl text-[#10231D] leading-snug mb-1 [text-shadow:0_1px_12px_rgba(244,239,230,0.9)]">
-                Spotless homes. <span className="text-[#D48E28]">Zero stress.</span>
-              </h1>
+          {/* Tier 2: Crisp Compact Action & Trust Command Bar Below Video (Never overlaps video!) */}
+          <div className="shrink-0 w-full bg-[#F4EFE6] border-t border-[#E2D9C8] px-4 sm:px-6 md:px-10 py-3 sm:py-4">
+            <div className="container mx-auto">
+              {/* Row 1: Headline/Quote on Left + CTAs on Right */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h1 className="font-display font-black text-xl sm:text-2xl md:text-3xl text-[#10231D] leading-tight">
+                    Spotless homes. <span className="text-[#D48E28]">Zero stress.</span>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#3D524A] italic font-medium font-sans mt-0.5">
+                    “A spotless home is peace of mind.”
+                  </p>
+                </div>
 
-              {/* Crisp Attention-Grabbing Line */}
-              <p className="text-[11px] sm:text-xs md:text-sm text-[#10231D] italic font-semibold font-sans max-w-md mb-2.5 sm:mb-3 [text-shadow:0_1px_8px_rgba(244,239,230,0.9)]">
-                “A spotless home is peace of mind.”
-              </p>
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Link
+                    to="/book"
+                    className="px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-sm flex items-center gap-1.5 group cursor-pointer"
+                  >
+                    <LuCalendar className="w-3.5 h-3.5" />
+                    <span>Book a service</span>
+                    <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
 
-              {/* Compact Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5">
-                <Link
-                  to="/book"
-                  className="px-4 py-2 sm:px-6 sm:py-3 rounded-xl bg-[#E9A23B] hover:bg-[#D48E28] text-[#10231D] font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md flex items-center gap-1.5 group cursor-pointer"
-                >
-                  <LuCalendar className="w-3.5 h-3.5" />
-                  <span>Book a service</span>
-                  <LuArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                  <button
+                    type="button"
+                    onClick={scrollToServices}
+                    className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#10231D] hover:bg-[#1E3B31] text-[#F4EFE6] font-bold text-xs sm:text-sm transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Select service</span>
+                    <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B] animate-bounce" />
+                  </button>
+
+                  <a
+                    href={`tel:${settings?.phone || '+919897766002'}`}
+                    className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-[#ECE5D8] text-[#10231D] border border-[#E2D9C8] transition-all flex items-center justify-center shadow-2xs"
+                    title="Direct Phone Dispatch"
+                  >
+                    <LuPhoneCall className="w-4 h-4 text-[#E9A23B]" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Row 2: Trust Metrics & Service Catalog Link */}
+              <div className="mt-2.5 pt-2 border-t border-[#E2D9C8]/80 flex items-center justify-between gap-4 text-[11px] sm:text-xs text-[#10231D]">
+                <div className="flex items-center gap-4 sm:gap-6">
+                  <div className="flex items-center gap-1.5 font-bold text-[#10231D]">
+                    <div className="flex text-[#E9A23B]">
+                      <LuStar className="w-3.5 h-3.5 fill-current" />
+                      <LuStar className="w-3.5 h-3.5 fill-current" />
+                      <LuStar className="w-3.5 h-3.5 fill-current" />
+                      <LuStar className="w-3.5 h-3.5 fill-current" />
+                      <LuStar className="w-3.5 h-3.5 fill-current" />
+                    </div>
+                    <span className="font-mono ml-1">4.92 / 5.0</span>
+                    <span className="text-[#3D524A] font-medium hidden sm:inline">(5,000+ happy customers)</span>
+                  </div>
+                  <div className="hidden md:flex items-center gap-1.5 text-[#10231D] font-semibold">
+                    <LuShieldCheck className="w-3.5 h-3.5 text-[#D48E28]" />
+                    <span>100% Free Re-Clean Guarantee</span>
+                  </div>
+                </div>
 
                 <button
                   type="button"
                   onClick={scrollToServices}
-                  className="px-3.5 py-2 sm:px-5 sm:py-3 rounded-xl bg-[#10231D] hover:bg-[#1E3B31] text-[#F4EFE6] font-bold text-xs sm:text-sm transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="flex items-center gap-1 text-[#10231D] hover:text-[#D48E28] font-bold transition-colors cursor-pointer"
                 >
-                  <span>Select service</span>
-                  <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B] animate-bounce" />
+                  <span>Service Catalog</span>
+                  <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B]" />
                 </button>
-
-                <a
-                  href={`tel:${settings?.phone || '+919897766002'}`}
-                  className="p-2 sm:p-3 rounded-xl bg-white hover:bg-[#ECE5D8] text-[#10231D] border border-[#E2D9C8] transition-all flex items-center justify-center shadow-sm"
-                  title="Direct Phone Dispatch"
-                >
-                  <LuPhoneCall className="w-3.5 h-3.5 text-[#E9A23B]" />
-                </a>
               </div>
-
             </div>
           </div>
-
-          {/* Bottom Bar: Trust Metrics & Scroll Cue (Clean Transparent Overlay) */}
-          <div className="container mx-auto px-0 md:px-4 relative z-30 pt-3 md:pt-4 border-t border-[#10231D]/15">
-            <div className="flex items-center justify-between gap-4 text-xs text-[#10231D] [text-shadow:0_1px_8px_rgba(244,239,230,0.9)]">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1.5 font-bold text-[#10231D]">
-                  <div className="flex text-[#E9A23B]">
-                    <LuStar className="w-3.5 h-3.5 fill-current" />
-                    <LuStar className="w-3.5 h-3.5 fill-current" />
-                    <LuStar className="w-3.5 h-3.5 fill-current" />
-                    <LuStar className="w-3.5 h-3.5 fill-current" />
-                    <LuStar className="w-3.5 h-3.5 fill-current" />
-                  </div>
-                  <span className="font-mono ml-1 text-[#10231D]">4.92 / 5.0</span>
-                  <span className="text-[#10231D]/85 font-semibold hidden sm:inline">(5,000+ happy customers)</span>
-                </div>
-                <div className="hidden md:flex items-center gap-1.5 text-[#10231D] font-bold">
-                  <LuShieldCheck className="w-3.5 h-3.5 text-[#D48E28]" />
-                  <span>100% Free Re-Clean Guarantee</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={scrollToServices}
-                className="flex items-center gap-1.5 text-[#10231D] hover:text-[#D48E28] font-bold transition-colors cursor-pointer text-[11px] sm:text-xs"
-              >
-                <span>Service Catalog</span>
-                <LuChevronDown className="w-3.5 h-3.5 text-[#E9A23B]" />
-              </button>
-            </div>
-          </div>
-
         </section>
-
       </div>
 
       {/* ========================================================
