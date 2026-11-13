@@ -377,6 +377,9 @@ export const adminAPI = {
   deleteSupervisor: (id) => apiRequest(`/admin/supervisors/${id}`, { method: 'DELETE' }),
   assignBookingSupervisor: (id, data) => apiRequest(`/admin/bookings/${id}/assign`, { method: 'PUT', body: data }),
   updateBookingSupervisorLocation: (id, data) => apiRequest(`/admin/bookings/${id}/supervisor-location`, { method: 'PUT', body: data }),
+  // GST Billing & Sequential Bill Numbering (IST)
+  getBills: (params = {}) => apiRequest('/admin/bills', { method: 'GET', noCache: true, params }),
+  assignBillNumbers: (data) => apiRequest('/admin/bills/assign', { method: 'POST', body: data }),
   updateSettings: async (data) => {
     clearCacheByPrefix('/public/settings');
     clearCacheByPrefix('/settings');

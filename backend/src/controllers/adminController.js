@@ -2161,7 +2161,9 @@ export default {
   deleteSupervisor,
   assignSupervisorToBooking,
   getSupervisorSlotAvailability,
-  updateBookingSupervisorLocation
+  updateBookingSupervisorLocation,
+  getAdminBills,
+  assignBillNumbers
 };
 
 /**
@@ -2216,6 +2218,240 @@ export async function updateBookingSupervisorLocation(req, res, next) {
       success: true,
       message: 'Supervisor location updated successfully by administrator.',
       supervisorLiveLocation: locData
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const IST_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIstDateBoundary(dateStr, endOfDay = false) {
+  if (!dateStr || typeof dateStr !== 'string' || !IST_DATE_REGEX.test(dateStr)) {
+    return null;
+  }
+  const check = validateDateMonthDays(dateStr);
+  if (check && check.valid === false) {
+    return null;
+  }
+  const timeSuffix = endOfDay ? '23:59:59.999+05:30' : '00:00:00.000+05:30';
+  const parsed = new Date(`${dateStr}T${timeSuffix}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function getNextAvailableBillNumber() {
+  const latest = await Booking.findOne({ billNumber: { $ne: null } })
+    .sort({ billNumber: -1 })
+    .select('billNumber')
+    .lean();
+  return (latest?.billNumber || 0) + 1;
+}
+
+/**
+ * Admin: Fetch GST-billable bookings filtered in IST (Asia/Kolkata)
+ * GET /api/v1/admin/bills
+ */
+export async function getAdminBills(req, res, next) {
+  try {
+    const {
+      startDate,
+      endDate,
+      dateField = 'slot.date',
+      paymentStatus = 'paid',
+      billStatus = 'all'
+    } = req.query;
+
+    const allowedDateFields = new Set(['slot.date', 'createdAt', 'paidAt']);
+    const resolvedDateField = allowedDateFields.has(dateField) ? dateField : 'slot.date';
+
+    const query = {
+      status: { $nin: ['cancelled', 'spam'] },
+      paymentStatus: { $nin: ['refunded', 'failed'] }
+    };
+
+    if (paymentStatus === 'paid') {
+      query.paymentStatus = 'paid';
+    } else if (paymentStatus === 'pending') {
+      query.paymentStatus = 'pending';
+    }
+
+    if (billStatus === 'unbilled') {
+      query.$or = [{ billNumber: { $exists: false } }, { billNumber: null }];
+    } else if (billStatus === 'billed') {
+      query.billNumber = { $ne: null };
+    }
+
+    if (startDate || endDate) {
+      if (startDate && !parseIstDateBoundary(startDate, false)) {
+        return res.status(400).json({ success: false, message: 'Invalid startDate. Expected YYYY-MM-DD in IST.' });
+      }
+      if (endDate && !parseIstDateBoundary(endDate, true)) {
+        return res.status(400).json({ success: false, message: 'Invalid endDate. Expected YYYY-MM-DD in IST.' });
+      }
+      if (startDate && endDate && startDate > endDate) {
+        return res.status(400).json({ success: false, message: 'startDate cannot be after endDate.' });
+      }
+
+      if (resolvedDateField === 'slot.date') {
+        query['slot.date'] = {};
+        if (startDate) query['slot.date'].$gte = startDate;
+        if (endDate) query['slot.date'].$lte = endDate;
+      } else {
+        const dbField = resolvedDateField === 'paidAt' ? 'paymentDetails.paidAt' : 'createdAt';
+        query[dbField] = {};
+        if (startDate) query[dbField].$gte = parseIstDateBoundary(startDate, false);
+        if (endDate) query[dbField].$lte = parseIstDateBoundary(endDate, true);
+      }
+    }
+
+    const [bookings, nextSuggestedSerial, totalUsedBills] = await Promise.all([
+      Booking.find(query)
+        .populate('assignedSupervisor', 'name email phone')
+        .populate('billIssuedBy', 'name email')
+        .sort({ 'slot.date': 1, createdAt: 1, _id: 1 })
+        .lean(),
+      getNextAvailableBillNumber(),
+      Booking.countDocuments({ billNumber: { $ne: null } })
+    ]);
+
+    const istNow = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date());
+
+    res.status(200).json({
+      success: true,
+      bookings,
+      nextSuggestedSerial,
+      totalUsedBills,
+      istNow
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Admin: Atomically assign sequential non-repeating GST bill numbers
+ * POST /api/v1/admin/bills/assign
+ */
+export async function assignBillNumbers(req, res, next) {
+  try {
+    const { bookingIds, startSerial } = req.body;
+
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Select at least one booking to generate bills.' });
+    }
+
+    const uniqueIds = [...new Set(bookingIds.map(String))];
+    const invalidIds = uniqueIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ success: false, message: 'One or more booking IDs are invalid.' });
+    }
+
+    const parsedStart = Number(startSerial);
+    if (!Number.isInteger(parsedStart) || parsedStart < 1 || parsedStart > 999999999) {
+      return res.status(400).json({
+        success: false,
+        message: 'Starting serial number must be a positive whole number (1 or greater).'
+      });
+    }
+
+    const bookings = await Booking.find({ _id: { $in: uniqueIds } })
+      .sort({ 'slot.date': 1, createdAt: 1, _id: 1 });
+
+    if (bookings.length !== uniqueIds.length) {
+      return res.status(404).json({ success: false, message: 'Some selected bookings could not be found.' });
+    }
+
+    const ineligible = bookings.filter(
+      b => ['cancelled', 'spam'].includes(b.status) || ['refunded', 'failed'].includes(b.paymentStatus)
+    );
+    if (ineligible.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cancelled, spam, refunded, or failed bookings cannot be billed (${ineligible.map(b => b.bookingCode).join(', ')}).`
+      });
+    }
+
+    const alreadyBilled = bookings.filter(b => b.billNumber != null);
+    const toBill = bookings.filter(b => b.billNumber == null);
+
+    let assignedCount = 0;
+
+    if (toBill.length > 0) {
+      const proposedNumbers = toBill.map((_, idx) => parsedStart + idx);
+      const conflicts = await Booking.find({ billNumber: { $in: proposedNumbers } })
+        .select('billNumber bookingCode')
+        .lean();
+
+      if (conflicts.length > 0) {
+        const nextSuggestedSerial = await getNextAvailableBillNumber();
+        const conflictingNumbers = conflicts.map(c => c.billNumber).sort((a, b) => a - b);
+        return res.status(409).json({
+          success: false,
+          message: `Bill number(s) already issued and cannot be repeated: ${conflictingNumbers.join(', ')}. Next available serial is ${nextSuggestedSerial}.`,
+          conflictingNumbers,
+          conflictingBookings: conflicts,
+          nextSuggestedSerial
+        });
+      }
+
+      const issuedAt = new Date();
+      for (let i = 0; i < toBill.length; i++) {
+        const booking = toBill[i];
+        const serialToAssign = parsedStart + i;
+        try {
+          const updated = await Booking.findOneAndUpdate(
+            {
+              _id: booking._id,
+              $or: [{ billNumber: { $exists: false } }, { billNumber: null }]
+            },
+            {
+              $set: {
+                billNumber: serialToAssign,
+                billIssuedAt: issuedAt,
+                billIssuedBy: req.user?._id
+              }
+            },
+            { new: true }
+          );
+          if (updated) {
+            assignedCount += 1;
+          }
+        } catch (err) {
+          if (err?.code === 11000) {
+            const nextSuggestedSerial = await getNextAvailableBillNumber();
+            return res.status(409).json({
+              success: false,
+              message: `Bill number ${serialToAssign} was just claimed by another request. Next available serial is ${nextSuggestedSerial}.`,
+              conflictingNumbers: [serialToAssign],
+              nextSuggestedSerial
+            });
+          }
+          throw err;
+        }
+      }
+    }
+
+    const finalBookings = await Booking.find({ _id: { $in: uniqueIds } })
+      .populate('assignedSupervisor', 'name email phone')
+      .populate('billIssuedBy', 'name email')
+      .sort({ 'slot.date': 1, createdAt: 1, _id: 1 })
+      .lean();
+
+    const nextSuggestedSerial = await getNextAvailableBillNumber();
+
+    res.status(200).json({
+      success: true,
+      message: assignedCount > 0
+        ? `Assigned ${assignedCount} new bill number(s).`
+        : 'All selected bookings already have immutable bill numbers.',
+      bookings: finalBookings,
+      assignedCount,
+      alreadyBilledCount: alreadyBilled.length,
+      nextSuggestedSerial
     });
   } catch (err) {
     next(err);

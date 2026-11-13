@@ -38,7 +38,9 @@ import {
   deleteSupervisor,
   assignSupervisorToBooking,
   getSupervisorSlotAvailability,
-  updateBookingSupervisorLocation
+  updateBookingSupervisorLocation,
+  getAdminBills,
+  assignBillNumbers
 } from '../controllers/adminController.js';
 import { uploadImage, uploadMultipleImages, uploadVideo, deleteImage } from '../controllers/uploadController.js';
 import { upload, uploadVideo as multerUploadVideo } from '../middleware/upload.js';
@@ -59,6 +61,10 @@ router.put('/bookings/:id', updateBooking);
 router.put('/bookings/:id/assign', assignSupervisorToBooking);
 router.put('/bookings/:id/supervisor-location', requireLiveTracking, updateBookingSupervisorLocation);
 router.delete('/bookings/:id', deleteBooking);
+
+// GST Billing & Sequential Bill Numbering
+router.get('/bills', getAdminBills);
+router.post('/bills/assign', assignBillNumbers);
 
 // Supervisor ID Management (Created & Managed by Admins)
 router.get('/supervisors/slot-availability', getSupervisorSlotAvailability);

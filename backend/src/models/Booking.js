@@ -164,7 +164,20 @@ const bookingSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     note: { type: String },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-  }]
+  }],
+  billNumber: {
+    type: Number,
+    unique: true,
+    sparse: true,
+    min: 1
+  },
+  billIssuedAt: {
+    type: Date
+  },
+  billIssuedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
 }, {
   timestamps: true
 });

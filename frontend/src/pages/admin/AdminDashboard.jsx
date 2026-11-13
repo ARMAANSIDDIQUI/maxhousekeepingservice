@@ -51,8 +51,10 @@ import {
   LuCircleHelp,
   LuFileText,
   LuPrinter,
-  LuTruck
+  LuTruck,
+  LuReceipt
 } from 'react-icons/lu';
+import AdminGstBillingSection from '../../components/admin/AdminGstBillingSection';
 import { formatDateDMY, formatDateTimeDMY, validateDateMonthDays } from '../../utils/date';
 import {
   apiRequest,
@@ -4828,6 +4830,7 @@ export default function AdminDashboard() {
 
   const adminTabs = [
     { id: 'bookings', label: 'Bookings & Dispatch', icon: LuCalendar, count: bookings.length },
+    { id: 'billing', label: 'GST Billing & Bills', icon: LuReceipt },
     { id: 'supervisors', label: 'Supervisors & Staff', icon: LuShieldCheck, count: supervisors.length },
     { id: 'services', label: 'Services & Dual-Pricing', icon: LuSparkles, count: services.length },
     { id: 'categories', label: 'Category Management', icon: LuLayers, count: categories.length },
@@ -6862,6 +6865,13 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ========================================================
+            TAB: GST BILLING & SEQUENTIAL BILL GENERATOR
+        ======================================================== */}
+        {activeTab === 'billing' && (
+          <AdminGstBillingSection settings={settings} />
         )}
 
         {/* ========================================================

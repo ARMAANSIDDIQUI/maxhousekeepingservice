@@ -346,11 +346,11 @@ export default function HomePage() {
       {testimonials.length > 0 && (
         <section className="py-20 bg-[#ECE5D8] border-t border-[#E2D9C8]">
           <div className="container mx-auto px-4">
-            <div className="text-center max-w-2xl mx-auto mb-14">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F4EFE6] text-[#10231D] text-[11px] font-bold tracking-widest uppercase mb-3 border border-[#E2D9C8]">
-                <LuStar className="w-3 h-3 text-[#E9A23B] fill-[#E9A23B]" />
-                Customer Stories
-              </span>
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-[#10231D] text-[11px] font-bold tracking-wider uppercase mb-3 border border-[#E2D9C8] shadow-sm">
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#10231D] text-white text-[10px] font-black">G</span>
+                <span>5.0 ★ Google &amp; Verified Reviews</span>
+              </div>
               <h2 className="font-display font-black text-3xl sm:text-4xl text-[#10231D] tracking-tight">
                 What Our Customers Say
               </h2>
@@ -412,17 +412,31 @@ export default function HomePage() {
                         </div>
                       )}
 
-                      {/* Top Bar: Stars & Verified Badge */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-0.5 text-[#E9A23B]">
-                          {[...Array(test.rating || 5)].map((_, starIdx) => (
-                            <LuStar key={starIdx} className="w-4 h-4 fill-[#E9A23B]" />
-                          ))}
+                      {/* Top Bar: Stars & Google/Verified Badge */}
+                      <div className="flex items-center justify-between gap-2 mb-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-0.5 text-[#E9A23B]">
+                            {[...Array(test.rating || 5)].map((_, starIdx) => (
+                              <LuStar key={starIdx} className="w-4 h-4 fill-[#E9A23B]" />
+                            ))}
+                          </div>
+                          {test.reviewDateLabel && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-900">
+                              {test.reviewDateLabel}
+                            </span>
+                          )}
                         </div>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#10231D] bg-[#ECE5D8] px-2 py-0.5 rounded-full">
-                          <LuShieldCheck className="w-3 h-3 text-[#E9A23B]" />
-                          Verified
-                        </span>
+                        {test.source === 'Google Review' ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#10231D] bg-white px-2.5 py-0.5 rounded-full border border-[#E2D9C8] shadow-xs">
+                            <span className="font-black text-[#4285F4]">G</span>
+                            Google
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#10231D] bg-[#ECE5D8] px-2 py-0.5 rounded-full">
+                            <LuShieldCheck className="w-3 h-3 text-[#E9A23B]" />
+                            Verified
+                          </span>
+                        )}
                       </div>
 
                       {test.serviceTitle && (
@@ -462,7 +476,7 @@ export default function HomePage() {
                           {test.name}
                         </h4>
                         <p className="text-xs text-[#6B8077] truncate">
-                          {test.role || 'Homeowner'} · <span className="text-[#10231D] font-medium">{test.city}</span>
+                          {test.reviewCountLabel || test.role || 'Homeowner'} · <span className="text-[#10231D] font-medium">{test.city}</span>
                         </p>
                       </div>
                     </div>

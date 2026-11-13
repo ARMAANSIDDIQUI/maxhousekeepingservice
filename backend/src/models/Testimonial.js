@@ -12,6 +12,9 @@ const testimonialSchema = new mongoose.Schema({
   videoUrl: { type: String, default: '', trim: true },
   videoPublicId: { type: String, default: '' },
   isFeatured: { type: Boolean, default: false },
+  source: { type: String, default: 'Verified Client', trim: true },
+  reviewDateLabel: { type: String, default: '', trim: true },
+  reviewCountLabel: { type: String, default: '', trim: true },
   sortOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true, index: true }
 }, {

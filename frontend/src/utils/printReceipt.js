@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import { formatDateDMY } from './date';
 
 let cachedLogoDataUrl = null;
@@ -42,25 +43,35 @@ function formatINR(val) {
   return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 }
 
-/**
- * Generates an A4-sized PDF-ready Service Bill / Official Receipt with Logo & Watermark
- * and triggers the native Print / Save as PDF dialog cleanly via an isolated iframe.
- */
-export async function printBookingReceipt(booking, settings = {}) {
-  if (!booking) return;
+function formatDateIST(val) {
+  if (!val) return '';
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) return formatDateDMY(val);
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(d);
+}
 
-  const logoSrc = await getLogoDataUrl();
-
+function buildReceiptPageBody(booking, settings = {}, logoSrc = '/logo.png') {
   const businessName = settings?.businessName || 'Max Housekeeping Service';
   const businessTagline = settings?.tagline || 'Professional Home, Sofa, Kitchen & Commercial Deep Cleaning';
   const businessPhone = settings?.phone || settings?.whatsappNumber || '+91 98977 66002';
-  const businessEmail = settings?.supportEmail || settings?.email || 'support@maxhousekeeping.in';
-  const businessAddress = settings?.officeAddress || 'Civil Lines, Moradabad, Uttar Pradesh 244001';
-  const gstNumber = settings?.gstNumber || '';
+  const businessEmail = 'vikasmax321@gmail.com';
+  const businessAddress = 'Vivekanand Hospital, Mora Ki Milak, Moradabad, Uttar Pradesh';
+  const gstNumber = settings?.gstNumber || '09HORPK7416E1ZG';
+  const businessState = '09-Uttar Pradesh';
 
   const bookingCode = booking.bookingCode || 'MH-BOOKING';
-  const invoiceNo = `INV-${bookingCode}`;
-  const createdDate = booking.createdAt ? formatDateDMY(booking.createdAt) : formatDateDMY(new Date());
+  const hasBillNumber = booking.billNumber !== null && booking.billNumber !== undefined && booking.billNumber !== '';
+  const invoiceNo = hasBillNumber ? `BILL-${booking.billNumber}` : `INV-${bookingCode}`;
+  const createdDate = booking.billIssuedAt
+    ? formatDateIST(booking.billIssuedAt)
+    : booking.createdAt
+    ? formatDateIST(booking.createdAt)
+    : formatDateIST(new Date());
   const serviceDate = booking.assignedSlot?.date || booking.slot?.date
     ? formatDateDMY(booking.assignedSlot?.date || booking.slot?.date)
     : 'Flexible Schedule';
@@ -107,7 +118,7 @@ export async function printBookingReceipt(booking, settings = {}) {
       : (booking.paymentMode || 'Cash on Service');
 
   const txId = booking.paymentDetails?.transactionId || booking.paymentDetails?.receipt || '';
-  const paidAtStr = booking.paymentDetails?.paidAt ? formatDateDMY(booking.paymentDetails.paidAt) : '';
+  const paidAtStr = booking.paymentDetails?.paidAt ? formatDateIST(booking.paymentDetails.paidAt) : '';
 
   const supName = booking.assignedSupervisor?.name || booking.supervisor?.name || booking.assignedCrew?.name || '';
   const supPhone = booking.assignedSupervisor?.phone || booking.supervisor?.phone || booking.assignedCrew?.phone || '';
@@ -144,12 +155,194 @@ export async function printBookingReceipt(booking, settings = {}) {
     })
     .join('');
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Receipt_${esc(bookingCode)}_${esc(businessName.replace(/\s+/g, '_'))}</title>
-  <style>
+  return `
+  <div class="a4-page">
+    <div class="top-accent-bar"></div>
+    <div class="bottom-accent-bar"></div>
+
+    <!-- Watermark Layer -->
+    <div class="watermark-layer">
+      <img src="${esc(logoSrc)}" alt="" class="watermark-logo" />
+      <div class="watermark-diagonal">${esc(businessName.toUpperCase())}</div>
+      <div class="watermark-status-stamp ${isPaid ? 'is-paid' : 'is-unpaid'}">${isPaid ? 'PAID IN FULL' : 'OFFICIAL BILL'}</div>
+    </div>
+
+    <!-- Foreground Content -->
+    <div class="content-layer">
+      <!-- Header -->
+      <div class="header-row">
+        <div class="brand-box">
+          <img src="${esc(logoSrc)}" alt="${esc(businessName)}" class="brand-logo" />
+          <div>
+            <h1 class="brand-name">${esc(businessName)}</h1>
+            <p class="brand-tag">${esc(businessTagline)}</p>
+            <div class="brand-meta">
+              <div><strong>Address:</strong> ${esc(businessAddress)}</div>
+              <div><strong>Helpline:</strong> ${esc(businessPhone)} &nbsp;|&nbsp; <strong>Email:</strong> ${esc(businessEmail)}</div>
+              <div><strong>GSTIN:</strong> ${esc(gstNumber)} &nbsp;|&nbsp; <strong>State:</strong> ${esc(businessState)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="invoice-meta-box">
+          <div class="doc-badge">${gstAmount > 0 ? 'Tax Invoice & Receipt' : 'Service Bill & Receipt'}</div>
+          <table class="meta-table">
+            <tr>
+              <td class="meta-label">${hasBillNumber ? 'GST Bill No:' : 'Receipt No:'}</td>
+              <td class="meta-val">${esc(invoiceNo)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Booking ID:</td>
+              <td class="meta-val">${esc(bookingCode)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Issue Date (IST):</td>
+              <td class="meta-val">${esc(createdDate)}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Status:</td>
+              <td class="meta-val">${esc(statusText)}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Billed To & Service Dispatch Info -->
+      <div class="info-grid">
+        <div class="info-card">
+          <h3 class="card-heading">Billed To & Service Location</h3>
+          <div class="cust-name">${esc(customerName)}</div>
+          <div class="info-line"><strong>Phone:</strong> ${esc(customerPhone)}</div>
+          ${customerEmail ? `<div class="info-line"><strong>Email:</strong> ${esc(customerEmail)}</div>` : ''}
+          <div class="info-line"><strong>Address:</strong> ${esc(fullAddress)}</div>
+        </div>
+
+        <div class="info-card">
+          <h3 class="card-heading">Schedule & Payment Details</h3>
+          <div class="info-line"><strong>Service Date:</strong> ${esc(serviceDate)}</div>
+          <div class="info-line"><strong>Arrival Slot:</strong> ${esc(serviceWindow)}</div>
+          ${supName ? `<div class="info-line"><strong>Supervisor:</strong> ${esc(supName)}${supPhone ? ` (${esc(supPhone)})` : ''}</div>` : ''}
+          <div class="info-line">
+            <strong>Payment:</strong> <span class="status-pill">${isPaid ? 'Paid' : 'Pending'}</span>
+            &nbsp;(${esc(paymentModeLabel)})
+          </div>
+          ${txId ? `<div class="info-line"><strong>Txn / Ref ID:</strong> <span style="font-family:monospace;">${esc(txId)}</span>${paidAtStr ? ` · ${esc(paidAtStr)}` : ''}</div>` : ''}
+        </div>
+      </div>
+
+      <!-- Services Table -->
+      <div class="items-section">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th class="col-num">#</th>
+              <th class="col-desc">Service Description &amp; Package</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-rate">Rate</th>
+              <th class="col-amt">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRowsHtml || `
+              <tr>
+                <td colspan="5" style="text-align:center; padding:16px; color:#6B8077;">No itemized services listed</td>
+              </tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Terms & Totals -->
+      <div class="summary-row">
+        <div class="notes-box">
+          <h3 class="card-heading">Service Assurance &amp; Terms</h3>
+          <ul>
+            <li><strong>48-Hour Re-Clean Guarantee:</strong> Report any missed spot within 48 hours for a complimentary touch-up.</li>
+            <li><strong>Eco-Safe Chemicals:</strong> Industrial Taski / Diversty hospital-grade solutions safe for kids &amp; pets.</li>
+            <li><strong>OTP Verification:</strong> Service completion &amp; supervisor visit verified via customer arrival OTP.</li>
+            ${booking.notes ? `<li><strong>Customer Note:</strong> "${esc(booking.notes)}"</li>` : ''}
+          </ul>
+        </div>
+
+        <div class="totals-box">
+          <h3 class="card-heading">Billing Summary</h3>
+          ${mrpTotal > subtotal ? `
+            <div class="tot-line">
+              <span>Standard MRP Total</span>
+              <span class="tot-val" style="text-decoration:line-through; color:#9CA3AF;">${formatINR(mrpTotal)}</span>
+            </div>
+            <div class="tot-line discount">
+              <span>Special Offer Savings</span>
+              <span class="tot-val">-${formatINR(packageDiscount)}</span>
+            </div>
+          ` : ''}
+          <div class="tot-line">
+            <span>Services Subtotal</span>
+            <span class="tot-val">${formatINR(subtotal)}</span>
+          </div>
+          ${outstationSurcharge > 0 ? `
+            <div class="tot-line">
+              <span>Outstation Travel Surcharge</span>
+              <span class="tot-val">+${formatINR(outstationSurcharge)}</span>
+            </div>
+          ` : ''}
+          ${couponDiscount > 0 ? `
+            <div class="tot-line discount">
+              <span>Coupon Applied ${couponCode ? `(${esc(couponCode)})` : ''}</span>
+              <span class="tot-val">-${formatINR(couponDiscount)}</span>
+            </div>
+          ` : ''}
+          ${platformChargeAmount > 0 ? `
+            <div class="tot-line">
+              <span>${esc(platformChargeLabel)}</span>
+              <span class="tot-val">+${formatINR(platformChargeAmount)}</span>
+            </div>
+          ` : ''}
+          ${gstAmount > 0 ? `
+            <div class="tot-line">
+              <span>GST (${gstPercentage}%)</span>
+              <span class="tot-val">+${formatINR(gstAmount)}</span>
+            </div>
+          ` : ''}
+
+          <div class="grand-total-bar">
+            <span>${isPaid ? 'Total Amount Paid' : 'Total Payable'}</span>
+            <span class="grand-total-amt">${formatINR(grandTotal)}</span>
+          </div>
+
+          ${customerSaved > 0 ? `
+            <div class="saved-banner">
+              Total Customer Savings: ${formatINR(customerSaved)}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Footer & Signatory -->
+      <div>
+        <div class="footer-sign-row">
+          <div class="declaration">
+            <strong>Bank Details:</strong> State Bank of India, Civil Lines, Moradabad (UP) &nbsp;|&nbsp; <strong>A/C No:</strong> 38543035795 &nbsp;|&nbsp; <strong>IFSC:</strong> SBIN0000682<br />
+            <strong>Declaration:</strong> This is a system-generated official bill and service receipt issued by ${esc(businessName)}. All prices and taxes shown reflect the confirmed service summary for Booking #${esc(bookingCode)}. For billing support, reach us at ${esc(businessPhone)}.
+          </div>
+          <div class="sign-box">
+            <div class="seal-ring">
+              <span>${esc(businessName)}</span>
+              <span>• Verified Digital Seal •</span>
+            </div>
+            <div class="sign-line">Authorized Signatory</div>
+          </div>
+        </div>
+        <div class="thank-you">
+          Thank you for choosing ${esc(businessName)} — Spotless Homes. Zero Stress.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildReceiptCss(isMultiPage = false) {
+  return `
     @page {
       size: A4 portrait;
       margin: 0;
@@ -181,7 +374,9 @@ export async function printBookingReceipt(booking, settings = {}) {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      ${isMultiPage ? 'page-break-after: always; break-after: page;' : ''}
     }
+    ${isMultiPage ? `.a4-page:last-child { page-break-after: auto; break-after: auto; }` : ''}
     /* Top and bottom subtle executive accent bars */
     .top-accent-bar {
       position: absolute;
@@ -202,7 +397,7 @@ export async function printBookingReceipt(booking, settings = {}) {
 
     /* WATERMARK LAYER (LOGO + DIAGONAL TEXT) */
     .watermark-layer {
-      position: fixed;
+      position: absolute;
       inset: 0;
       width: 210mm;
       height: 297mm;
@@ -238,14 +433,18 @@ export async function printBookingReceipt(booking, settings = {}) {
       top: 56%;
       right: 22mm;
       transform: rotate(-18deg);
-      border: 3px solid ${isPaid ? 'rgba(5, 150, 105, 0.18)' : 'rgba(217, 119, 6, 0.16)'};
-      color: ${isPaid ? 'rgba(5, 150, 105, 0.22)' : 'rgba(217, 119, 6, 0.20)'};
+      border: 3px solid rgba(5, 150, 105, 0.18);
+      color: rgba(5, 150, 105, 0.22);
       padding: 4px 14px;
       border-radius: 8px;
       font-size: 20px;
       font-weight: 900;
       letter-spacing: 3px;
       text-transform: uppercase;
+    }
+    .watermark-status-stamp.is-unpaid {
+      border-color: rgba(217, 119, 6, 0.16);
+      color: rgba(217, 119, 6, 0.20);
     }
 
     /* MAIN CONTENT LAYER ABOVE WATERMARK */
@@ -578,195 +777,44 @@ export async function printBookingReceipt(booking, settings = {}) {
       color: #3D524A;
       letter-spacing: 0.3px;
     }
-  </style>
+  `;
+}
+
+function buildHtmlDocument(title, bodyHtml, isMultiPage = false, includeScreenToolbar = false) {
+  const toolbarCss = includeScreenToolbar
+    ? `
+      @media screen {
+        body { background: #E7E5E0; padding: 16px 0; }
+        .a4-page { margin: 0 auto 16px auto; box-shadow: 0 12px 32px rgba(16, 35, 29, 0.14); }
+        .screen-print-bar {
+          position: fixed; top: 14px; right: 18px; z-index: 9999;
+          background: #10231D; color: #F4EFE6; padding: 10px 16px;
+          border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 700;
+          border: 1px solid #E9A23B; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+      }
+      @media print { .screen-print-bar { display: none !important; } }
+    `
+    : '';
+  const toolbarHtml = includeScreenToolbar
+    ? `<button class="screen-print-bar" onclick="window.print()">Print / Save as PDF</button>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${esc(title)}</title>
+  <style>${buildReceiptCss(isMultiPage)}${toolbarCss}</style>
 </head>
 <body>
-  <div class="a4-page">
-    <div class="top-accent-bar"></div>
-    <div class="bottom-accent-bar"></div>
-
-    <!-- Watermark Layer -->
-    <div class="watermark-layer">
-      <img src="${esc(logoSrc)}" alt="" class="watermark-logo" />
-      <div class="watermark-diagonal">${esc(businessName.toUpperCase())}</div>
-      <div class="watermark-status-stamp">${isPaid ? 'PAID IN FULL' : 'OFFICIAL BILL'}</div>
-    </div>
-
-    <!-- Foreground Content -->
-    <div class="content-layer">
-      <!-- Header -->
-      <div class="header-row">
-        <div class="brand-box">
-          <img src="${esc(logoSrc)}" alt="${esc(businessName)}" class="brand-logo" />
-          <div>
-            <h1 class="brand-name">${esc(businessName)}</h1>
-            <p class="brand-tag">${esc(businessTagline)}</p>
-            <div class="brand-meta">
-              <div><strong>Head Office:</strong> ${esc(businessAddress)}</div>
-              <div><strong>Helpline:</strong> ${esc(businessPhone)} &nbsp;|&nbsp; <strong>Email:</strong> ${esc(businessEmail)}</div>
-              ${gstNumber ? `<div><strong>GSTIN:</strong> ${esc(gstNumber)}</div>` : ''}
-            </div>
-          </div>
-        </div>
-
-        <div class="invoice-meta-box">
-          <div class="doc-badge">${gstAmount > 0 ? 'Tax Invoice & Receipt' : 'Service Bill & Receipt'}</div>
-          <table class="meta-table">
-            <tr>
-              <td class="meta-label">Receipt No:</td>
-              <td class="meta-val">${esc(invoiceNo)}</td>
-            </tr>
-            <tr>
-              <td class="meta-label">Booking ID:</td>
-              <td class="meta-val">${esc(bookingCode)}</td>
-            </tr>
-            <tr>
-              <td class="meta-label">Issue Date:</td>
-              <td class="meta-val">${esc(createdDate)}</td>
-            </tr>
-            <tr>
-              <td class="meta-label">Status:</td>
-              <td class="meta-val">${esc(statusText)}</td>
-            </tr>
-          </table>
-        </div>
-      </div>
-
-      <!-- Billed To & Service Dispatch Info -->
-      <div class="info-grid">
-        <div class="info-card">
-          <h3 class="card-heading">Billed To & Service Location</h3>
-          <div class="cust-name">${esc(customerName)}</div>
-          <div class="info-line"><strong>Phone:</strong> ${esc(customerPhone)}</div>
-          ${customerEmail ? `<div class="info-line"><strong>Email:</strong> ${esc(customerEmail)}</div>` : ''}
-          <div class="info-line"><strong>Address:</strong> ${esc(fullAddress)}</div>
-        </div>
-
-        <div class="info-card">
-          <h3 class="card-heading">Schedule & Payment Details</h3>
-          <div class="info-line"><strong>Service Date:</strong> ${esc(serviceDate)}</div>
-          <div class="info-line"><strong>Arrival Slot:</strong> ${esc(serviceWindow)}</div>
-          ${supName ? `<div class="info-line"><strong>Supervisor:</strong> ${esc(supName)}${supPhone ? ` (${esc(supPhone)})` : ''}</div>` : ''}
-          <div class="info-line">
-            <strong>Payment:</strong> <span class="status-pill">${isPaid ? 'Paid' : 'Pending'}</span>
-            &nbsp;(${esc(paymentModeLabel)})
-          </div>
-          ${txId ? `<div class="info-line"><strong>Txn / Ref ID:</strong> <span style="font-family:monospace;">${esc(txId)}</span>${paidAtStr ? ` · ${esc(paidAtStr)}` : ''}</div>` : ''}
-        </div>
-      </div>
-
-      <!-- Services Table -->
-      <div class="items-section">
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th class="col-num">#</th>
-              <th class="col-desc">Service Description &amp; Package</th>
-              <th class="col-qty">Qty</th>
-              <th class="col-rate">Rate</th>
-              <th class="col-amt">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemRowsHtml || `
-              <tr>
-                <td colspan="5" style="text-align:center; padding:16px; color:#6B8077;">No itemized services listed</td>
-              </tr>
-            `}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Terms & Totals -->
-      <div class="summary-row">
-        <div class="notes-box">
-          <h3 class="card-heading">Service Assurance &amp; Terms</h3>
-          <ul>
-            <li><strong>48-Hour Re-Clean Guarantee:</strong> Report any missed spot within 48 hours for a complimentary touch-up.</li>
-            <li><strong>Eco-Safe Chemicals:</strong> Industrial Taski / Diversty hospital-grade solutions safe for kids &amp; pets.</li>
-            <li><strong>OTP Verification:</strong> Service completion &amp; supervisor visit verified via customer arrival OTP.</li>
-            ${booking.notes ? `<li><strong>Customer Note:</strong> "${esc(booking.notes)}"</li>` : ''}
-          </ul>
-        </div>
-
-        <div class="totals-box">
-          <h3 class="card-heading">Billing Summary</h3>
-          ${mrpTotal > subtotal ? `
-            <div class="tot-line">
-              <span>Standard MRP Total</span>
-              <span class="tot-val" style="text-decoration:line-through; color:#9CA3AF;">${formatINR(mrpTotal)}</span>
-            </div>
-            <div class="tot-line discount">
-              <span>Special Offer Savings</span>
-              <span class="tot-val">-${formatINR(packageDiscount)}</span>
-            </div>
-          ` : ''}
-          <div class="tot-line">
-            <span>Services Subtotal</span>
-            <span class="tot-val">${formatINR(subtotal)}</span>
-          </div>
-          ${outstationSurcharge > 0 ? `
-            <div class="tot-line">
-              <span>Outstation Travel Surcharge</span>
-              <span class="tot-val">+${formatINR(outstationSurcharge)}</span>
-            </div>
-          ` : ''}
-          ${couponDiscount > 0 ? `
-            <div class="tot-line discount">
-              <span>Coupon Applied ${couponCode ? `(${esc(couponCode)})` : ''}</span>
-              <span class="tot-val">-${formatINR(couponDiscount)}</span>
-            </div>
-          ` : ''}
-          ${platformChargeAmount > 0 ? `
-            <div class="tot-line">
-              <span>${esc(platformChargeLabel)}</span>
-              <span class="tot-val">+${formatINR(platformChargeAmount)}</span>
-            </div>
-          ` : ''}
-          ${gstAmount > 0 ? `
-            <div class="tot-line">
-              <span>GST (${gstPercentage}%)</span>
-              <span class="tot-val">+${formatINR(gstAmount)}</span>
-            </div>
-          ` : ''}
-
-          <div class="grand-total-bar">
-            <span>${isPaid ? 'Total Amount Paid' : 'Total Payable'}</span>
-            <span class="grand-total-amt">${formatINR(grandTotal)}</span>
-          </div>
-
-          ${customerSaved > 0 ? `
-            <div class="saved-banner">
-              Total Customer Savings: ${formatINR(customerSaved)}
-            </div>
-          ` : ''}
-        </div>
-      </div>
-
-      <!-- Footer & Signatory -->
-      <div>
-        <div class="footer-sign-row">
-          <div class="declaration">
-            <strong>Declaration:</strong> This is a system-generated official bill and service receipt issued by ${esc(businessName)}. All prices and taxes shown reflect the confirmed service summary for Booking #${esc(bookingCode)}. For billing support, reach us at ${esc(businessPhone)}.
-          </div>
-          <div class="sign-box">
-            <div class="seal-ring">
-              <span>${esc(businessName)}</span>
-              <span>• Verified Digital Seal •</span>
-            </div>
-            <div class="sign-line">Authorized Signatory</div>
-          </div>
-        </div>
-        <div class="thank-you">
-          Thank you for choosing ${esc(businessName)} — Spotless Homes. Zero Stress.
-        </div>
-      </div>
-    </div>
-  </div>
+  ${toolbarHtml}
+  ${bodyHtml}
 </body>
 </html>`;
+}
 
-  // Create invisible iframe for clean A4 print / Save as PDF without popup blocker issues
+function triggerHtmlPrint(html) {
   const existingIframe = document.getElementById('max-print-receipt-frame');
   if (existingIframe) {
     existingIframe.remove();
@@ -802,11 +850,96 @@ export async function printBookingReceipt(booking, settings = {}) {
     }, 60000);
   };
 
-  // Ensure images inside iframe are decoded before opening print preview
   if (iframe.contentWindow.document.readyState === 'complete') {
     setTimeout(triggerPrint, 250);
   } else {
     iframe.onload = () => setTimeout(triggerPrint, 250);
   }
+}
+
+/**
+ * Generates an A4-sized PDF-ready Service Bill / Official Receipt with Logo & Watermark
+ * and triggers the native Print / Save as PDF dialog cleanly via an isolated iframe.
+ */
+export async function printBookingReceipt(booking, settings = {}) {
+  if (!booking) return;
+  const logoSrc = await getLogoDataUrl();
+  const businessName = settings?.businessName || 'Max Housekeeping Service';
+  const bookingCode = booking.bookingCode || 'MH-BOOKING';
+  const bodyHtml = buildReceiptPageBody(booking, settings, logoSrc);
+  const html = buildHtmlDocument(`Receipt_${bookingCode}_${businessName.replace(/\s+/g, '_')}`, bodyHtml, false, false);
+  triggerHtmlPrint(html);
+}
+
+/**
+ * Generates a single combined multi-page A4 document (default admin GST download mode)
+ * where each booking bill sits on its own A4 page with sequential GST Bill Numbers.
+ */
+export async function printCombinedGstBills(bookings = [], settings = {}) {
+  if (!Array.isArray(bookings) || bookings.length === 0) return;
+  const logoSrc = await getLogoDataUrl();
+  const businessName = settings?.businessName || 'Max Housekeeping Service';
+  const pagesHtml = bookings.map((b) => buildReceiptPageBody(b, settings, logoSrc)).join('\n');
+  const firstBill = bookings[0]?.billNumber || bookings[0]?.bookingCode || 'Start';
+  const lastBill = bookings[bookings.length - 1]?.billNumber || bookings[bookings.length - 1]?.bookingCode || 'End';
+  const html = buildHtmlDocument(
+    `GST_Bills_${firstBill}_to_${lastBill}_${businessName.replace(/\s+/g, '_')}`,
+    pagesHtml,
+    bookings.length > 1,
+    false
+  );
+  triggerHtmlPrint(html);
+}
+
+/**
+ * Packages individual A4 GST bill files + an IST CSV summary into a downloadable .zip archive.
+ */
+export async function downloadGstBillsZip(bookings = [], settings = {}, zipFilename) {
+  if (!Array.isArray(bookings) || bookings.length === 0) return;
+  const logoSrc = await getLogoDataUrl();
+  const zip = new JSZip();
+  const csvRows = [
+    ['Bill No', 'Booking Code', 'Customer Name', 'Phone', 'Service Date (IST)', 'Payment Status', 'Payment Mode', 'Subtotal', 'GST', 'Total', 'Paid At (IST)', 'Bill Issued At (IST)']
+  ];
+
+  for (const booking of bookings) {
+    const billNo = booking.billNumber != null ? String(booking.billNumber).padStart(4, '0') : 'UNBILLED';
+    const bookingCode = booking.bookingCode || 'BOOKING';
+    const pageHtml = buildReceiptPageBody(booking, settings, logoSrc);
+    const fullDoc = buildHtmlDocument(`Bill_${billNo}_${bookingCode}`, pageHtml, false, true);
+    zip.file(`Bill_${billNo}_${bookingCode}.html`, fullDoc);
+
+    const totals = booking.totals || {};
+    csvRows.push([
+      booking.billNumber ?? '',
+      bookingCode,
+      booking.customer?.name || '',
+      booking.customer?.phone || '',
+      booking.assignedSlot?.date || booking.slot?.date || '',
+      booking.paymentStatus || '',
+      booking.paymentMode || '',
+      totals.subtotal ?? 0,
+      totals.gstAmount ?? 0,
+      totals.total ?? booking.total ?? 0,
+      booking.paymentDetails?.paidAt ? formatDateIST(booking.paymentDetails.paidAt) : '',
+      booking.billIssuedAt ? formatDateIST(booking.billIssuedAt) : ''
+    ]);
+  }
+
+  const csvContent = csvRows
+    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  zip.file('GST_Bills_Summary_IST.csv', csvContent);
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const todayIst = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  a.href = url;
+  a.download = zipFilename || `MaxHousekeeping_GST_Bills_${todayIst}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
