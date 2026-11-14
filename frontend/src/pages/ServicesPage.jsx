@@ -7,6 +7,7 @@ import { useBooking } from '../context/BookingContext';
 import CustomSelect from '../components/common/CustomSelect';
 import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
+import ServiceShowcaseCarousel from '../components/common/ServiceShowcaseCarousel';
 import SEO from '../components/common/SEO';
 
 export default function ServicesPage() {
@@ -678,6 +679,9 @@ export default function ServicesPage() {
             })}
           </div>
         )}
+
+        {/* Service Showcase Carousel */}
+        <ServiceShowcaseCarousel className="mt-14" />
 
         {/* Instagram Reel Consultation Banner */}
         <div className="mt-16 p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">

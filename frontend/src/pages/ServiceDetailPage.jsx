@@ -8,7 +8,6 @@ import {
   LuCalendar,
   LuArrowLeft,
   LuSparkles,
-  LuMoveHorizontal,
   LuVideo
 } from 'react-icons/lu';
 import { FaInstagram, FaYoutube } from 'react-icons/fa6';
@@ -17,6 +16,7 @@ import { useBooking } from '../context/BookingContext';
 import { useToast } from '../context/ToastContext';
 import { getServiceIcon } from '../utils/iconHelper';
 import ServiceCarousel from '../components/common/ServiceCarousel';
+import ServiceShowcaseCarousel from '../components/common/ServiceShowcaseCarousel';
 import SEO from '../components/common/SEO';
 
 function isYouTubeUrl(url) {
@@ -236,7 +236,6 @@ export default function ServiceDetailPage() {
   const [service, setService] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState('');
-  const [sliderPosition, setSliderPosition] = useState(50); // Before/After slider
 
   const { addItem, selectedCity, settings } = useBooking();
   const { toast } = useToast();
@@ -551,70 +550,8 @@ export default function ServiceDetailPage() {
           </div>
         )}
 
-        {/* Interactive Before & After Demonstration Slider */}
-        <div className="p-8 rounded-3xl bg-[#ECE5D8] border border-[#E2D9C8] mb-14">
-          <div className="text-center max-w-xl mx-auto mb-6">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E9A23B]">
-              RESULTS YOU CAN SEE
-            </span>
-            <h3 className="font-display font-bold text-2xl text-[#10231D] mt-1">
-              Before & After Demonstration
-            </h3>
-            <p className="text-xs text-[#6B8077] mt-1">
-              Drag the brass slider horizontally to compare surface restoration.
-            </p>
-          </div>
-
-          {/* Slider Container */}
-          <div className="relative w-full max-w-2xl mx-auto h-72 sm:h-96 rounded-2xl overflow-hidden select-none border-2 border-[#10231D]">
-            {/* After Image (Full width background) */}
-            <img
-              src="/media/services/full-home-deep-cleaning.jpg"
-              alt="Clean restored surface"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <span className="absolute bottom-4 right-4 px-2.5 py-1 rounded bg-[#10231D]/80 text-[#F4EFE6] text-[11px] font-bold">
-              AFTER (Restored)
-            </span>
-
-            {/* Before Image (Clipped overlay) */}
-            <div
-              className="absolute inset-0 overflow-hidden"
-              style={{ width: `${sliderPosition}%` }}
-            >
-              <img
-                src="/media/services/kitchen-deep-cleaning.jpg"
-                alt="Uncleaned surface before service"
-                className="absolute inset-0 w-[672px] h-full object-cover filter saturate-50 contrast-125"
-                style={{ maxWidth: 'none' }}
-              />
-              <span className="absolute bottom-4 left-4 px-2.5 py-1 rounded bg-[#10231D]/80 text-[#F4EFE6] text-[11px] font-bold">
-                BEFORE (Dust & Grime)
-              </span>
-            </div>
-
-            {/* Drag Handle Divider */}
-            <div
-              className="absolute top-0 bottom-0 w-1 bg-[#E9A23B] cursor-ew-resize flex items-center justify-center"
-              style={{ left: `${sliderPosition}%` }}
-            >
-              <div className="w-8 h-8 rounded-full bg-[#E9A23B] text-[#10231D] flex items-center justify-center font-bold text-xs shadow-lg">
-                <LuMoveHorizontal className="w-4 h-4 stroke-[2.5]" />
-              </div>
-            </div>
-
-            {/* Invisible Range Input for accessibility and dragging */}
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={sliderPosition}
-              onChange={(e) => setSliderPosition(e.target.value)}
-              className="absolute inset-0 opacity-0 cursor-ew-resize w-full h-full"
-              aria-label="Before after comparison slider"
-            />
-          </div>
-        </div>
+        {/* Service Showcase Carousel */}
+        <ServiceShowcaseCarousel className="mb-14" />
 
         {/* Instagram Reel Transformation Callout */}
         <div className="mt-12 p-6 sm:p-8 rounded-3xl bg-[#10231D] text-[#F4EFE6] border border-[#2C4A3E] flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">

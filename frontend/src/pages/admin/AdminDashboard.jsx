@@ -6871,7 +6871,7 @@ export default function AdminDashboard() {
             TAB: GST BILLING & SEQUENTIAL BILL GENERATOR
         ======================================================== */}
         {activeTab === 'billing' && (
-          <AdminGstBillingSection settings={settings} />
+          <AdminGstBillingSection settings={settingsForm} />
         )}
 
         {/* ========================================================
