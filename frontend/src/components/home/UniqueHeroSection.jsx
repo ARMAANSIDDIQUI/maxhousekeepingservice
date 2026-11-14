@@ -324,7 +324,7 @@ export default function UniqueHeroSection({ services = [] }) {
                     : { height: 'auto', maxHeight: desktopMode === 'tall' ? '100vh' : 'calc(100vh - 92px)' }
                 }
                 className={`w-full ${videoFitClass} object-center block`}
-                poster="/media/site/hero-clean-home.jpg"
+                poster="/logo.png"
               />
             </motion.div>
           </AnimatePresence>
