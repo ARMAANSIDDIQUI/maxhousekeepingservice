@@ -42,6 +42,11 @@ export const DEFAULT_REALISTIC_ICON = '/icons/realistic/generalclean.png';
 
 // Comprehensive 3D Miniature Realistic Icons (Every file verified on disk in public/icons/realistic/)
 export const REALISTIC_ICONS = {
+  // 0. Hotel & Hospitality
+  hotel: '/icons/realistic/hotel.png',
+  resort: '/icons/realistic/hotel.png',
+  hospitality: '/icons/realistic/hotel.png',
+
   // 1. Sofa & Upholstery
   sofa: '/icons/realistic/sofa.png',
   armchair: '/icons/realistic/sofa.png',

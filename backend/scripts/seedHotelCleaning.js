@@ -46,7 +46,7 @@ async function run() {
       'Specialized hospitality and hotel deep cleaning by uniformed Max Housekeeping technicians. Covers guest room sanitization, furniture & bedside wiping, carpet vacuuming, glass & mirror polishing, and washroom descaling using hospital-grade eco-safe solutions.',
     duration: '2-4 hrs',
     icon: 'Building2',
-    realisticIcon: 'office',
+    realisticIcon: 'hotel',
     pricingType: 'unit',
     pricingUnit: 'sq_ft',
     unitLabel: 'Sq. Ft.',
