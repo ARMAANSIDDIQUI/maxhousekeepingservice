@@ -819,7 +819,7 @@ function buildHtmlDocument(title, bodyHtml, isMultiPage = false, includeScreenTo
 </html>`;
 }
 
-function triggerHtmlPrint(html) {
+function triggerHtmlPrint(html, pdfTitle = '') {
   const existingIframe = document.getElementById('max-print-receipt-frame');
   if (existingIframe) {
     existingIframe.remove();
@@ -842,11 +842,21 @@ function triggerHtmlPrint(html) {
   iframeDoc.close();
 
   const triggerPrint = () => {
+    const prevTitle = document.title;
+    if (pdfTitle) {
+      document.title = pdfTitle;
+    }
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     } catch (err) {
       console.error('Print trigger error:', err);
+    } finally {
+      if (pdfTitle) {
+        setTimeout(() => {
+          document.title = prevTitle;
+        }, 1500);
+      }
     }
     setTimeout(() => {
       if (iframe && iframe.parentNode) {
@@ -869,31 +879,31 @@ function triggerHtmlPrint(html) {
 export async function printBookingReceipt(booking, settings = {}) {
   if (!booking) return;
   const logoSrc = await getLogoDataUrl();
-  const businessName = settings?.businessName || 'Max Housekeeping Service';
-  const bookingCode = booking.bookingCode || 'MH-BOOKING';
+  const bookingDate = booking.assignedSlot?.date || booking.slot?.date || formatDateIST(booking.createdAt || new Date());
+  const pdfTitle = `max house keeping bill (${bookingDate})`;
   const bodyHtml = buildReceiptPageBody(booking, settings, logoSrc);
-  const html = buildHtmlDocument(`Receipt_${bookingCode}_${businessName.replace(/\s+/g, '_')}`, bodyHtml, false, false);
-  triggerHtmlPrint(html);
+  const html = buildHtmlDocument(pdfTitle, bodyHtml, false, false);
+  triggerHtmlPrint(html, pdfTitle);
 }
 
 /**
  * Generates a single combined multi-page A4 document (default admin GST download mode)
  * where each booking bill sits on its own A4 page with sequential GST Bill Numbers.
  */
-export async function printCombinedGstBills(bookings = [], settings = {}) {
+export async function printCombinedGstBills(bookings = [], settings = {}, dateRange = {}) {
   if (!Array.isArray(bookings) || bookings.length === 0) return;
   const logoSrc = await getLogoDataUrl();
-  const businessName = settings?.businessName || 'Max Housekeeping Service';
   const pagesHtml = bookings.map((b) => buildReceiptPageBody(b, settings, logoSrc)).join('\n');
-  const firstBill = bookings[0]?.billNumber || bookings[0]?.bookingCode || 'Start';
-  const lastBill = bookings[bookings.length - 1]?.billNumber || bookings[bookings.length - 1]?.bookingCode || 'End';
+  const fromDate = dateRange.startDate || bookings[0]?.slot?.date || formatDateIST(bookings[0]?.createdAt || new Date());
+  const toDate = dateRange.endDate || bookings[bookings.length - 1]?.slot?.date || fromDate;
+  const pdfTitle = `max house keeping bill (${fromDate} - ${toDate})`;
   const html = buildHtmlDocument(
-    `GST_Bills_${firstBill}_to_${lastBill}_${businessName.replace(/\s+/g, '_')}`,
+    pdfTitle,
     pagesHtml,
     bookings.length > 1,
     false
   );
-  triggerHtmlPrint(html);
+  triggerHtmlPrint(html, pdfTitle);
 }
 
 /**

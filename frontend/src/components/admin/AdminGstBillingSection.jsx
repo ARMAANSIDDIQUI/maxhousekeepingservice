@@ -177,10 +177,11 @@ export default function AdminGstBillingSection({ settings = {} }) {
       toast.success(res.message || 'Bill numbers verified & locked.');
 
       if (downloadMode === 'zip') {
-        await downloadGstBillsZip(finalBookings, settings);
+        const zipName = `max house keeping bill (${startDate || 'start'} - ${endDate || 'end'}).zip`;
+        await downloadGstBillsZip(finalBookings, settings, zipName);
         toast.success(`Downloaded ZIP with ${finalBookings.length} GST bill(s).`);
       } else {
-        await printCombinedGstBills(finalBookings, settings);
+        await printCombinedGstBills(finalBookings, settings, { startDate, endDate });
       }
 
       await fetchBills();
