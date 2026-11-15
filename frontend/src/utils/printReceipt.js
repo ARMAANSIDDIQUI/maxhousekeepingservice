@@ -223,7 +223,7 @@ function buildReceiptPageBody(booking, settings = {}, logoSrc = '/logo.png') {
           <div class="info-line"><strong>Arrival Slot:</strong> ${esc(serviceWindow)}</div>
           ${supName ? `<div class="info-line"><strong>Supervisor:</strong> ${esc(supName)}${supPhone ? ` (${esc(supPhone)})` : ''}</div>` : ''}
           <div class="info-line">
-            <strong>Payment:</strong> <span class="status-pill">${isPaid ? 'Paid' : 'Pending'}</span>
+            <strong>Payment:</strong> <span class="status-pill ${isPaid ? 'is-paid' : 'is-unpaid'}">${isPaid ? 'Paid' : 'Pending'}</span>
             &nbsp;(${esc(paymentModeLabel)})
           </div>
           ${txId ? `<div class="info-line"><strong>Txn / Ref ID:</strong> <span style="font-family:monospace;">${esc(txId)}</span>${paidAtStr ? ` · ${esc(paidAtStr)}` : ''}</div>` : ''}
@@ -581,9 +581,14 @@ function buildReceiptCss(isMultiPage = false) {
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      background: ${isPaid ? '#D1FAE5' : '#FEF3C7'};
-      color: ${isPaid ? '#065F46' : '#92400E'};
-      border: 1px solid ${isPaid ? '#6EE7B7' : '#FCD34D'};
+      background: #D1FAE5;
+      color: #065F46;
+      border: 1px solid #6EE7B7;
+    }
+    .status-pill.is-unpaid {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FCD34D;
     }
 
     /* SERVICE ITEMS TABLE */
