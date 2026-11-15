@@ -44,7 +44,7 @@ function formatINR(val) {
 }
 
 export default function AdminGstBillingSection({ settings = {} }) {
-  const toast = useToast();
+  const { toast } = useToast();
   const [startDate, setStartDate] = useState(getMonthStartIstString);
   const [endDate, setEndDate] = useState(getTodayIstString);
   const [dateField, setDateField] = useState('slot.date');
