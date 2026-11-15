@@ -2376,62 +2376,67 @@ export async function assignBillNumbers(req, res, next) {
     }
 
     const alreadyBilled = bookings.filter(b => b.billNumber != null);
-    const toBill = bookings.filter(b => b.billNumber == null);
+    const proposedNumbers = bookings.map((_, idx) => parsedStart + idx);
+
+    // Check if any OTHER booking outside the selected batch already owns one of the proposed bill numbers
+    const conflicts = await Booking.find({
+      _id: { $nin: uniqueIds },
+      billNumber: { $in: proposedNumbers }
+    })
+      .select('billNumber bookingCode')
+      .lean();
+
+    if (conflicts.length > 0) {
+      const nextSuggestedSerial = await getNextAvailableBillNumber();
+      const conflictingNumbers = conflicts.map(c => c.billNumber).sort((a, b) => a - b);
+      return res.status(409).json({
+        success: false,
+        message: `Bill number(s) already issued to other bookings and cannot be repeated: ${conflictingNumbers.join(', ')}. Next available serial is ${nextSuggestedSerial}.`,
+        conflictingNumbers,
+        conflictingBookings: conflicts,
+        nextSuggestedSerial
+      });
+    }
+
+    // Clear existing billNumbers on selected batch first so re-numbering (e.g. 1,2,3 -> 2,3,4) never hits transient unique index overlap
+    if (alreadyBilled.length > 0) {
+      await Booking.updateMany(
+        { _id: { $in: uniqueIds } },
+        { $unset: { billNumber: 1 } }
+      );
+    }
 
     let assignedCount = 0;
-
-    if (toBill.length > 0) {
-      const proposedNumbers = toBill.map((_, idx) => parsedStart + idx);
-      const conflicts = await Booking.find({ billNumber: { $in: proposedNumbers } })
-        .select('billNumber bookingCode')
-        .lean();
-
-      if (conflicts.length > 0) {
-        const nextSuggestedSerial = await getNextAvailableBillNumber();
-        const conflictingNumbers = conflicts.map(c => c.billNumber).sort((a, b) => a - b);
-        return res.status(409).json({
-          success: false,
-          message: `Bill number(s) already issued and cannot be repeated: ${conflictingNumbers.join(', ')}. Next available serial is ${nextSuggestedSerial}.`,
-          conflictingNumbers,
-          conflictingBookings: conflicts,
-          nextSuggestedSerial
-        });
-      }
-
-      const issuedAt = new Date();
-      for (let i = 0; i < toBill.length; i++) {
-        const booking = toBill[i];
-        const serialToAssign = parsedStart + i;
-        try {
-          const updated = await Booking.findOneAndUpdate(
-            {
-              _id: booking._id,
-              $or: [{ billNumber: { $exists: false } }, { billNumber: null }]
-            },
-            {
-              $set: {
-                billNumber: serialToAssign,
-                billIssuedAt: issuedAt,
-                billIssuedBy: req.user?._id
-              }
-            },
-            { new: true }
-          );
-          if (updated) {
-            assignedCount += 1;
-          }
-        } catch (err) {
-          if (err?.code === 11000) {
-            const nextSuggestedSerial = await getNextAvailableBillNumber();
-            return res.status(409).json({
-              success: false,
-              message: `Bill number ${serialToAssign} was just claimed by another request. Next available serial is ${nextSuggestedSerial}.`,
-              conflictingNumbers: [serialToAssign],
-              nextSuggestedSerial
-            });
-          }
-          throw err;
+    const issuedAt = new Date();
+    for (let i = 0; i < bookings.length; i++) {
+      const booking = bookings[i];
+      const serialToAssign = parsedStart + i;
+      try {
+        const updated = await Booking.findByIdAndUpdate(
+          booking._id,
+          {
+            $set: {
+              billNumber: serialToAssign,
+              billIssuedAt: booking.billIssuedAt || issuedAt,
+              billIssuedBy: req.user?._id
+            }
+          },
+          { new: true }
+        );
+        if (updated) {
+          assignedCount += 1;
         }
+      } catch (err) {
+        if (err?.code === 11000) {
+          const nextSuggestedSerial = await getNextAvailableBillNumber();
+          return res.status(409).json({
+            success: false,
+            message: `Bill number ${serialToAssign} was just claimed by another request. Next available serial is ${nextSuggestedSerial}.`,
+            conflictingNumbers: [serialToAssign],
+            nextSuggestedSerial
+          });
+        }
+        throw err;
       }
     }
 
@@ -2445,9 +2450,7 @@ export async function assignBillNumbers(req, res, next) {
 
     res.status(200).json({
       success: true,
-      message: assignedCount > 0
-        ? `Assigned ${assignedCount} new bill number(s).`
-        : 'All selected bookings already have immutable bill numbers.',
+      message: `Prepared ${finalBookings.length} GST bill(s) (#${parsedStart} to #${parsedStart + finalBookings.length - 1}).`,
       bookings: finalBookings,
       assignedCount,
       alreadyBilledCount: alreadyBilled.length,

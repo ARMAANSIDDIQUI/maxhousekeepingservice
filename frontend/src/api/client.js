@@ -52,7 +52,10 @@ api.interceptors.response.use(
     if (error.response && error.response.data) {
       const serverMsg = error.response.data.message || error.response.data.error;
       if (serverMsg) {
-        return Promise.reject(new Error(serverMsg));
+        const formattedErr = new Error(serverMsg);
+        formattedErr.status = error.response.status;
+        formattedErr.data = error.response.data;
+        return Promise.reject(formattedErr);
       }
     }
     return Promise.reject(error);

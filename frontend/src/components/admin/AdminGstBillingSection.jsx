@@ -82,9 +82,6 @@ export default function AdminGstBillingSection({ settings = {} }) {
       setNextSuggestedSerial(suggested);
       setTotalUsedBills(Number(res?.totalUsedBills || 0));
       setIstNow(res?.istNow || '');
-      if (!serialTouched) {
-        setStartSerial(String(suggested));
-      }
     } catch (err) {
       toast.error(err?.message || 'Failed to load GST billing records.');
     } finally {
@@ -106,12 +103,8 @@ export default function AdminGstBillingSection({ settings = {} }) {
     let cursor = parsedSerial;
     for (const b of bills) {
       if (!selectedIds.includes(b._id)) continue;
-      if (b.billNumber != null) {
-        map[b._id] = { number: b.billNumber, isExisting: true };
-      } else {
-        map[b._id] = { number: cursor, isExisting: false };
-        cursor += 1;
-      }
+      map[b._id] = { number: cursor, isExisting: b.billNumber === cursor };
+      cursor += 1;
     }
     return map;
   }, [bills, selectedIds, parsedSerial, isSerialValid]);
@@ -179,8 +172,6 @@ export default function AdminGstBillingSection({ settings = {} }) {
 
       if (res.nextSuggestedSerial) {
         setNextSuggestedSerial(res.nextSuggestedSerial);
-        setStartSerial(String(res.nextSuggestedSerial));
-        setSerialTouched(false);
       }
 
       toast.success(res.message || 'Bill numbers verified & locked.');
@@ -337,7 +328,7 @@ export default function AdminGstBillingSection({ settings = {} }) {
                   setSerialTouched(true);
                   setConflictInfo(null);
                 }}
-                placeholder={`e.g. ${nextSuggestedSerial}`}
+                placeholder="1"
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-bold text-[#10231D] focus:outline-none ${
                   isSerialValid ? 'border-[#D8D3C9] focus:border-[#10231D]' : 'border-red-400 bg-red-50'
                 }`}
@@ -345,18 +336,32 @@ export default function AdminGstBillingSection({ settings = {} }) {
               <button
                 type="button"
                 onClick={() => {
-                  setStartSerial(String(nextSuggestedSerial));
+                  setStartSerial('1');
                   setSerialTouched(false);
                   setConflictInfo(null);
                 }}
                 className="px-3 py-2.5 rounded-xl border border-[#D8D3C9] text-xs font-bold text-[#10231D] hover:bg-[#F4EFE6] whitespace-nowrap"
-                title="Use next available unused serial number"
+                title="Reset starting serial number to 1"
               >
-                Auto #{nextSuggestedSerial}
+                Default #1
               </button>
+              {nextSuggestedSerial > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartSerial(String(nextSuggestedSerial));
+                    setSerialTouched(true);
+                    setConflictInfo(null);
+                  }}
+                  className="px-3 py-2.5 rounded-xl border border-[#D8D3C9] text-xs font-bold text-[#10231D] hover:bg-[#F4EFE6] whitespace-nowrap"
+                  title="Use next available unused serial number"
+                >
+                  Next #{nextSuggestedSerial}
+                </button>
+              )}
             </div>
             <p className="text-[11px] text-[#6B8077] mt-1">
-              Applies to {selectedStats.unbilledCount} unbilled booking(s). {selectedStats.alreadyBilledCount} already-billed booking(s) keep their locked number.
+              Numbers {selectedStats.totalSelected} selected booking(s) sequentially starting from #{isSerialValid ? parsedSerial : 1}. Duplicate numbers across different bookings are blocked.
             </p>
           </div>
 

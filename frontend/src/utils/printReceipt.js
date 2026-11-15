@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { formatDateDMY } from './date';
+import { formatDateDMY } from './date.js';
 
 let cachedLogoDataUrl = null;
 
