@@ -427,103 +427,32 @@ export default function UniqueHeroSection({ services = [] }) {
           </div>
 
           {/* Dynamic 8 Grid Tiles featuring 3D REALISTIC MINIATURE ICONS & ACCURATE PRICING */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
-            {dynamicHeroServices.map((item) => {
-              const isSelected = selectedService?.id === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedServiceId(item.id);
-                  }}
-                  className={`p-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-between gap-2.5 group ${
-                    isSelected
-                      ? 'bg-[#E9A23B] text-[#181511] border-[#E9A23B] shadow-xl scale-[1.05]'
-                      : 'bg-[#F8F5EE] hover:bg-[#EFE8DA] text-[#10231D] border-[#E2D9C8] hover:border-[#D4C8B4] hover:shadow-md'
-                  }`}
-                >
-                  {/* Realistic 3D Miniature Object Icon on Clean Background with 3D Depth */}
-                  <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center p-2 sm:p-2.5 transition-all duration-300 group-hover:scale-110 ${
-                    isSelected
-                      ? 'bg-white/40 shadow-[0_4px_14px_rgba(0,0,0,0.12),inset_0_1px_2px_rgba(255,255,255,0.8)] border border-white/50'
-                      : 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.95)] border border-[#E2D9C8]'
-                  }`}>
-                    {getServiceIcon(
-                      item.rawService || item,
-                      'w-full h-full object-contain filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.18)] transition-all duration-300 group-hover:scale-115 group-hover:-translate-y-1 group-hover:drop-shadow-[0_14px_20px_rgba(0,0,0,0.25)]'
-                    )}
-                  </div>
-
-                  <div>
-                    <p className={`text-xs font-bold leading-tight line-clamp-1 ${isSelected ? 'text-[#181511]' : 'text-[#10231D]'}`}>
-                      {item.title}
-                    </p>
-                    <span className={`text-[11px] font-mono font-bold block mt-0.5 ${isSelected ? 'text-[#181511]/90' : 'text-[#C2512D]'}`}>
-                      From ₹{Number(item.price).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Selected Service Quick Action Ribbon */}
-          {selectedService && (
-            <div className="pt-4 border-t border-[#E2D9C8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white p-2 sm:p-2.5 border border-[#E2D9C8] shrink-0 flex items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.95)]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            {dynamicHeroServices.map((item) => (
+              <Link
+                key={item.id}
+                to={`/services/${item.slug}`}
+                className="p-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-between gap-2.5 group bg-[#F8F5EE] hover:bg-[#E9A23B] text-[#10231D] hover:text-[#181511] border-[#E2D9C8] hover:border-[#E9A23B] hover:shadow-xl hover:scale-[1.03]"
+              >
+                {/* Realistic 3D Miniature Object Icon on Clean Background with 3D Depth */}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center p-2 sm:p-2.5 transition-all duration-300 group-hover:scale-110 bg-white group-hover:bg-white/60 shadow-[0_4px_16px_rgba(0,0,0,0.06),inset_0_1px_1px_rgba(255,255,255,0.95)] border border-[#E2D9C8]">
                   {getServiceIcon(
-                    selectedService.rawService || selectedService,
-                    'w-full h-full object-contain filter drop-shadow-[0_6px_12px_rgba(0,0,0,0.18)]'
+                    item.rawService || item,
+                    'w-full h-full object-contain filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.18)] transition-all duration-300 group-hover:scale-115 group-hover:-translate-y-1 group-hover:drop-shadow-[0_14px_20px_rgba(0,0,0,0.25)]'
                   )}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-[#10231D] font-display">
-                      {selectedService.title}
-                    </h3>
-                    <span className="text-xs text-emerald-800 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">
-                      Starting at ₹{Number(selectedService.price).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#5C7067] mt-0.5">
-                    {selectedService.subtitle} · Certified Max Housekeeping Specialists
-                  </p>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-3">
-                <Link
-                  to={`/services/${selectedService.slug}`}
-                  className="px-4 py-2.5 rounded-xl bg-[#F4EFE6] hover:bg-[#EAE3D4] text-[#10231D] font-bold text-xs transition-colors border border-[#E2D9C8]"
-                >
-                  Service Details
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleAddToCart(selectedService)}
-                  className={`px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all shadow-md flex items-center gap-2 cursor-pointer group ${
-                    addedAnim
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-[#E9A23B] hover:bg-[#D48E28] text-[#181511]'
-                  }`}
-                >
-                  {addedAnim ? (
-                    <>
-                      <LuCheck className="w-4 h-4 text-white" />
-                      <span>Added to Cart!</span>
-                    </>
-                  ) : (
-                    <>
-                      <LuShoppingBag className="w-4 h-4" />
-                      <span>Add to Cart</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+                <div>
+                  <p className="text-xs font-bold leading-tight line-clamp-1 text-[#10231D] group-hover:text-[#181511]">
+                    {item.title}
+                  </p>
+                  <span className="text-[11px] font-mono font-bold block mt-0.5 text-[#C2512D] group-hover:text-[#181511]/90">
+                    From ₹{Number(item.price).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
 
         </div>
       </section>
